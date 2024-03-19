@@ -1,14 +1,18 @@
 use std::marker::PhantomData;
+use crate::bit_block::BitBlock;
 use crate::block::{Block, HiBlock};
 use crate::level::Level;
+use crate::{LevelMasks, ref_or_val};
 use crate::primitive::Primitive;
+
+// TODO: rename DataBlock to Data?
 
 #[inline]
 fn level_indices<Level1Block: HiBlock>(index: usize) 
     -> (usize/*level0*/, usize/*level1*/)
 {
     // this should be const and act as const.
-    /*const*/ let level1_block_capacity_pot_exp: usize = Level1Block::SIZE_POT_EXPONENT;
+    /*const*/ let level1_block_capacity_pot_exp: usize = Level1Block::Mask::SIZE_POT_EXPONENT;
     /*const*/ let level1_block_capacity        : usize = 1 << level1_block_capacity_pot_exp;
 
     // index / LEVEL1_BLOCK_CAP
@@ -31,6 +35,22 @@ where
     level1: Level<Level1Block>,
     data  : Level<DataBlock>,
     //phantom: PhantomData<Conf>
+}
+impl<Level0Block, Level1Block, DataBlock> Default for
+    SparseBlockArray<Level0Block, Level1Block, DataBlock>
+where
+    Level0Block: HiBlock,
+    Level1Block: HiBlock,
+    DataBlock: Block,
+{
+    #[inline]
+    fn default() -> Self {
+        Self{
+            level0: Block::empty(),
+            level1: Default::default(),
+            data: Default::default(),
+        }
+    }
 }
 
 impl<Level0Block, Level1Block, DataBlock> 
@@ -139,3 +159,47 @@ where
         }
     }  */  
 }
+
+
+
+impl<Level0Block, Level1Block, DataBlock> LevelMasks for 
+    SparseBlockArray<Level0Block, Level1Block, DataBlock>
+where
+    Level0Block: HiBlock,
+    Level1Block: HiBlock,
+    DataBlock: Block + Clone,
+{
+    type Level0Mask = Level0Block::Mask;
+    #[inline]
+    fn level0_mask(&self) -> Self::Level0Mask {
+        self.level0.mask().clone()
+    }
+
+    type Level1Mask = Level1Block::Mask;
+    #[inline]
+    unsafe fn level1_mask(&self, level0_index: usize) -> Self::Level1Mask {
+        let level1_block_index = self.level0.get_or_zero(level0_index).as_usize();
+        let level1_block = self.level1.blocks().get_unchecked(level1_block_index);
+        level1_block.mask().clone()
+    }
+
+    type DataBlock = DataBlock;
+    #[inline]
+    unsafe fn data_block(&self, level0_index: usize, level1_index: usize) -> Self::DataBlock {
+        let level1_block_index = self.level0.get_or_zero(level0_index).as_usize();
+        let level1_block = self.level1.blocks().get_unchecked(level1_block_index);
+
+        let data_block_index = level1_block.get_or_zero(level1_index).as_usize();
+        let data_block = self.data.blocks().get_unchecked(data_block_index);
+        data_block.clone()
+    }
+}
+
+ref_or_val!(
+    impl <Level0Block, Level1Block, DataBlock> for 
+        ref SparseBlockArray<Level0Block, Level1Block, DataBlock>
+    where
+        Level0Block: HiBlock,
+        Level1Block: HiBlock,
+        DataBlock: Block,
+);
