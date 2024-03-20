@@ -1,3 +1,8 @@
+//! Ala "universal reference"/"forwarding reference" in C++
+//! 
+//! Ideally, we should just have blanket implementation for everything.
+//! And somehow opt-out for val/ref.
+
 pub trait RefOrVal{
     /// without ref
     type Type;

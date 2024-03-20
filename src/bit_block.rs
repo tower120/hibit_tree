@@ -3,6 +3,11 @@ use crate::bit_queue::{ArrayBitQueue, BitQueue, PrimitiveBitQueue};
 use crate::bit_utils;
 use crate::primitive_array::PrimitiveArray;
 
+// `Clone` or `Copy` is necessary, since LevelMasks
+// interface does not allow to work with references.
+// We need to make LevelMasks to return RefOrVal first.
+// This is HARD as of RUST 1.76 . We need this 
+// https://github.com/rust-lang/rust/pull/122055 at least (should appear in 1.79).
 pub trait BitBlock: Sized + Clone {
     /// 2^N bits
     const SIZE_POT_EXPONENT: usize;

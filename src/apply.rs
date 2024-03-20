@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 use crate::bit_block::BitBlock;
-use crate::{LevelMasks, RefOrVal};
+use crate::{LevelMasks, ref_or_val, RefOrVal};
 
 pub trait Op {
     type Level0Mask;
@@ -68,5 +68,7 @@ where
         )
     }
 }
+
+ref_or_val!(impl<Op, S1, S2> for Apply<Op, S1, S2>);
 
 // TODO: other array read operations
