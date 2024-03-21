@@ -9,8 +9,10 @@ mod apply;
 pub mod bit_queue;
 pub mod block;
 pub mod simple_iter;
+pub mod caching_iter;
 mod ref_or_val;
 mod level_masks;
+
 
 use std::marker::PhantomData;
 pub use ref_or_val::*;

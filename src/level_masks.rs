@@ -31,7 +31,7 @@ pub trait LevelMasks{
 /// 
 /// Use `NoState<Self>` for stateless.
 pub trait LevelMasksIterState {
-    type Container: LevelMasksIter;
+    type Container/*: LevelMasksIter*/;
     
     fn make(container: &Self::Container) -> Self;
     
@@ -117,6 +117,6 @@ pub trait LevelMasksIter: LevelMasks{
     ///
     /// indices are not checked.
     unsafe fn data_block_from_info(
-        level1_block_data: &Self::Level1BlockInfo, level1_index: usize
+        level1_block_info: &Self::Level1BlockInfo, level1_index: usize
     ) -> Self::DataBlock;
 }

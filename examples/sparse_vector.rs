@@ -3,6 +3,7 @@ use std::ops::{BitAnd, Mul};
 use wide::f32x4;
 use hi_sparse_array::{Apply, apply, BitBlock, Op, SparseBlockArray};
 use hi_sparse_array::block::{Block, FixedHiBlock};
+use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::simple_iter::SimpleBlockIter;
 
 #[derive(Clone)]
@@ -103,7 +104,7 @@ pub fn mul<'a>(v1: &'a SparseVector, v2: &'a SparseVector) -> Apply<MulOp<u64, u
 
 pub fn dot(v1: &SparseVector, v2: &SparseVector) -> f32 {
     let m = mul(v1, v2);
-    let iter = SimpleBlockIter::new(&m);
+    let iter = CachingBlockIter::new(&m);
     let mut sum = f32x4::ZERO;
     iter.for_each(|(index, block)|{
         sum += block.0;

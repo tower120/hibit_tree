@@ -1,8 +1,11 @@
 use std::marker::PhantomData;
+use std::mem::MaybeUninit;
+use std::ptr::NonNull;
 use crate::bit_block::BitBlock;
 use crate::block::{Block, HiBlock};
 use crate::level::Level;
 use crate::{LevelMasks, ref_or_val};
+use crate::level_masks::{LevelMasksIter, NoState};
 use crate::primitive::Primitive;
 
 // TODO: rename DataBlock to Data?
@@ -191,6 +194,55 @@ where
 
         let data_block_index = level1_block.get_or_zero(level1_index).as_usize();
         let data_block = self.data.blocks().get_unchecked(data_block_index);
+        data_block.clone()
+    }
+}
+
+impl<Level0Block, Level1Block, DataBlock> LevelMasksIter for 
+    SparseBlockArray<Level0Block, Level1Block, DataBlock>
+where
+    Level0Block: HiBlock,
+    Level1Block: HiBlock,
+    DataBlock: Block + Clone,
+{
+    type IterState = NoState<Self>;
+    
+    /// Points to elements in heap. Guaranteed to be stable.
+    /// This is just plain pointers with null in default:
+    /// `(*const LevelDataBlock<Conf>, *const Level1Block<Conf>)`
+    type Level1BlockInfo = (
+        Option<NonNull<DataBlock>>,       /* data array pointer */
+        Option<NonNull<Level1Block>>      /* block pointer */
+    );
+
+    #[inline]
+    unsafe fn init_level1_block_info(
+        &self, 
+        _: &mut Self::IterState, 
+        level1_block_data: &mut MaybeUninit<Self::Level1BlockInfo>, 
+        level0_index: usize
+    ) -> (Self::Level1Mask, bool) {
+        let level1_block_index = self.level0.get_or_zero(level0_index);
+        let level1_block = self.level1.blocks().get_unchecked(level1_block_index.as_usize());
+        level1_block_data.write(
+            (
+                Some(NonNull::new_unchecked(self.data.blocks().as_ptr() as *mut _)),
+                Some(NonNull::from(level1_block))
+            )
+        );
+        (level1_block.mask().clone(), !level1_block_index.is_zero())
+    }
+
+    #[inline]
+    unsafe fn data_block_from_info(
+        level1_block_info: &Self::Level1BlockInfo, 
+        level1_index: usize
+    ) -> Self::DataBlock {
+        let array_ptr = level1_block_info.0.unwrap_unchecked().as_ptr().cast_const();
+        let level1_block = level1_block_info.1.unwrap_unchecked().as_ref();
+
+        let data_block_index = level1_block.get_or_zero(level1_index);
+        let data_block = &*array_ptr.add(data_block_index.as_usize());
         data_block.clone()
     }
 }
