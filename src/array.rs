@@ -4,7 +4,7 @@ use std::ptr::NonNull;
 use crate::bit_block::BitBlock;
 use crate::block::{Block, HiBlock};
 use crate::level::Level;
-use crate::{LevelMasks, ref_or_val};
+use crate::{LevelMasks, ref_or_val, LevelMasksBorrow};
 use crate::level_masks::{LevelMasksIter, NoState};
 use crate::primitive::Primitive;
 
@@ -172,29 +172,32 @@ where
     Level1Block: HiBlock,
     DataBlock: Block + Clone,
 {
-    type Level0Mask = Level0Block::Mask;
+    type Level0MaskType = Level0Block::Mask;
+    type Level0Mask<'a> = &'a Level0Block::Mask where Self: 'a;
     #[inline]
-    fn level0_mask(&self) -> Self::Level0Mask {
-        self.level0.mask().clone()
+    fn level0_mask(&self) -> Self::Level0Mask<'_> {
+        self.level0.mask()
     }
 
-    type Level1Mask = Level1Block::Mask;
+    type Level1MaskType = Level1Block::Mask;
+    type Level1Mask<'a> = &'a Level1Block::Mask where Self: 'a;
     #[inline]
-    unsafe fn level1_mask(&self, level0_index: usize) -> Self::Level1Mask {
+    unsafe fn level1_mask(&self, level0_index: usize) -> Self::Level1Mask<'_> {
         let level1_block_index = self.level0.get_or_zero(level0_index).as_usize();
         let level1_block = self.level1.blocks().get_unchecked(level1_block_index);
-        level1_block.mask().clone()
+        level1_block.mask()
     }
 
-    type DataBlock = DataBlock;
+    type DataBlockType = DataBlock;
+    type DataBlock<'a> = &'a DataBlock where Self: 'a;
     #[inline]
-    unsafe fn data_block(&self, level0_index: usize, level1_index: usize) -> Self::DataBlock {
+    unsafe fn data_block(&self, level0_index: usize, level1_index: usize) -> Self::DataBlock<'_> {
         let level1_block_index = self.level0.get_or_zero(level0_index).as_usize();
         let level1_block = self.level1.blocks().get_unchecked(level1_block_index);
 
         let data_block_index = level1_block.get_or_zero(level1_index).as_usize();
         let data_block = self.data.blocks().get_unchecked(data_block_index);
-        data_block.clone()
+        data_block
     }
 }
 
@@ -221,7 +224,7 @@ where
         _: &mut Self::IterState, 
         level1_block_data: &mut MaybeUninit<Self::Level1BlockInfo>, 
         level0_index: usize
-    ) -> (Self::Level1Mask, bool) {
+    ) -> (Self::Level1Mask<'_>, bool) {
         let level1_block_index = self.level0.get_or_zero(level0_index);
         let level1_block = self.level1.blocks().get_unchecked(level1_block_index.as_usize());
         level1_block_data.write(
@@ -230,20 +233,22 @@ where
                 Some(NonNull::from(level1_block))
             )
         );
-        (level1_block.mask().clone(), !level1_block_index.is_zero())
+        (level1_block.mask(), !level1_block_index.is_zero())
     }
 
     #[inline]
-    unsafe fn data_block_from_info(
+    unsafe fn data_block_from_info<'container>(
         level1_block_info: &Self::Level1BlockInfo, 
         level1_index: usize
-    ) -> Self::DataBlock {
+    ) -> Self::DataBlock<'container>
+        where Self: 'container
+    {
         let array_ptr = level1_block_info.0.unwrap_unchecked().as_ptr().cast_const();
         let level1_block = level1_block_info.1.unwrap_unchecked().as_ref();
 
         let data_block_index = level1_block.get_or_zero(level1_index);
         let data_block = &*array_ptr.add(data_block_index.as_usize());
-        data_block.clone()
+        data_block
     }
 }
 
@@ -255,3 +260,23 @@ ref_or_val!(
         Level1Block: HiBlock,
         DataBlock: Block,
 );
+
+impl <Level0Block, Level1Block, DataBlock> LevelMasksBorrow
+    for SparseBlockArray<Level0Block, Level1Block, DataBlock>
+where
+    Level0Block: HiBlock,
+    Level1Block: HiBlock,
+    DataBlock: Block + Clone,
+{
+    type Type = Self;
+}
+
+impl <Level0Block, Level1Block, DataBlock> LevelMasksBorrow
+    for &SparseBlockArray<Level0Block, Level1Block, DataBlock>
+where
+    Level0Block: HiBlock,
+    Level1Block: HiBlock,
+    DataBlock: Block + Clone,
+{
+    type Type = SparseBlockArray<Level0Block, Level1Block, DataBlock>;
+}

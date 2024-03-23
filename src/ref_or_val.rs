@@ -1,7 +1,12 @@
+// TODO: remove this!!
+
 //! Ala "universal reference"/"forwarding reference" in C++
 //! 
 //! Ideally, we should just have blanket implementation for everything.
 //! And somehow opt-out for val/ref.
+
+use std::borrow::Borrow;
+use crate::{LevelMasks, IntoOwned};
 
 pub trait RefOrVal{
     /// without ref

@@ -1,24 +1,34 @@
+use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::mem::{ManuallyDrop, MaybeUninit};
-use crate::BitBlock;
+use crate::{BitBlock, IntoOwned};
 
 /// Basic interface for accessing block masks. Can work with `SimpleIter`.
+/// 
+// We need xxxxType for each concrete block/mask type to avoid the need for use `for<'a>`,
+// which is still not working (at Rust level) in cases, where we need it most. 
 pub trait LevelMasks{
-    type Level0Mask: BitBlock;
-    fn level0_mask(&self) -> Self::Level0Mask;
+    type Level0MaskType: BitBlock;
+    type Level0Mask<'a>: Borrow<Self::Level0MaskType> + IntoOwned<Self::Level0MaskType>
+        where Self: 'a;
+    fn level0_mask(&self) -> Self::Level0Mask<'_>;
 
-    type Level1Mask: BitBlock;
+    type Level1MaskType: BitBlock;
+    type Level1Mask<'a>: Borrow<Self::Level1MaskType> + IntoOwned<Self::Level1MaskType>
+        where Self: 'a;
     /// # Safety
     ///
     /// index is not checked
-    unsafe fn level1_mask(&self, level0_index: usize) -> Self::Level1Mask;
+    unsafe fn level1_mask(&self, level0_index: usize) -> Self::Level1Mask<'_>;
     
-    type DataBlock;
+    type DataBlockType;
+    type DataBlock<'a>: Borrow<Self::DataBlockType> + IntoOwned<Self::DataBlockType> 
+        where Self: 'a;
     /// # Safety
     ///
     /// indices are not checked
     unsafe fn data_block(&self, level0_index: usize, level1_index: usize)
-        -> Self::DataBlock;
+        -> Self::DataBlock<'_>;
 }
 
 /// Iterator state for LevelMasksIter.
@@ -74,6 +84,7 @@ impl<C: LevelMasksIter> LevelMasksIterState for NoState<C> {
 pub trait LevelMasksIter: LevelMasks{
     type IterState: LevelMasksIterState<Container = Self>;
     
+    // TODO: rename to xxxMeta?
     /// Level1 block related data, used to speed up data block access.
     ///
     /// Prefer POD, or any kind of drop-less, since it will be dropped
@@ -94,6 +105,7 @@ pub trait LevelMasksIter: LevelMasks{
     /// It exists - because sometimes you may have faster ways of checking emptiness,
     /// then checking simd register (bitblock) for zero in general case.
     /// For example, in BitSet - it is done by checking of block indirection index for zero.
+    /// False positive is OK, though may incur unnecessary overhead.
     /// 
     /// # Safety
     ///
@@ -109,14 +121,17 @@ pub trait LevelMasksIter: LevelMasks{
         state: &mut Self::IterState,
         level1_block_data: &mut MaybeUninit<Self::Level1BlockInfo>,
         level0_index: usize
-    ) -> (Self::Level1Mask, bool);    
+    ) -> (Self::Level1Mask<'_>, bool);    
 
     /// Called by iterator for each traversed data block.
+    /// 
+    /// `'container` is a lifetime of iterated &Self.
     /// 
     /// # Safety
     ///
     /// indices are not checked.
-    unsafe fn data_block_from_info(
+    unsafe fn data_block_from_info<'container>(
         level1_block_info: &Self::Level1BlockInfo, level1_index: usize
-    ) -> Self::DataBlock;
+    ) -> Self::DataBlock<'container>
+        where Self:'container;
 }

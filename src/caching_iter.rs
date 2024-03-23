@@ -1,32 +1,29 @@
 use std::mem::{ManuallyDrop, MaybeUninit};
 use crate::level_masks::{LevelMasksIter, LevelMasksIterState};
-use crate::{BitBlock, LevelMasks, RefOrVal};
+use crate::{BitBlock, LevelMasks, IntoOwned, RefOrVal};
 use crate::bit_queue::BitQueue;
 
-pub struct CachingBlockIter<T>
+pub struct CachingBlockIter<'a, T>
 where
-    T: RefOrVal,
-    T::Type: LevelMasksIter,
+    T: LevelMasksIter,
 {
-    container: T,
-    level0_iter: <<T::Type as LevelMasks>::Level0Mask as BitBlock>::BitsIter,
-    level1_iter: <<T::Type as LevelMasks>::Level1Mask as BitBlock>::BitsIter,
+    container: &'a T,
+    level0_iter: <T::Level0MaskType as BitBlock>::BitsIter,
+    level1_iter: <T::Level1MaskType as BitBlock>::BitsIter,
     level0_index: usize,
 
-    state: ManuallyDrop<<T::Type as LevelMasksIter>::IterState>,
-    level1_block_data: MaybeUninit<<T::Type as LevelMasksIter>::Level1BlockInfo>,
+    state: ManuallyDrop<T::IterState>,
+    level1_block_data: MaybeUninit<T::Level1BlockInfo>,
 }
 
-impl<T> CachingBlockIter<T>
+impl<'a, T> CachingBlockIter<'a, T>
 where
-    T: RefOrVal,
-    T::Type: LevelMasksIter,
+    T: LevelMasksIter,
 {
     #[inline]
-    pub fn new(container: T) -> Self {
-        let container_ref = container.as_ref();
-        let level0_iter = container_ref.level0_mask().into_bits_iter(); 
-        let state = <T::Type as LevelMasksIter>::IterState::make(container_ref); 
+    pub fn new(container: &'a T) -> Self {
+        let level0_iter = container.level0_mask().into_owned().into_bits_iter(); 
+        let state = T::IterState::make(container); 
         Self{
             container,
             
@@ -44,12 +41,11 @@ where
     }
 }
 
-impl<T> Iterator for CachingBlockIter<T>
+impl<'a, T> Iterator for CachingBlockIter<'a, T>
 where
-    T: RefOrVal,
-    T::Type: LevelMasksIter,
+    T: LevelMasksIter,
 {
-    type Item = (usize/*index*/, <T::Type as LevelMasks>::DataBlock);
+    type Item = (usize/*index*/, T::DataBlock<'a>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -64,7 +60,7 @@ where
                     let level1_mask = unsafe {
                         self.level1_block_data.assume_init_drop();
                         let (level1_mask, _) = 
-                            self.container.as_ref().init_level1_block_info(
+                            self.container.init_level1_block_info(
                                 &mut self.state,
                                 &mut self.level1_block_data,
                                 index
@@ -72,7 +68,7 @@ where
                         level1_mask
                     };
 
-                    self.level1_iter = level1_mask.into_bits_iter();
+                    self.level1_iter = level1_mask.into_owned().into_bits_iter();
                 } else {
                     return None;
                 }
@@ -80,31 +76,30 @@ where
         };
 
         let data_block = unsafe {
-            <T::Type as LevelMasksIter>::data_block_from_info(
+            T::data_block_from_info(
                 self.level1_block_data.assume_init_ref(), level1_index
             )
         };
 
         let block_index =
-            self.level0_index << <T::Type as LevelMasks>::Level1Mask::SIZE_POT_EXPONENT
+            self.level0_index << T::Level1MaskType::SIZE_POT_EXPONENT
             + level1_index;
 
         Some((block_index, data_block))
     }    
 }
 
-impl<T> Drop for CachingBlockIter<T>
+impl<'a, T> Drop for CachingBlockIter<'a, T>
 where
-    T: RefOrVal,
-    T::Type: LevelMasksIter,
+    T: LevelMasksIter
 {
     #[inline]
     fn drop(&mut self) {
         unsafe{
             self.level1_block_data.assume_init_drop();
             
-            <T::Type as LevelMasksIter>::IterState
-                ::drop(self.container.as_ref(), &mut self.state);
+            T::IterState
+                ::drop(self.container, &mut self.state);
         }
     }
 }
