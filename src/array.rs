@@ -214,6 +214,7 @@ where
     /// This is just plain pointers with null in default:
     /// `(*const LevelDataBlock<Conf>, *const Level1Block<Conf>)`
     type Level1BlockInfo = (
+        // TODO: remove this, use &self
         Option<NonNull<DataBlock>>,       /* data array pointer */
         Option<NonNull<Level1Block>>      /* block pointer */
     );
@@ -237,12 +238,11 @@ where
     }
 
     #[inline]
-    unsafe fn data_block_from_info<'container>(
+    unsafe fn data_block_from_info(
+        &self,
         level1_block_info: &Self::Level1BlockInfo, 
         level1_index: usize
-    ) -> Self::DataBlock<'container>
-        where Self: 'container
-    {
+    ) -> Self::DataBlock<'_> {
         let array_ptr = level1_block_info.0.unwrap_unchecked().as_ptr().cast_const();
         let level1_block = level1_block_info.1.unwrap_unchecked().as_ref();
 

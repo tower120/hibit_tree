@@ -46,13 +46,13 @@ impl<T: Clone> IntoOwned<T> for &T{
 }
 
 #[inline]
-pub fn apply<Op, S1, S2>(_: Op, s1: S1, s2: S2) -> Apply<Op, S1, S2>
+pub fn apply<Op, S1, S2>(op: Op, s1: S1, s2: S2) -> Apply<Op, S1, S2>
 where
     Op: apply::Op,
     S1: LevelMasksBorrow,
     S2: LevelMasksBorrow,
 {
-    Apply{s1, s2, phantom: PhantomData}
+    Apply{op, s1, s2}
 }
 
 pub trait LevelMasksBorrow: Borrow<Self::Type>{

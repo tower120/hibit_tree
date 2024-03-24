@@ -125,13 +125,11 @@ pub trait LevelMasksIter: LevelMasks{
 
     /// Called by iterator for each traversed data block.
     /// 
-    /// `'container` is a lifetime of iterated &Self.
-    /// 
     /// # Safety
     ///
     /// indices are not checked.
-    unsafe fn data_block_from_info<'container>(
+    unsafe fn data_block_from_info(
+        &self,
         level1_block_info: &Self::Level1BlockInfo, level1_index: usize
-    ) -> Self::DataBlock<'container>
-        where Self:'container;
+    ) -> Self::DataBlock<'_>;
 }

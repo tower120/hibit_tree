@@ -75,20 +75,20 @@ impl<L0, L1, LD> Default for MulOp<L0, L1, LD>{
 
 impl<L0, L1, LD> Op for MulOp<L0, L1, LD>
 where
-    L0: BitAnd<Output = L0>, L1:BitAnd<Output = L1>, LD: Mul<Output = LD>/* + Clone*/
+    L0: BitAnd<Output = L0>, L1: BitAnd<Output = L1>, LD: Mul<Output = LD>/* + Clone*/
 {
     type Level0Mask = L0;
-    fn lvl0_op(left: impl IntoOwned<L0>, right: impl IntoOwned<L0>) -> Self::Level0Mask {
+    fn lvl0_op(&self, left: impl IntoOwned<L0>, right: impl IntoOwned<L0>) -> Self::Level0Mask {
         left.into_owned() & right.into_owned()
     }
 
     type Level1Mask = L1;
-    fn lvl1_op(left: impl IntoOwned<L1>, right: impl IntoOwned<L1>) -> Self::Level1Mask {
+    fn lvl1_op(&self, left: impl IntoOwned<L1>, right: impl IntoOwned<L1>) -> Self::Level1Mask {
         left.into_owned() & right.into_owned()
     }
 
     type DataBlock = LD;
-    fn data_op(left: impl Borrow<LD> + IntoOwned<LD>, right: impl Borrow<LD> + IntoOwned<LD>) -> Self::DataBlock 
+    fn data_op(&self, left: impl Borrow<LD> + IntoOwned<LD>, right: impl Borrow<LD> + IntoOwned<LD>) -> Self::DataBlock 
     {
         left.into_owned() * right.into_owned()
     }

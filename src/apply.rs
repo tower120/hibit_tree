@@ -12,28 +12,28 @@ use crate::level_masks::{LevelMasksIter, LevelMasksIterState};
 // For now, should be good enough as-is for Apply.
 pub trait Op {
     type Level0Mask;
-    fn lvl0_op(
+    fn lvl0_op(&self,
         left : impl Borrow<Self::Level0Mask> + IntoOwned<Self::Level0Mask>,
         right: impl Borrow<Self::Level0Mask> + IntoOwned<Self::Level0Mask>
     ) -> Self::Level0Mask;
     
     type Level1Mask;
-    fn lvl1_op(
+    fn lvl1_op(&self,
         left : impl Borrow<Self::Level1Mask> + IntoOwned<Self::Level1Mask>,
         right: impl Borrow<Self::Level1Mask> + IntoOwned<Self::Level1Mask>
     ) -> Self::Level1Mask;
     
     type DataBlock;
-    fn data_op(
+    fn data_op(&self,
         left : impl Borrow<Self::DataBlock> + IntoOwned<Self::DataBlock>,
         right: impl Borrow<Self::DataBlock> + IntoOwned<Self::DataBlock>
     ) -> Self::DataBlock;
 }
 
 pub struct Apply<Op, S1, S2>{
+    pub(crate) op: Op,
     pub(crate) s1: S1,
     pub(crate) s2: S2,
-    pub(crate) phantom: PhantomData<Op>
 }
 
 impl<Op, S1, S2> LevelMasks for Apply<Op, S1, S2>
@@ -44,7 +44,7 @@ where
     S2::Type: LevelMasks<
         Level0MaskType = <S1::Type as LevelMasks>::Level0MaskType, 
         Level1MaskType = <S1::Type as LevelMasks>::Level1MaskType,
-        DataBlockType = <S1::Type as LevelMasks>::DataBlockType,
+        DataBlockType  = <S1::Type as LevelMasks>::DataBlockType,
     >,
 
     Op: self::Op<
@@ -59,7 +59,7 @@ where
     fn level0_mask(&self) -> Self::Level0Mask<'_> {
         let s1 = self.s1.borrow(); 
         let s2 = self.s2.borrow();
-        Op::lvl0_op(s1.level0_mask(), s2.level0_mask())
+        self.op.lvl0_op(s1.level0_mask(), s2.level0_mask())
     }
 
     type Level1MaskType = <S1::Type as LevelMasks>::Level1MaskType;
@@ -68,7 +68,7 @@ where
     unsafe fn level1_mask(&self, level0_index: usize) -> Self::Level1Mask<'_> {
         let s1 = self.s1.borrow(); 
         let s2 = self.s2.borrow();
-        Op::lvl1_op(
+        self.op.lvl1_op(
             s1.level1_mask(level0_index),
             s2.level1_mask(level0_index)
         )
@@ -80,7 +80,7 @@ where
     unsafe fn data_block(&self, level0_index: usize, level1_index: usize) -> Self::DataBlock<'_> {
         let s1 = self.s1.borrow(); 
         let s2 = self.s2.borrow();
-        Op::data_op(
+        self.op.data_op(
             s1.data_block(level0_index, level1_index),
             s2.data_block(level0_index, level1_index)
         )
@@ -177,24 +177,23 @@ where
             &mut state.s2, level1_block_data1, level0_index
         );
         
-        let mask = Op::lvl1_op(mask1, mask2);
+        let mask = self.op.lvl1_op(mask1, mask2);
         (mask, v1 | v2)
     }
 
     #[inline]
-    unsafe fn data_block_from_info<'container>(
+    unsafe fn data_block_from_info(
+        &self,
         level1_block_info: &Self::Level1BlockInfo, 
         level1_index: usize
-    ) -> Self::DataBlock<'container>
-        where Self: 'container
-    {
-        let m0 = <S1::Type as LevelMasksIter>::data_block_from_info(
+    ) -> Self::DataBlock<'_> {
+        let m0 = self.s1.borrow().data_block_from_info(
             &level1_block_info.0, level1_index
         );
-        let m1 = <S2::Type as LevelMasksIter>::data_block_from_info(
+        let m1 = self.s2.borrow().data_block_from_info(
             &level1_block_info.1, level1_index
         ); 
-        Op::data_op(m0, m1)
+        self.op.data_op(m0, m1)
     }
 }
 

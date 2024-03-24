@@ -77,6 +77,7 @@ where
 
         let data_block = unsafe {
             T::data_block_from_info(
+                &self.container,
                 self.level1_block_data.assume_init_ref(), level1_index
             )
         };
