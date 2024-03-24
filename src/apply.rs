@@ -147,16 +147,16 @@ where
     >
 {
     type IterState = ApplyIterState<Op, S1, S2>;
-    type Level1BlockInfo = (
-        <S1::Type as LevelMasksIter>::Level1BlockInfo, 
-        <S2::Type as LevelMasksIter>::Level1BlockInfo
+    type Level1BlockMeta = (
+        <S1::Type as LevelMasksIter>::Level1BlockMeta,
+        <S2::Type as LevelMasksIter>::Level1BlockMeta
     );
 
     #[inline]
-    unsafe fn init_level1_block_info(
-        &self, 
-        state: &mut Self::IterState, 
-        level1_block_data: &mut MaybeUninit<Self::Level1BlockInfo>, 
+    unsafe fn init_level1_block_meta(
+        &self,
+        state: &mut Self::IterState,
+        level1_block_data: &mut MaybeUninit<Self::Level1BlockMeta>,
         level0_index: usize
     ) -> (Self::Level1Mask<'_>, bool) {
         // &mut MaybeUninit<(T0, T1)> = (&mut MaybeUninit<T0>, &mut MaybeUninit<T1>) 
@@ -165,15 +165,15 @@ where
             let ptr0 = addr_of_mut!((*ptr).0);
             let ptr1 = addr_of_mut!((*ptr).1);
             (
-                &mut*mem::transmute::<_, *mut MaybeUninit<<S1::Type as LevelMasksIter>::Level1BlockInfo>>(ptr0), 
-                &mut*mem::transmute::<_, *mut MaybeUninit<<S2::Type as LevelMasksIter>::Level1BlockInfo>>(ptr1)
+                &mut*mem::transmute::<_, *mut MaybeUninit<<S1::Type as LevelMasksIter>::Level1BlockMeta>>(ptr0),
+                &mut*mem::transmute::<_, *mut MaybeUninit<<S2::Type as LevelMasksIter>::Level1BlockMeta>>(ptr1)
             )
         };   
         
-        let (mask1, v1) = self.s1.borrow().init_level1_block_info(
+        let (mask1, v1) = self.s1.borrow().init_level1_block_meta(
             &mut state.s1, level1_block_data0, level0_index
         );
-        let (mask2, v2) = self.s2.borrow().init_level1_block_info(
+        let (mask2, v2) = self.s2.borrow().init_level1_block_meta(
             &mut state.s2, level1_block_data1, level0_index
         );
         
@@ -182,15 +182,15 @@ where
     }
 
     #[inline]
-    unsafe fn data_block_from_info(
+    unsafe fn data_block_from_meta(
         &self,
-        level1_block_info: &Self::Level1BlockInfo, 
+        level1_block_info: &Self::Level1BlockMeta,
         level1_index: usize
     ) -> Self::DataBlock<'_> {
-        let m0 = self.s1.borrow().data_block_from_info(
+        let m0 = self.s1.borrow().data_block_from_meta(
             &level1_block_info.0, level1_index
         );
-        let m1 = self.s2.borrow().data_block_from_info(
+        let m1 = self.s2.borrow().data_block_from_meta(
             &level1_block_info.1, level1_index
         ); 
         self.op.data_op(m0, m1)

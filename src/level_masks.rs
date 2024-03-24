@@ -84,7 +84,6 @@ impl<C: LevelMasksIter> LevelMasksIterState for NoState<C> {
 pub trait LevelMasksIter: LevelMasks{
     type IterState: LevelMasksIterState<Container = Self>;
     
-    // TODO: rename to xxxMeta?
     /// Level1 block related data, used to speed up data block access.
     ///
     /// Prefer POD, or any kind of drop-less, since it will be dropped
@@ -92,7 +91,7 @@ pub trait LevelMasksIter: LevelMasks{
     /// 
     /// In library, used to cache Level1Block pointers for faster DataBlock access,
     /// without traversing whole hierarchy for getting each block during iteration.
-    type Level1BlockInfo: Default;
+    type Level1BlockMeta: Default;
     
     
     /// Init `level1_block_data` and return (Level1Mask, is_not_empty).
@@ -116,10 +115,10 @@ pub trait LevelMasksIter: LevelMasks{
     // instead of just returning Level1BlockData. Even if we return Level1BlockData,
     // and then immediately write it to MaybeUninit - compiler somehow still can't
     // optimize it as direct memory write without an intermediate bitwise copy.
-    unsafe fn init_level1_block_info(
+    unsafe fn init_level1_block_meta(
         &self,
         state: &mut Self::IterState,
-        level1_block_data: &mut MaybeUninit<Self::Level1BlockInfo>,
+        level1_block_meta: &mut MaybeUninit<Self::Level1BlockMeta>,
         level0_index: usize
     ) -> (Self::Level1Mask<'_>, bool);    
 
@@ -128,8 +127,8 @@ pub trait LevelMasksIter: LevelMasks{
     /// # Safety
     ///
     /// indices are not checked.
-    unsafe fn data_block_from_info(
+    unsafe fn data_block_from_meta(
         &self,
-        level1_block_info: &Self::Level1BlockInfo, level1_index: usize
+        level1_block_meta: &Self::Level1BlockMeta, level1_index: usize
     ) -> Self::DataBlock<'_>;
 }

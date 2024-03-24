@@ -210,44 +210,32 @@ where
 {
     type IterState = NoState<Self>;
     
-    /// Points to elements in heap. Guaranteed to be stable.
-    /// This is just plain pointers with null in default:
-    /// `(*const LevelDataBlock<Conf>, *const Level1Block<Conf>)`
-    type Level1BlockInfo = (
-        // TODO: remove this, use &self
-        Option<NonNull<DataBlock>>,       /* data array pointer */
-        Option<NonNull<Level1Block>>      /* block pointer */
-    );
+    /// Points to the element in heap. Guaranteed to be stable.
+    type Level1BlockMeta = Option<NonNull<Level1Block>>;
 
     #[inline]
-    unsafe fn init_level1_block_info(
-        &self, 
-        _: &mut Self::IterState, 
-        level1_block_data: &mut MaybeUninit<Self::Level1BlockInfo>, 
+    unsafe fn init_level1_block_meta(
+        &self,
+        _: &mut Self::IterState,
+        level1_block_meta: &mut MaybeUninit<Self::Level1BlockMeta>,
         level0_index: usize
     ) -> (Self::Level1Mask<'_>, bool) {
         let level1_block_index = self.level0.get_or_zero(level0_index);
         let level1_block = self.level1.blocks().get_unchecked(level1_block_index.as_usize());
-        level1_block_data.write(
-            (
-                Some(NonNull::new_unchecked(self.data.blocks().as_ptr() as *mut _)),
-                Some(NonNull::from(level1_block))
-            )
-        );
+        level1_block_meta.write( Some(NonNull::from(level1_block)) );
         (level1_block.mask(), !level1_block_index.is_zero())
     }
 
     #[inline]
-    unsafe fn data_block_from_info(
+    unsafe fn data_block_from_meta(
         &self,
-        level1_block_info: &Self::Level1BlockInfo, 
+        level1_block_meta: &Self::Level1BlockMeta,
         level1_index: usize
     ) -> Self::DataBlock<'_> {
-        let array_ptr = level1_block_info.0.unwrap_unchecked().as_ptr().cast_const();
-        let level1_block = level1_block_info.1.unwrap_unchecked().as_ref();
+        let level1_block = level1_block_meta.unwrap_unchecked().as_ref();
 
-        let data_block_index = level1_block.get_or_zero(level1_index);
-        let data_block = &*array_ptr.add(data_block_index.as_usize());
+        let data_block_index = level1_block.get_or_zero(level1_index).as_usize();
+        let data_block = self.data.blocks().get_unchecked(data_block_index);
         data_block
     }
 }

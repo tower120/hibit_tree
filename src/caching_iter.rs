@@ -13,7 +13,7 @@ where
     level0_index: usize,
 
     state: ManuallyDrop<T::IterState>,
-    level1_block_data: MaybeUninit<T::Level1BlockInfo>,
+    level1_block_data: MaybeUninit<T::Level1BlockMeta>,
 }
 
 impl<'a, T> CachingBlockIter<'a, T>
@@ -60,7 +60,7 @@ where
                     let level1_mask = unsafe {
                         self.level1_block_data.assume_init_drop();
                         let (level1_mask, _) = 
-                            self.container.init_level1_block_info(
+                            self.container.init_level1_block_meta(
                                 &mut self.state,
                                 &mut self.level1_block_data,
                                 index
@@ -76,7 +76,7 @@ where
         };
 
         let data_block = unsafe {
-            T::data_block_from_info(
+            T::data_block_from_meta(
                 &self.container,
                 self.level1_block_data.assume_init_ref(), level1_index
             )
