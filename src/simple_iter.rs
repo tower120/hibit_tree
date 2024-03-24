@@ -1,7 +1,6 @@
-use std::marker::PhantomData;
 use crate::bit_block::BitBlock;
 use crate::bit_queue::BitQueue;
-use crate::{LevelMasks, IntoOwned, RefOrVal};
+use crate::{LevelMasks, IntoOwned};
 
 pub struct SimpleBlockIter<'a, T>
 where
@@ -11,8 +10,6 @@ where
     level0_iter: <T::Level0MaskType as BitBlock>::BitsIter,
     level1_iter: <T::Level1MaskType as BitBlock>::BitsIter,
     level0_index: usize,
-    //phantom: PhantomData<&'a T>
-
 }
 
 impl<'a, T> SimpleBlockIter<'a, T>
@@ -27,7 +24,6 @@ where
             level0_iter,
             level1_iter: BitQueue::empty(),
             level0_index: 0,
-            //phantom: PhantomData
         }
     }
 }

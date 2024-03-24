@@ -1,4 +1,5 @@
-// TODO: remove this!!
+// TODO: remove this as soon as impl_array will be implemented.
+//       Need this macro as example.
 
 //! Ala "universal reference"/"forwarding reference" in C++
 //! 

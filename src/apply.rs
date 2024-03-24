@@ -4,7 +4,7 @@ use std::mem;
 use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ptr::addr_of_mut;
 use crate::bit_block::BitBlock;
-use crate::{LevelMasks, ref_or_val, RefOrVal, IntoOwned, LevelMasksBorrow};
+use crate::{LevelMasks, IntoOwned, LevelMasksBorrow};
 use crate::level_masks::{LevelMasksIter, LevelMasksIterState};
 
 // We need more advanced GAT in Rust to make `DataBlock<'a>` work here 
@@ -196,7 +196,5 @@ where
         self.op.data_op(m0, m1)
     }
 }
-
-ref_or_val!(impl<Op, S1, S2> for Apply<Op, S1, S2>);
 
 // TODO: other array read operations

@@ -1,6 +1,6 @@
 use std::mem::{ManuallyDrop, MaybeUninit};
 use crate::level_masks::{LevelMasksIter, LevelMasksIterState};
-use crate::{BitBlock, LevelMasks, IntoOwned, RefOrVal};
+use crate::{BitBlock, LevelMasks, IntoOwned};
 use crate::bit_queue::BitQueue;
 
 pub struct CachingBlockIter<'a, T>

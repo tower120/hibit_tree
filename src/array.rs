@@ -4,7 +4,7 @@ use std::ptr::NonNull;
 use crate::bit_block::BitBlock;
 use crate::block::{Block, HiBlock};
 use crate::level::Level;
-use crate::{LevelMasks, ref_or_val, LevelMasksBorrow};
+use crate::{LevelMasks, LevelMasksBorrow};
 use crate::level_masks::{LevelMasksIter, NoState};
 use crate::primitive::Primitive;
 
@@ -239,15 +239,6 @@ where
         data_block
     }
 }
-
-ref_or_val!(
-    impl <Level0Block, Level1Block, DataBlock> for 
-        ref SparseBlockArray<Level0Block, Level1Block, DataBlock>
-    where
-        Level0Block: HiBlock,
-        Level1Block: HiBlock,
-        DataBlock: Block,
-);
 
 impl <Level0Block, Level1Block, DataBlock> LevelMasksBorrow
     for SparseBlockArray<Level0Block, Level1Block, DataBlock>

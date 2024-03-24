@@ -10,11 +10,11 @@ pub mod bit_queue;
 pub mod block;
 pub mod simple_iter;
 pub mod caching_iter;
-mod ref_or_val;
+//mod ref_or_val;
 mod level_masks;
 
 use std::marker::PhantomData;
-pub use ref_or_val::*;
+//pub use ref_or_val::*;
 pub use bit_block::BitBlock;
 pub use primitive::Primitive;
 pub use primitive_array::PrimitiveArray;
@@ -55,6 +55,8 @@ where
     Apply{op, s1, s2}
 }
 
+// TODO: As long as iterator works with &LevelMasks - we can just
+//       use Borrow<impl LevelMasks> everywhere
 pub trait LevelMasksBorrow: Borrow<Self::Type>{
     type Type: LevelMasks;
 }
