@@ -37,21 +37,20 @@ where
     level0: Level0Block,
     level1: Level<Level1Block>,
     data  : Level<DataBlock>,
-    //phantom: PhantomData<Conf>
 }
 impl<Level0Block, Level1Block, DataBlock> Default for
     SparseBlockArray<Level0Block, Level1Block, DataBlock>
 where
     Level0Block: HiBlock,
     Level1Block: HiBlock,
-    DataBlock: Block,
+    DataBlock  : Block,
 {
     #[inline]
     fn default() -> Self {
         Self{
             level0: Block::empty(),
             level1: Default::default(),
-            data: Default::default(),
+            data  : Default::default(),
         }
     }
 }
@@ -61,7 +60,7 @@ impl<Level0Block, Level1Block, DataBlock>
 where
     Level0Block: HiBlock,
     Level1Block: HiBlock,
-    DataBlock: Block,
+    DataBlock  : Block,
 {
     #[inline]
     fn level_indices(index: usize) -> (usize/*level0*/, usize/*level1*/) {
@@ -74,7 +73,7 @@ where
     /// 
     /// # Safety
     /// 
-    /// Pointed block at `index` must exists and be empty
+    /// Pointed block at `index` must exist and be empty.
     pub unsafe fn remove_empty_unchecked(&mut self, index: usize){
         todo!()
     }
@@ -86,7 +85,7 @@ where
     pub fn get_or_insert(&mut self, index: usize) -> &mut DataBlock {
         //assert!(Self::is_in_range(index), "index out of range!");
 
-        // That's indices to next level
+        // That's indices to the next level
         let (level0_index, level1_index) = Self::level_indices(index);
 
         // 1. Level0
@@ -113,6 +112,7 @@ where
         }        
     }
     
+    // TODO: Refactor - LevelMasks have data_block
     /// # Safety
     /// 
     /// `index` must be within SparseBlockArray range.
