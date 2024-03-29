@@ -1,4 +1,5 @@
 use std::mem;
+use std::ops::ControlFlow;
 use crate::bit_queue::{ArrayBitQueue, BitQueue, PrimitiveBitQueue};
 use crate::bit_utils;
 use crate::primitive_array::PrimitiveArray;
@@ -36,6 +37,23 @@ pub trait BitBlock: Sized + Clone {
     #[inline]
     fn get_bit(&self, bit_index: usize) -> bool{
         todo!()
+    }
+    
+    /// Returns [Break] if traverse was interrupted (`f` returns [Break]).
+    /// 
+    /// [Break]: ControlFlow::Break
+    #[inline]
+    fn traverse_bits<F>(&self, f: F) -> ControlFlow<()>
+    where
+        F: FnMut(usize) -> ControlFlow<()>
+    {
+        let array = self.as_array().as_ref();
+        if Self::Array::CAP == 1 {
+            let primitive = unsafe{ *array.get_unchecked(0) };
+            bit_utils::traverse_one_bits(primitive, f)
+        } else {
+            bit_utils::traverse_array_one_bits(array, f)
+        }
     }    
     
     type BitsIter: BitQueue;

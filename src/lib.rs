@@ -12,6 +12,7 @@ pub mod simple_iter;
 pub mod caching_iter;
 //mod ref_or_val;
 mod level_masks;
+pub mod small_block;
 
 use std::marker::PhantomData;
 //pub use ref_or_val::*;
