@@ -60,7 +60,7 @@ where
         };
 
         let block_index =
-            self.level0_index << T::Level1MaskType::SIZE_POT_EXPONENT
+            (self.level0_index << T::Level1MaskType::SIZE_POT_EXPONENT)
             + level1_index;
 
         Some((block_index, data_block))
