@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
 use wide::f32x4;
 use hi_sparse_array::{Apply, apply, BitBlock, Op, IntoOwned, SparseBlockArray};
-use hi_sparse_array::block::{Block, FixedHiBlock};
+use hi_sparse_array::block::{LevelBlock, Block};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::simple_iter::SimpleBlockIter;
 
@@ -17,7 +17,7 @@ impl Mul for DataBlock{
     }
 }
 
-impl Block for DataBlock{
+impl LevelBlock for DataBlock{
     fn empty() -> Self {
         Self(f32x4::ZERO)
     }
@@ -39,8 +39,8 @@ impl Block for DataBlock{
     }
 }
 
-type Lvl0Block = FixedHiBlock<u64, [u8; 64]>;
-type Lvl1Block = FixedHiBlock<u64, [u16; 64]>;
+type Lvl0Block = Block<u64, [u8; 64]>;
+type Lvl1Block = Block<u64, [u16; 64]>;
 type SparseArray = SparseBlockArray<
     Lvl0Block,
     Lvl1Block,

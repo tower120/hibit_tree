@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::ptr::NonNull;
 use crate::bit_block::BitBlock;
-use crate::block::{Block, HiBlock};
+use crate::block::{LevelBlock, HiBlock};
 use crate::level::Level;
 use crate::{LevelMasks, LevelMasksBorrow};
 use crate::level_masks::{LevelMasksIter, NoState};
@@ -32,7 +32,7 @@ pub struct SparseBlockArray<Level0Block, Level1Block, DataBlock>
 where
     Level0Block: HiBlock,
     Level1Block: HiBlock,
-    DataBlock: Block,
+    DataBlock: LevelBlock,
 {
     level0: Level0Block,
     level1: Level<Level1Block>,
@@ -43,12 +43,12 @@ impl<Level0Block, Level1Block, DataBlock> Default for
 where
     Level0Block: HiBlock,
     Level1Block: HiBlock,
-    DataBlock  : Block,
+    DataBlock  : LevelBlock,
 {
     #[inline]
     fn default() -> Self {
         Self{
-            level0: Block::empty(),
+            level0: LevelBlock::empty(),
             level1: Default::default(),
             data  : Default::default(),
         }
@@ -60,7 +60,7 @@ impl<Level0Block, Level1Block, DataBlock>
 where
     Level0Block: HiBlock,
     Level1Block: HiBlock,
-    DataBlock  : Block,
+    DataBlock  : LevelBlock,
 {
     #[inline]
     fn level_indices(index: usize) -> (usize/*level0*/, usize/*level1*/) {
@@ -170,7 +170,7 @@ impl<Level0Block, Level1Block, DataBlock> LevelMasks for
 where
     Level0Block: HiBlock,
     Level1Block: HiBlock,
-    DataBlock: Block + Clone,
+    DataBlock: LevelBlock + Clone,
 {
     type Level0MaskType = Level0Block::Mask;
     type Level0Mask<'a> = &'a Level0Block::Mask where Self: 'a;
@@ -206,7 +206,7 @@ impl<Level0Block, Level1Block, DataBlock> LevelMasksIter for
 where
     Level0Block: HiBlock,
     Level1Block: HiBlock,
-    DataBlock: Block + Clone,
+    DataBlock: LevelBlock + Clone,
 {
     type IterState = NoState<Self>;
     
@@ -245,7 +245,7 @@ impl <Level0Block, Level1Block, DataBlock> LevelMasksBorrow
 where
     Level0Block: HiBlock,
     Level1Block: HiBlock,
-    DataBlock: Block + Clone,
+    DataBlock: LevelBlock + Clone,
 {
     type Type = Self;
 }
@@ -255,7 +255,7 @@ impl <Level0Block, Level1Block, DataBlock> LevelMasksBorrow
 where
     Level0Block: HiBlock,
     Level1Block: HiBlock,
-    DataBlock: Block + Clone,
+    DataBlock: LevelBlock + Clone,
 {
     type Type = SparseBlockArray<Level0Block, Level1Block, DataBlock>;
 }

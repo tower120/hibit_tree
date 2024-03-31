@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 use std::ops::ControlFlow::Continue;
 use std::ptr;
 use crate::BitBlock;
-use crate::block::{Block, HiBlock};
+use crate::block::{LevelBlock, HiBlock};
 use crate::primitive::Primitive;
 use crate::primitive_array::{PrimitiveArray, UninitPrimitiveArray};
 
@@ -185,13 +185,14 @@ where
 }
 
 
-impl<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices> Block for CompactBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
+impl<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices> LevelBlock for CompactBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
 where
     Mask: BitBlock,
     MaskU64Populations: PrimitiveArray<Item=u8>, 
     BlockIndices: PrimitiveArray,
     SmallBlockIndices: PrimitiveArray<Item=BlockIndices::Item>,
 {
+    #[inline]
     fn empty() -> Self {
         Self{
             mask: Mask::zero(),
@@ -205,16 +206,19 @@ where
         }
     }
 
+    #[inline]
     fn is_empty(&self) -> bool {
         todo!()
     }
 
+    #[inline]
     fn as_u64_mut(&mut self) -> &mut u64 {
         unsafe{
             self.mask.as_array_mut().as_mut().get_unchecked_mut(0)
         }
     }
 
+    #[inline]
     fn restore_empty_u64(&mut self) {
         *self.as_u64_mut() = 0;
     }

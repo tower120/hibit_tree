@@ -3,8 +3,10 @@ use crate::bit_block::BitBlock;
 use crate::primitive::Primitive;
 use crate::primitive_array::PrimitiveArray;
 
-pub trait Block: Sized {
+pub trait LevelBlock: Sized {
     fn empty() -> Self; 
+    
+    // Do we need this?
     fn is_empty(&self) -> bool;
     
 /*    // Does this needed?
@@ -19,7 +21,7 @@ pub trait Block: Sized {
 }
 
 /// Hierarchy block
-pub trait HiBlock: Block {
+pub trait HiBlock: LevelBlock {
     type Mask: BitBlock;
     
     fn mask(&self) -> &Self::Mask;
@@ -68,13 +70,13 @@ pub trait HiBlock: Block {
 }
 
 #[derive(Clone)]
-pub struct FixedHiBlock<Mask, BlockIndices> {
+pub struct Block<Mask, BlockIndices> {
     mask: Mask,
     /// Next level block indices
     block_indices: BlockIndices,
 }
 
-impl<Mask, BlockIndices> Block for FixedHiBlock<Mask, BlockIndices>
+impl<Mask, BlockIndices> LevelBlock for Block<Mask, BlockIndices>
 where
     Mask: BitBlock,
     BlockIndices: PrimitiveArray
@@ -105,7 +107,7 @@ where
     }
 }
 
-impl<Mask, BlockIndices> HiBlock for FixedHiBlock<Mask, BlockIndices>
+impl<Mask, BlockIndices> HiBlock for Block<Mask, BlockIndices>
 where
     Mask: BitBlock,
     BlockIndices: PrimitiveArray

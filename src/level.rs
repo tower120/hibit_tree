@@ -1,4 +1,4 @@
-use crate::block::Block as IBlock;
+use crate::block::LevelBlock as IBlock;
 use crate::primitive::Primitive;
 
 #[derive(Clone)]
