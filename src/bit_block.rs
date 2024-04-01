@@ -1,10 +1,11 @@
+use std::any::TypeId;
 use std::mem;
 use std::ops::ControlFlow;
-use crate::bit_queue::{ArrayBitQueue, BitQueue, PrimitiveBitQueue};
+use crate::bit_queue::{ArrayBitQueue, BitQueue, EmptyBitQueue, PrimitiveBitQueue};
 use crate::bit_utils;
 use crate::primitive_array::PrimitiveArray;
 
-pub trait BitBlock: Sized + Clone {
+pub trait BitBlock: Sized + Clone + 'static{
     /// 2^N bits
     const SIZE_POT_EXPONENT: usize;
     
@@ -63,6 +64,34 @@ pub trait BitBlock: Sized + Clone {
     type Array: PrimitiveArray<Item = u64>;
     fn as_array(&self) -> &Self::Array;
     fn as_array_mut(&mut self) -> &mut Self::Array;
+}
+
+impl BitBlock for (){
+    const SIZE_POT_EXPONENT: usize = 0;
+
+    fn zero() -> Self {
+        ()
+    }
+
+    type BitsIter = EmptyBitQueue;
+
+    fn into_bits_iter(self) -> Self::BitsIter {
+        EmptyBitQueue
+    }
+    
+    type Array = [u64;0];
+
+    fn as_array(&self) -> &Self::Array {
+        &[]
+    }
+
+    fn as_array_mut(&mut self) -> &mut Self::Array {
+        &mut[]
+    }
+}
+
+pub(crate) /*const*/ fn is_bypass_bitblock<T: BitBlock>() -> bool {
+    TypeId::of::<T>() == TypeId::of::<()>()
 }
 
 impl BitBlock for u64{

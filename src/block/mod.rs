@@ -1,10 +1,12 @@
-mod cluster_block;
-mod small_block;
+//mod cluster_block;
+//mod small_block;
 mod block;
+mod bypass;
 
-pub use small_block::*;
-pub use cluster_block::*;
+//pub use small_block::*;
+//pub use cluster_block::*;
 pub use block::*;
+pub use bypass::*;
 
 use crate::{BitBlock, Primitive, PrimitiveArray};
 

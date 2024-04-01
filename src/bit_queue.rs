@@ -60,6 +60,40 @@ pub trait BitQueue: Iterator<Item = usize> + Clone{
     fn is_empty(&self) -> bool;*/
 }
 
+#[derive(Default, Clone)]
+pub struct EmptyBitQueue;
+
+impl Iterator for EmptyBitQueue {
+    type Item = usize;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        None
+    }
+}
+
+impl BitQueue for EmptyBitQueue{
+    fn empty() -> Self {
+        Self
+    }
+
+    fn filled() -> Self {
+        todo!()
+    }
+
+    fn trim_to(&mut self, n: usize) {
+        todo!()
+    }
+
+    fn current(&self) -> usize {
+        todo!()
+    }
+
+    fn traverse<F>(self, f: F) -> ControlFlow<()> where F: FnMut(usize) -> ControlFlow<()> {
+        todo!()
+    }
+}
+
 /// [BitQueue] for [Primitive].
 #[derive(Clone)]
 pub struct PrimitiveBitQueue<P>{

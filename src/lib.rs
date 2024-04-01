@@ -22,6 +22,16 @@ pub use array::SparseBlockArray;
 pub use apply::{Apply, Op};
 pub use level_masks::LevelMasks;
 use std::borrow::Borrow;
+use crate::bit_block::is_bypass_bitblock;
+
+#[inline]
+pub(crate) fn data_block_index<T: LevelMasks>(level0_index: usize, level1_index: usize) -> usize {
+    let mut index = level1_index;
+    if !is_bypass_bitblock::<T::Level1MaskType>() {
+        index += level0_index << T::Level1MaskType::SIZE_POT_EXPONENT; 
+    }
+    index
+}
 
 /// convert T to value. noop for value, clone - for reference.
 ///

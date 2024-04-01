@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::ptr::NonNull;
 use crate::bit_block::BitBlock;
-use crate::block::{LevelBlock, HiBlock};
+use crate::block::{LevelBlock, HiBlock, is_bypass_block};
 use crate::level::Level;
 use crate::{LevelMasks, LevelMasksBorrow};
 use crate::level_masks::{LevelMasksIter, NoState};
@@ -14,6 +14,10 @@ use crate::primitive::Primitive;
 fn level_indices<Level1Block: HiBlock>(index: usize) 
     -> (usize/*level0*/, usize/*level1*/)
 {
+    if is_bypass_block::<Level1Block>(){
+        return (index, 0)
+    }
+    
     // this should be const and act as const.
     /*const*/ let level1_block_capacity_pot_exp: usize = Level1Block::Mask::SIZE_POT_EXPONENT;
     /*const*/ let level1_block_capacity        : usize = 1 << level1_block_capacity_pot_exp;
@@ -87,23 +91,33 @@ where
 
         // That's indices to the next level
         let (level0_index, level1_index) = Self::level_indices(index);
-
-        // 1. Level0
-        let level1_block_index = unsafe{
-            self.level0.get_or_insert(level0_index, ||{
-                let block_index = self.level1.insert_empty_block();
-                Primitive::from_usize(block_index)
-            })
-        }.as_usize();
-
-        // 2. Level1
-        let data_block_index = unsafe{
-            let level1_block = self.level1.blocks_mut().get_unchecked_mut(level1_block_index);
-            level1_block.get_or_insert(level1_index, ||{
-                let block_index = self.data.insert_empty_block();
-                Primitive::from_usize(block_index)
-            })
-        }.as_usize();
+        
+        let data_block_index = 
+        if is_bypass_block::<Level1Block>() {
+             unsafe{
+                self.level0.get_or_insert(level0_index, ||{
+                    let block_index = self.data.insert_empty_block();
+                    Primitive::from_usize(block_index)
+                })
+            }.as_usize()
+        } else {
+            // 1. Level0
+            let level1_block_index = unsafe{
+                self.level0.get_or_insert(level0_index, ||{
+                    let block_index = self.level1.insert_empty_block();
+                    Primitive::from_usize(block_index)
+                })
+            }.as_usize();
+    
+            // 2. Level1
+            unsafe{
+                let level1_block = self.level1.blocks_mut().get_unchecked_mut(level1_block_index);
+                level1_block.get_or_insert(level1_index, ||{
+                    let block_index = self.data.insert_empty_block();
+                    Primitive::from_usize(block_index)
+                })
+            }.as_usize()
+        };
 
         // 3. Data level
         unsafe{
@@ -192,6 +206,7 @@ where
     type DataBlock<'a> = &'a DataBlock where Self: 'a;
     #[inline]
     unsafe fn data_block(&self, level0_index: usize, level1_index: usize) -> Self::DataBlock<'_> {
+        // TODO: bypass
         let level1_block_index = self.level0.get_or_zero(level0_index).as_usize();
         let level1_block = self.level1.blocks().get_unchecked(level1_block_index);
 
@@ -210,7 +225,8 @@ where
 {
     type IterState = NoState<Self>;
     
-    /// Points to the element in heap. Guaranteed to be stable.
+    // TODO: ZST for BypassBlock
+    /// Points to the element in the heap. Guaranteed to be stable.
     type Level1BlockMeta = Option<NonNull<Level1Block>>;
 
     #[inline]
@@ -220,6 +236,11 @@ where
         level1_block_meta: &mut MaybeUninit<Self::Level1BlockMeta>,
         level0_index: usize
     ) -> (Self::Level1Mask<'_>, bool) {
+        if is_bypass_block::<Level1Block>(){
+            // we know that Level1Block::Mask is ()
+            return (NonNull::<Level1Block::Mask>::dangling().as_ref(), false)
+        }
+        
         let level1_block_index = self.level0.get_or_zero(level0_index);
         let level1_block = self.level1.blocks().get_unchecked(level1_block_index.as_usize());
         level1_block_meta.write( Some(NonNull::from(level1_block)) );
@@ -232,11 +253,16 @@ where
         level1_block_meta: &Self::Level1BlockMeta,
         level1_index: usize
     ) -> Self::DataBlock<'_> {
-        let level1_block = level1_block_meta.unwrap_unchecked().as_ref();
-
-        let data_block_index = level1_block.get_or_zero(level1_index).as_usize();
-        let data_block = self.data.blocks().get_unchecked(data_block_index);
-        data_block
+        let data_block_index = if is_bypass_block::<Level1Block>(){
+            let level0_index = level1_index;
+            self.level0.get_or_zero(level0_index).as_usize()
+        } else {
+            let level1_block = level1_block_meta.unwrap_unchecked().as_ref();
+            let data_block_index = level1_block.get_or_zero(level1_index).as_usize();
+            data_block_index
+        };
+        
+        self.data.blocks().get_unchecked(data_block_index)
     }
 }
 
