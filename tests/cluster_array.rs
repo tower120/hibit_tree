@@ -1,7 +1,5 @@
-use hi_sparse_array::block::{Block, LevelBlock};
-use hi_sparse_array::cluster_block::ClusterBlock;
+use hi_sparse_array::block::{Block, ClusterBlock, LevelBlock};
 use hi_sparse_array::simple_iter::SimpleBlockIter;
-use hi_sparse_array::small_block::CompactBlock;
 use hi_sparse_array::SparseBlockArray;
 use itertools::assert_equal;
 

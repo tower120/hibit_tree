@@ -1,47 +1,3 @@
-//! Experimental.
-//! 
-//! Theoretically could be used for super-big 8kb LevelBlock with 65000 elements.
-//! 
-//! # Principle of work
-//! 
-//! ```text
-//!                                128 bit                   
-//!               16 bit │ 16 bit                            
-//! Block       └──────── ─────────────────────────────────┘ 
-//!                u32   │  NULL     u32   ...   x16           sub-blocks
-//!              └───┬──┘ └──────┘ └───┬──┘                  
-//!                  │                 │                     
-//!                  └────┐            └───────┐             
-//!                       ▼                    ▼             
-//! Level array       16 values            16 values             buckets
-//!              └─────────────────┘  └─────────────────┘    
-//! ```
-//! Not implemented, but several sub-blocks can point to the same bucket:
-//! ```text
-//!                                128 bit                    
-//!                                                           
-//!               16 bit   16 bit                             
-//!              0101110 │  0000  │                           
-//! Block       └──────── ──────── ────────────────────────┘  
-//!         offset:0 ptr │        │                           
-//!               u8 u24    NULL    offset:4  ...  x16        
-//!              └───┬──┘│└──────┘│└────┬───┘                 
-//!                  │                  │                     
-//!                  └────┐  ┌──────────┘                     
-//!                       ▼  ▼                                
-//! Bucket Array      16 values            16 values       ...
-//!              └─────────────────┘  └─────────────────┘     
-//!                                                           
-//!  offset - is in-bucket offset                             
-//! ``` 
-//! 
-//! # Benchmark results
-//! 
-//! It is suprisingly **NOT** faster than SmallBlock, even when 
-//! SmallBlock never switches to Big. When SmallBlock allowed to
-//! switch to Big storage - SmallBlock is observably faster.   
-//! 
-
 use std::marker::PhantomData;
 use std::mem::{MaybeUninit, size_of};
 use std::ptr;
@@ -56,6 +12,51 @@ const SUB_BLOCK_SIZE: usize = size_of::<SubBlockMask>()*8;
 /*type GlobalSubBlock = [u16;16];
 static mut global_sub_block_storage: Vec<GlobalSubBlock> = Vec::new();*/
 
+/// Experimental!
+/// 
+/// Theoretically could be used for super-big 8kb LevelBlock with 65000 elements.
+/// 
+/// # Principle of work
+/// 
+/// ```text
+///                                128 bit                   
+///               16 bit │ 16 bit                            
+/// Block       └──────── ─────────────────────────────────┘ 
+///                u32   │  NULL     u32   ...   x16           sub-blocks
+///              └───┬──┘ └──────┘ └───┬──┘                  
+///                  │                 │                     
+///                  └────┐            └───────┐             
+///                       ▼                    ▼             
+/// Bucket Array     16 values            16 values     
+///              └─────────────────┘  └─────────────────┘    
+/// ```
+/// Not implemented, but several sub-blocks can point to the same bucket:
+/// ```text
+///                                128 bit                    
+///                                                           
+///               16 bit   16 bit                             
+///              0101110 │  0000  │                           
+/// Block       └──────── ──────── ────────────────────────┘  
+///         offset:0 ptr │        │                           
+///               u8 u24    NULL    offset:4  ...  x16        
+///              └───┬──┘│└──────┘│└────┬───┘                 
+///                  │                  │                     
+///                  └────┐  ┌──────────┘                     
+///                       ▼  ▼                                
+/// Bucket Array      16 values            16 values       ...
+///              └─────────────────┘  └─────────────────┘     
+///                                                           
+///  offset - is in-bucket offset                             
+/// ``` 
+/// 
+/// # Benchmark results
+/// 
+/// It is suprisingly **NOT** faster than SmallBlock, even when 
+/// SmallBlock never switches to Big. When SmallBlock allowed to
+/// switch to Big storage - SmallBlock is observably faster.   
+///
+/// # Safety
+/// 
 /// SubBlock size MUST be 16!
 pub struct ClusterBlock<Mask, SubBlockIndices/*: PrimitiveArray*/, SubBlock/*: PrimitiveArray*/>{
     mask: Mask,

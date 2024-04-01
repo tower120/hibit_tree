@@ -97,8 +97,9 @@ where
     }
 }
 
+/// TODO: Copy description from hi_sparse_bitset
 #[derive(Clone)]
-pub struct CompactBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
+pub struct SmallBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
 where
     BlockIndices: PrimitiveArray,
     SmallBlockIndices: PrimitiveArray<Item=BlockIndices::Item>,
@@ -108,7 +109,7 @@ where
     big_small: BigSmallArray<BlockIndices, SmallBlockIndices, MaskU64Populations>
 }
 
-impl<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices> CompactBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
+impl<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices> SmallBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
 where
     Mask: BitBlock,
     MaskU64Populations: PrimitiveArray<Item=u8>, 
@@ -185,7 +186,7 @@ where
 }
 
 
-impl<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices> LevelBlock for CompactBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
+impl<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices> LevelBlock for SmallBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
 where
     Mask: BitBlock,
     MaskU64Populations: PrimitiveArray<Item=u8>, 
@@ -225,7 +226,7 @@ where
 }
 
 
-impl<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices> HiBlock for CompactBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
+impl<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices> HiBlock for SmallBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
 where
     Mask: BitBlock,
     MaskU64Populations: PrimitiveArray<Item=u8>, 
