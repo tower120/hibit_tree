@@ -1,15 +1,13 @@
 use std::collections::HashMap;
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
 use hi_sparse_array::SparseBlockArray;
-use hi_sparse_array::block::{LevelBlock, Block};
+use hi_sparse_array::level_block::{LevelBlock, Block, SmallBlock, ClusterBlock};
 use hi_sparse_array::caching_iter::CachingBlockIter;
-use hi_sparse_array::cluster_block::ClusterBlock;
-use hi_sparse_array::simple_iter::SimpleBlockIter;
-use hi_sparse_array::small_block::CompactBlock;
+use hi_sparse_array::level::Level;
 
 type Lvl0Block = Block<u64, [u8;64]>;
 type Lvl1Block = Block<u64, [u16;64]>;
-type CompactLvl1Block = CompactBlock<u64, [u8;1], [u16;64], [u16;7]>;
+type CompactLvl1Block = SmallBlock<u64, [u8;1], [u16;64], [u16;7]>;
 type ClusterLvl1Block = ClusterBlock<u64, [u16;4], [u16;16]>;
 
 #[derive(Clone)]
@@ -32,9 +30,9 @@ impl LevelBlock for DataBlock{
     }
 }
 
-type BlockArray = SparseBlockArray<Lvl0Block, Lvl1Block, DataBlock>;
-type SmallBlockArray = SparseBlockArray<Lvl0Block, CompactLvl1Block, DataBlock>;
-type ClusterBlockArray = SparseBlockArray<Lvl0Block, ClusterLvl1Block, DataBlock>;
+type BlockArray = SparseBlockArray<Lvl0Block, Level<Lvl1Block>, Level<DataBlock>>;
+type SmallBlockArray = SparseBlockArray<Lvl0Block, Level<CompactLvl1Block>, Level<DataBlock>>;
+type ClusterBlockArray = SparseBlockArray<Lvl0Block, Level<ClusterLvl1Block>, Level<DataBlock>>;
 
 
 fn cluster_array_iter(array: &ClusterBlockArray) -> u64 {
@@ -90,9 +88,9 @@ pub fn bench_iter(c: &mut Criterion) {
         hashmap.insert(i as u64, DataBlock(i as u64));
     }
 
-    c.bench_function("cluster block array", |b| b.iter(|| cluster_array_iter(black_box(&cluster_block_array))));
-    c.bench_function("small block array", |b| b.iter(|| small_array_iter(black_box(&small_block_array))));
-    c.bench_function("block array", |b| b.iter(|| array_iter(black_box(&block_array))));
+    c.bench_function("cluster level_block array", |b| b.iter(|| cluster_array_iter(black_box(&cluster_block_array))));
+    c.bench_function("small level_block array", |b| b.iter(|| small_array_iter(black_box(&small_block_array))));
+    c.bench_function("level_block array", |b| b.iter(|| array_iter(black_box(&block_array))));
     c.bench_function("vec", |b| b.iter(|| vec_iter(black_box(&vec))));
     c.bench_function("hashmap", |b| b.iter(|| hashmap_iter(black_box(&hashmap))));
     

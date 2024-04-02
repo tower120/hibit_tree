@@ -1,9 +1,8 @@
-use std::any::TypeId;
 use std::mem::{ManuallyDrop, MaybeUninit};
 use crate::level_masks::{LevelMasksIter, LevelMasksIterState};
-use crate::{BitBlock, LevelMasks, IntoOwned, data_block_index};
-use crate::bit_block::is_bypass_bitblock;
+use crate::{BitBlock, data_block_index, IntoOwned, LevelMasks};
 use crate::bit_queue::BitQueue;
+use crate::bool_type::BoolType;
 
 pub struct CachingBlockIter<'a, T>
 where
@@ -41,11 +40,6 @@ where
             level1_block_meta: MaybeUninit::new(Default::default())
         }
     }
-    
-    #[inline]
-    /*const*/ fn bypass_lvl1() -> bool{
-        is_bypass_bitblock::<T::Level1MaskType>()
-    }
 }
 
 impl<'a, T> Iterator for CachingBlockIter<'a, T>
@@ -62,7 +56,7 @@ where
             } else {
                 //update level0
                 if let Some(index) = self.level0_iter.next() {
-                    if Self::bypass_lvl1(){
+                    if T::Level1Bypass::VALUE{
                         break index;
                     }
                     

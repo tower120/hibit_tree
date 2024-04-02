@@ -66,34 +66,6 @@ pub trait BitBlock: Sized + Clone + 'static{
     fn as_array_mut(&mut self) -> &mut Self::Array;
 }
 
-impl BitBlock for (){
-    const SIZE_POT_EXPONENT: usize = 0;
-
-    fn zero() -> Self {
-        ()
-    }
-
-    type BitsIter = EmptyBitQueue;
-
-    fn into_bits_iter(self) -> Self::BitsIter {
-        EmptyBitQueue
-    }
-    
-    type Array = [u64;0];
-
-    fn as_array(&self) -> &Self::Array {
-        &[]
-    }
-
-    fn as_array_mut(&mut self) -> &mut Self::Array {
-        &mut[]
-    }
-}
-
-pub(crate) /*const*/ fn is_bypass_bitblock<T: BitBlock>() -> bool {
-    TypeId::of::<T>() == TypeId::of::<()>()
-}
-
 impl BitBlock for u64{
     const SIZE_POT_EXPONENT: usize = 6;
 

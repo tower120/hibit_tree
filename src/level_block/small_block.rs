@@ -3,7 +3,8 @@ use std::ops::{Deref, DerefMut};
 use std::ops::ControlFlow::Continue;
 use std::ptr;
 use crate::BitBlock;
-use crate::block::{LevelBlock, HiBlock};
+use crate::level_block::{LevelBlock, HiBlock};
+use crate::level_block::meta_ptr::Ptr;
 use crate::primitive::Primitive;
 use crate::primitive_array::{PrimitiveArray, UninitPrimitiveArray};
 
@@ -233,6 +234,7 @@ where
     BlockIndices: PrimitiveArray,
     SmallBlockIndices: PrimitiveArray<Item=BlockIndices::Item>,
 {
+    type Meta = Ptr<Self>;
     type Mask = Mask;
 
     #[inline]

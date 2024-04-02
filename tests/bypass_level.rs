@@ -1,6 +1,7 @@
 use itertools::{assert_equal, Itertools};
-use hi_sparse_array::block::{Block, BypassBlock, LevelBlock};
+use hi_sparse_array::level_block::{Block, LevelBlock};
 use hi_sparse_array::caching_iter::CachingBlockIter;
+use hi_sparse_array::level::{BypassLevel, Level};
 use hi_sparse_array::simple_iter::SimpleBlockIter;
 use hi_sparse_array::SparseBlockArray;
 
@@ -28,7 +29,7 @@ impl LevelBlock for DataBlock{
 #[test]
 fn bypass_test(){
     type Lvl0Block = Block<u64, [u8;64]>;
-    type Array = SparseBlockArray<Lvl0Block, BypassBlock, DataBlock>;
+    type Array = SparseBlockArray<Lvl0Block, BypassLevel, Level<DataBlock>>;
     
     let mut array: Array = Default::default(); 
     

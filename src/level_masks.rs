@@ -2,10 +2,11 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::mem::{ManuallyDrop, MaybeUninit};
 use crate::{BitBlock, IntoOwned};
+use crate::bool_type::BoolType;
 
-/// Basic interface for accessing block masks. Can work with `SimpleIter`.
+/// Basic interface for accessing level_block masks. Can work with `SimpleIter`.
 /// 
-// We need xxxxType for each concrete block/mask type to avoid the need for use `for<'a>`,
+// We need xxxxType for each concrete level_block/mask type to avoid the need for use `for<'a>`,
 // which is still not working (at Rust level) in cases, where we need it most. 
 pub trait LevelMasks{
     type Level0MaskType: BitBlock;
@@ -13,6 +14,7 @@ pub trait LevelMasks{
         where Self: 'a;
     fn level0_mask(&self) -> Self::Level0Mask<'_>;
 
+    type Level1Bypass: BoolType;
     type Level1MaskType: BitBlock;
     type Level1Mask<'a>: Borrow<Self::Level1MaskType> + IntoOwned<Self::Level1MaskType>
         where Self: 'a;
@@ -36,7 +38,7 @@ pub trait LevelMasks{
 /// Constructed at the start of iteration, dropped at the end.
 /// You'll need it, if you'd want to use heavy-to-construct/heavy-to-drop
 /// data in Level1BlockInfo, like Vec. Since Level1BlockInfo dropped on each
-/// block - you'd want to create Vec in state, and then use pointer, which points
+/// level_block - you'd want to create Vec in state, and then use pointer, which points
 /// to state Vec.  
 /// 
 /// Use `NoState<Self>` for stateless.
@@ -77,33 +79,33 @@ impl<C: LevelMasksIter> LevelMasksIterState for NoState<C> {
 /// generative/lazy bitset.
 /// 
 /// For example, in [Reduce] this achieved through
-/// caching level1 block pointers of all sets. Which also allows to discard
+/// caching level1 level_block pointers of all sets. Which also allows to discard
 /// bitsets with empty level1 blocks in final stage of getting data blocks.
 /// Properly implementing this gave [Reduce] and [Apply] 25-100% performance boost.  
 ///
 pub trait LevelMasksIter: LevelMasks{
     type IterState: LevelMasksIterState<Container = Self>;
     
-    /// Level1 block related data, used to speed up data block access.
+    /// Level1 level_block related data, used to speed up data level_block access.
     ///
     /// Prefer POD, or any kind of drop-less, since it will be dropped
-    /// before the iteration of each next level1 block.
+    /// before the iteration of each next level1 level_block.
     /// 
     /// In library, used to cache Level1Block pointers for faster DataBlock access,
-    /// without traversing whole hierarchy for getting each block during iteration.
+    /// without traversing whole hierarchy for getting each level_block during iteration.
     type Level1BlockMeta: Default;
     
     
     /// Init `level1_block_data` and return (Level1Mask, is_not_empty).
     /// 
-    /// Called by iterator for each traversed level1 block.
+    /// Called by iterator for each traversed level1 level_block.
     /// 
     /// - `level1_block_data` will come in undefined state - rewrite it completely.
     /// - `is_not_empty` is not used by iterator itself, but can be used by other 
     /// generative bitsets (namely [Reduce]). We expect compiler to optimize away non-used code.
     /// It exists - because sometimes you may have faster ways of checking emptiness,
     /// then checking simd register (bitblock) for zero in general case.
-    /// For example, in BitSet - it is done by checking of block indirection index for zero.
+    /// For example, in BitSet - it is done by checking of level_block indirection index for zero.
     /// False positive is OK, though may incur unnecessary overhead.
     /// 
     /// # Safety
@@ -122,7 +124,7 @@ pub trait LevelMasksIter: LevelMasks{
         level0_index: usize
     ) -> (Self::Level1Mask<'_>, bool);    
 
-    /// Called by iterator for each traversed data block.
+    /// Called by iterator for each traversed data level_block.
     /// 
     /// # Safety
     ///

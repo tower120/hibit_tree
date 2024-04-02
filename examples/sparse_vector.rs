@@ -3,8 +3,9 @@ use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
 use wide::f32x4;
 use hi_sparse_array::{Apply, apply, BitBlock, Op, IntoOwned, SparseBlockArray};
-use hi_sparse_array::block::{LevelBlock, Block};
+use hi_sparse_array::level_block::{LevelBlock, Block};
 use hi_sparse_array::caching_iter::CachingBlockIter;
+use hi_sparse_array::level::{BypassLevel, Level};
 use hi_sparse_array::simple_iter::SimpleBlockIter;
 
 #[derive(Clone)]
@@ -43,8 +44,9 @@ type Lvl0Block = Block<u64, [u8; 64]>;
 type Lvl1Block = Block<u64, [u16; 64]>;
 type SparseArray = SparseBlockArray<
     Lvl0Block,
-    Lvl1Block,
-    DataBlock
+    //Level<Lvl1Block>,
+    BypassLevel<Lvl1Block>,
+    Level<DataBlock>
 >;
 
 #[derive(Default)]
@@ -122,12 +124,14 @@ fn main(){
     let mut v1 = SparseVector::default();
     let mut v2 = SparseVector::default();
     
-    v1.set(100, 1.0);
-    v1.set(200, 10.0);
-    v1.set(300, 100.0);
+    let INDEX_MUL: usize = 1; 
     
-    v2.set(100, 1.0);
-    v2.set(300, 0.5);
+    v1.set(10*INDEX_MUL, 1.0);
+    v1.set(20*INDEX_MUL, 10.0);
+    v1.set(30*INDEX_MUL, 100.0);
+    
+    v2.set(10*INDEX_MUL, 1.0);
+    v2.set(30*INDEX_MUL, 0.5);
     
     let d = dot(&v1, &v2);
     assert_eq!(d, 51.0 )

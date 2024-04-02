@@ -1,25 +1,27 @@
-use std::marker::PhantomData;
 use std::mem::MaybeUninit;
-use std::ptr::NonNull;
 use crate::bit_block::BitBlock;
-use crate::block::{LevelBlock, HiBlock, is_bypass_block};
-use crate::level::Level;
+use crate::level_block::{HiBlock, LevelBlock};
+use crate::level::ILevel;
 use crate::{LevelMasks, LevelMasksBorrow};
+use crate::bool_type::BoolType;
 use crate::level_masks::{LevelMasksIter, NoState};
 use crate::primitive::Primitive;
 
 // TODO: rename DataBlock to Data?
 
 #[inline]
-fn level_indices<Level1Block: HiBlock>(index: usize) 
+fn level_indices<Level1>(index: usize) 
     -> (usize/*level0*/, usize/*level1*/)
+where 
+    Level1: ILevel,
+    Level1::Block: HiBlock
 {
-    if is_bypass_block::<Level1Block>(){
+    if Level1::Bypass::VALUE {
         return (index, 0)
     }
     
     // this should be const and act as const.
-    /*const*/ let level1_block_capacity_pot_exp: usize = Level1Block::Mask::SIZE_POT_EXPONENT;
+    /*const*/ let level1_block_capacity_pot_exp: usize = <Level1::Block as HiBlock>::Mask::SIZE_POT_EXPONENT;
     /*const*/ let level1_block_capacity        : usize = 1 << level1_block_capacity_pot_exp;
 
     // index / LEVEL1_BLOCK_CAP
@@ -32,22 +34,23 @@ fn level_indices<Level1Block: HiBlock>(index: usize)
     (level0, level1)
 }
 
-pub struct SparseBlockArray<Level0Block, Level1Block, DataBlock>
+pub struct SparseBlockArray<Level0Block, Level1, DataLevel>
 where
-    Level0Block: HiBlock,
-    Level1Block: HiBlock,
-    DataBlock: LevelBlock,
+    Level0Block: HiBlock, 
+    Level1   : ILevel,
+    DataLevel: ILevel
 {
     level0: Level0Block,
-    level1: Level<Level1Block>,
-    data  : Level<DataBlock>,
+    level1: Level1,
+    data  : DataLevel,
 }
-impl<Level0Block, Level1Block, DataBlock> Default for
-    SparseBlockArray<Level0Block, Level1Block, DataBlock>
+impl<Level0Block, Level1, DataLevel> Default for
+    SparseBlockArray<Level0Block, Level1, DataLevel>
 where
     Level0Block: HiBlock,
-    Level1Block: HiBlock,
-    DataBlock  : LevelBlock,
+    Level1: ILevel,
+    Level1::Block: HiBlock,
+    DataLevel: ILevel
 {
     #[inline]
     fn default() -> Self {
@@ -59,16 +62,17 @@ where
     }
 }
 
-impl<Level0Block, Level1Block, DataBlock> 
-    SparseBlockArray<Level0Block, Level1Block, DataBlock>
+impl<Level0Block, Level1, DataLevel> 
+    SparseBlockArray<Level0Block, Level1, DataLevel>
 where
     Level0Block: HiBlock,
-    Level1Block: HiBlock,
-    DataBlock  : LevelBlock,
+    Level1: ILevel,
+    Level1::Block: HiBlock,
+    DataLevel: ILevel
 {
     #[inline]
     fn level_indices(index: usize) -> (usize/*level0*/, usize/*level1*/) {
-        level_indices::<Level1Block>(index)
+        level_indices::<Level1>(index)
     }
     
     // get_mut
@@ -77,23 +81,23 @@ where
     /// 
     /// # Safety
     /// 
-    /// Pointed block at `index` must exist and be empty.
+    /// Pointed level_block at `index` must exist and be empty.
     pub unsafe fn remove_empty_unchecked(&mut self, index: usize){
         todo!()
     }
     
-    /// Inserts and return empty block, if not exists.
+    /// Inserts and return empty level_block, if not exists.
     /// 
     /// If returned DataBlock will end up empty - you MUST
     /// call [remove_empty_unchecked].
-    pub fn get_or_insert(&mut self, index: usize) -> &mut DataBlock {
+    pub fn get_or_insert(&mut self, index: usize) -> &mut DataLevel::Block {
         //assert!(Self::is_in_range(index), "index out of range!");
 
         // That's indices to the next level
         let (level0_index, level1_index) = Self::level_indices(index);
         
         let data_block_index = 
-        if is_bypass_block::<Level1Block>() {
+        if Level1::Bypass::VALUE {
              unsafe{
                 self.level0.get_or_insert(level0_index, ||{
                     let block_index = self.data.insert_empty_block();
@@ -131,7 +135,7 @@ where
     /// 
     /// `index` must be within SparseBlockArray range.
     #[inline]
-    pub unsafe fn get_unchecked(&self, index: usize) -> &DataBlock {
+    pub unsafe fn get_unchecked(&self, index: usize) -> &DataLevel::Block {
         let (level0_index, level1_index) = Self::level_indices(index);
         
         let level1_block_index = self.level0.get_or_zero(level0_index).as_usize();
@@ -179,12 +183,14 @@ where
 
 
 
-impl<Level0Block, Level1Block, DataBlock> LevelMasks for 
-    SparseBlockArray<Level0Block, Level1Block, DataBlock>
+impl<Level0Block, Level1, DataLevel> LevelMasks for 
+    SparseBlockArray<Level0Block, Level1, DataLevel>
 where
     Level0Block: HiBlock,
-    Level1Block: HiBlock,
-    DataBlock: LevelBlock + Clone,
+    Level1: ILevel,
+    Level1::Block: HiBlock,
+    DataLevel: ILevel,
+    DataLevel::Block: Clone,
 {
     type Level0MaskType = Level0Block::Mask;
     type Level0Mask<'a> = &'a Level0Block::Mask where Self: 'a;
@@ -193,8 +199,9 @@ where
         self.level0.mask()
     }
 
-    type Level1MaskType = Level1Block::Mask;
-    type Level1Mask<'a> = &'a Level1Block::Mask where Self: 'a;
+    type Level1Bypass   = Level1::Bypass;
+    type Level1MaskType = <Level1::Block as HiBlock>::Mask;
+    type Level1Mask<'a> = &'a <Level1::Block as HiBlock>::Mask where Self: 'a;
     #[inline]
     unsafe fn level1_mask(&self, level0_index: usize) -> Self::Level1Mask<'_> {
         let level1_block_index = self.level0.get_or_zero(level0_index).as_usize();
@@ -202,8 +209,8 @@ where
         level1_block.mask()
     }
 
-    type DataBlockType = DataBlock;
-    type DataBlock<'a> = &'a DataBlock where Self: 'a;
+    type DataBlockType = DataLevel::Block;
+    type DataBlock<'a> = &'a DataLevel::Block where Self: 'a;
     #[inline]
     unsafe fn data_block(&self, level0_index: usize, level1_index: usize) -> Self::DataBlock<'_> {
         // TODO: bypass
@@ -216,18 +223,19 @@ where
     }
 }
 
-impl<Level0Block, Level1Block, DataBlock> LevelMasksIter for 
-    SparseBlockArray<Level0Block, Level1Block, DataBlock>
+impl<Level0Block, Level1, DataLevel> LevelMasksIter for 
+    SparseBlockArray<Level0Block, Level1, DataLevel>
 where
     Level0Block: HiBlock,
-    Level1Block: HiBlock,
-    DataBlock: LevelBlock + Clone,
+    Level1: ILevel,
+    Level1::Block: HiBlock,
+    DataLevel: ILevel,
+    DataLevel::Block: Clone,
 {
     type IterState = NoState<Self>;
     
-    // TODO: ZST for BypassBlock
     /// Points to the element in the heap. Guaranteed to be stable.
-    type Level1BlockMeta = Option<NonNull<Level1Block>>;
+    type Level1BlockMeta = <Level1::Block as HiBlock>::Meta; 
 
     #[inline]
     unsafe fn init_level1_block_meta(
@@ -236,14 +244,9 @@ where
         level1_block_meta: &mut MaybeUninit<Self::Level1BlockMeta>,
         level0_index: usize
     ) -> (Self::Level1Mask<'_>, bool) {
-        if is_bypass_block::<Level1Block>(){
-            // we know that Level1Block::Mask is ()
-            return (NonNull::<Level1Block::Mask>::dangling().as_ref(), false)
-        }
-        
         let level1_block_index = self.level0.get_or_zero(level0_index);
         let level1_block = self.level1.blocks().get_unchecked(level1_block_index.as_usize());
-        level1_block_meta.write( Some(NonNull::from(level1_block)) );
+        level1_block_meta.write( Self::Level1BlockMeta::from(level1_block) );
         (level1_block.mask(), !level1_block_index.is_zero())
     }
 
@@ -253,11 +256,11 @@ where
         level1_block_meta: &Self::Level1BlockMeta,
         level1_index: usize
     ) -> Self::DataBlock<'_> {
-        let data_block_index = if is_bypass_block::<Level1Block>(){
+        let data_block_index = if Level1::Bypass::VALUE{
             let level0_index = level1_index;
             self.level0.get_or_zero(level0_index).as_usize()
         } else {
-            let level1_block = level1_block_meta.unwrap_unchecked().as_ref();
+            let level1_block = level1_block_meta.as_ref();
             let data_block_index = level1_block.get_or_zero(level1_index).as_usize();
             data_block_index
         };
@@ -266,22 +269,26 @@ where
     }
 }
 
-impl <Level0Block, Level1Block, DataBlock> LevelMasksBorrow
-    for SparseBlockArray<Level0Block, Level1Block, DataBlock>
+impl <Level0Block, Level1, DataLevel> LevelMasksBorrow
+    for SparseBlockArray<Level0Block, Level1, DataLevel>
 where
     Level0Block: HiBlock,
-    Level1Block: HiBlock,
-    DataBlock: LevelBlock + Clone,
+    Level1: ILevel,
+    Level1::Block: HiBlock,
+    DataLevel: ILevel,
+    DataLevel::Block: Clone,
 {
     type Type = Self;
 }
 
-impl <Level0Block, Level1Block, DataBlock> LevelMasksBorrow
-    for &SparseBlockArray<Level0Block, Level1Block, DataBlock>
+impl <Level0Block, Level1, DataLevel> LevelMasksBorrow
+    for &SparseBlockArray<Level0Block, Level1, DataLevel>
 where
     Level0Block: HiBlock,
-    Level1Block: HiBlock,
-    DataBlock: LevelBlock + Clone,
+    Level1: ILevel,
+    Level1::Block: HiBlock,
+    DataLevel: ILevel,
+    DataLevel::Block: Clone,
 {
-    type Type = SparseBlockArray<Level0Block, Level1Block, DataBlock>;
+    type Type = SparseBlockArray<Level0Block, Level1, DataLevel>;
 }

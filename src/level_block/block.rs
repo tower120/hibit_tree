@@ -1,6 +1,8 @@
 use std::mem::{MaybeUninit, size_of};
+use std::ptr::NonNull;
 use crate::bit_block::BitBlock;
-use crate::block::{HiBlock, LevelBlock};
+use crate::level_block::{HiBlock, LevelBlock};
+use crate::level_block::meta_ptr::Ptr;
 use crate::primitive::Primitive;
 use crate::primitive_array::PrimitiveArray;
 
@@ -8,7 +10,7 @@ use crate::primitive_array::PrimitiveArray;
 #[derive(Clone)]
 pub struct Block<Mask, BlockIndices> {
     mask: Mask,
-    /// Next level block indices
+    /// Next level level_block indices
     block_indices: BlockIndices,
 }
 
@@ -48,6 +50,7 @@ where
     Mask: BitBlock,
     BlockIndices: PrimitiveArray
 {
+    type Meta = Ptr<Self>;
     type Mask = Mask;
 
     #[inline]

@@ -3,8 +3,9 @@ use std::mem::{MaybeUninit, size_of};
 use std::ptr;
 use std::slice::{from_raw_parts, from_raw_parts_mut};
 use arrayvec::ArrayVec;
-use crate::block::{LevelBlock, HiBlock};
+use crate::level_block::{LevelBlock, HiBlock};
 use crate::{BitBlock, Primitive, PrimitiveArray};
+use crate::level_block::meta_ptr::Ptr;
 
 type SubBlockMask = u16;
 const SUB_BLOCK_SIZE: usize = size_of::<SubBlockMask>()*8;
@@ -139,6 +140,7 @@ where
     SubBlockIndices: PrimitiveArray,
     SubBlock: PrimitiveArray<Item = u16>
 {
+    type Meta = Ptr<Self>;
     type Mask = Mask;
 
     #[inline]
@@ -193,7 +195,7 @@ where
         
         let sub_block_index_pointer = 
             if sub_block_mask == 0 {
-                // allocate new block
+                // allocate new level_block
                 sub_block_storage.push(unsafe{MaybeUninit::zeroed().assume_init()});
                 //self.sub_block_storage.push(unsafe{MaybeUninit::zeroed().assume_init()});
                 let index = /*self.*/sub_block_storage.len() - 1;

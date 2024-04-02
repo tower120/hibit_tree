@@ -42,13 +42,14 @@ where
 
     S2: LevelMasksBorrow,
     S2::Type: LevelMasks<
-        Level0MaskType = <S1::Type as LevelMasks>::Level0MaskType, 
+        Level0MaskType = <S1::Type as LevelMasks>::Level0MaskType,
+        Level1Bypass   = <S1::Type as LevelMasks>::Level1Bypass,
         Level1MaskType = <S1::Type as LevelMasks>::Level1MaskType,
         DataBlockType  = <S1::Type as LevelMasks>::DataBlockType,
     >,
 
     Op: self::Op<
-        Level0Mask = <S1::Type as LevelMasks>::Level0MaskType, 
+        Level0Mask = <S1::Type as LevelMasks>::Level0MaskType,
         Level1Mask = <S1::Type as LevelMasks>::Level1MaskType,
         DataBlock  = <S1::Type as LevelMasks>::DataBlockType,
     >
@@ -62,6 +63,7 @@ where
         self.op.lvl0_op(s1.level0_mask(), s2.level0_mask())
     }
 
+    type Level1Bypass   = <S1::Type as LevelMasks>::Level1Bypass;
     type Level1MaskType = <S1::Type as LevelMasks>::Level1MaskType;
     type Level1Mask<'a> = Self::Level1MaskType where Self:'a;
     #[inline]
@@ -136,6 +138,7 @@ where
     S2: LevelMasksBorrow,
     S2::Type: LevelMasksIter<
         Level0MaskType = <S1::Type as LevelMasks>::Level0MaskType, 
+        Level1Bypass   = <S1::Type as LevelMasks>::Level1Bypass,
         Level1MaskType = <S1::Type as LevelMasks>::Level1MaskType,
         DataBlockType  = <S1::Type as LevelMasks>::DataBlockType,
     >,

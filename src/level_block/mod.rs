@@ -1,13 +1,16 @@
-//mod cluster_block;
-//mod small_block;
+mod cluster_block;
+mod small_block;
 mod block;
 mod bypass;
 
-//pub use small_block::*;
-//pub use cluster_block::*;
+pub use small_block::*;
+pub use cluster_block::*;
 pub use block::*;
-pub use bypass::*;
 
+pub(crate) use bypass::*;
+
+use std::marker::PhantomData;
+use std::ptr::NonNull;
 use crate::{BitBlock, Primitive, PrimitiveArray};
 
 pub trait LevelBlock: Sized {
@@ -27,8 +30,53 @@ pub trait LevelBlock: Sized {
     fn restore_empty_u64(&mut self);
 }
 
-/// Hierarchy level block
+mod meta_ptr{
+    use super::*;
+    
+    pub struct Ptr<T>(pub(crate) Option<NonNull<T>>);
+    impl<T> From<&T> for Ptr<T>{
+        #[inline]
+        fn from(value: &T) -> Self {
+            Self(Some(NonNull::from(value)))
+        }
+    }
+    impl<T> Default for Ptr<T>{
+        #[inline]
+        fn default() -> Self {
+            Self(None)
+        }
+    }
+    impl<T> AsRef<T> for Ptr<T>{
+        #[inline]
+        fn as_ref(&self) -> &T {
+            unsafe{
+                self.0.unwrap_unchecked().as_ref()
+            }
+        }
+    }
+    
+    pub struct EmptyPtr<T>(PhantomData<T>);
+    impl<T> Default for EmptyPtr<T>{
+        #[inline]
+        fn default() -> Self {
+            Self(PhantomData)
+        }
+    }
+    impl<T> From<&T> for EmptyPtr<T>{
+        fn from(_: &T) -> Self {
+            unreachable!()
+        }
+    }
+    impl<T> AsRef<T> for EmptyPtr<T>{
+        fn as_ref(&self) -> &T {
+            unreachable!()
+        }
+    }
+}
+
+/// Hierarchy level level_block
 pub trait HiBlock: LevelBlock {
+    type Meta: AsRef<Self> + Default + for<'a> From<&'a Self>;
     type Mask: BitBlock;
     
     fn mask(&self) -> &Self::Mask;
