@@ -1,11 +1,13 @@
 use std::any::TypeId;
 use std::mem;
 use std::ops::ControlFlow;
+use std::ptr::NonNull;
 use crate::bit_queue::{ArrayBitQueue, BitQueue, EmptyBitQueue, PrimitiveBitQueue};
 use crate::bit_utils;
 use crate::primitive_array::PrimitiveArray;
 
 pub trait BitBlock: Sized + Clone + 'static{
+    // TODO: Try use SIZE instead. There is const ilog2
     /// 2^N bits
     const SIZE_POT_EXPONENT: usize;
     
@@ -92,3 +94,49 @@ impl BitBlock for u64{
         }        
     }
 }
+
+pub trait IEmptyBitBlock: BitBlock<BitsIter = EmptyBitQueue>{}
+impl<T: BitBlock<BitsIter = EmptyBitQueue>> IEmptyBitBlock for T{}
+
+pub(crate) /*const*/ fn is_empty_bitblock<T: BitBlock>() -> bool {
+    TypeId::of::<T::BitsIter>() == TypeId::of::<EmptyBitQueue>()
+}
+
+#[derive(Default, Copy, Clone)]
+pub struct EmptyBitBlock;
+impl BitBlock for EmptyBitBlock{
+    // TODO: This is actually wrong
+    const SIZE_POT_EXPONENT: usize = 0;
+    
+    /// Size in bits
+    #[inline]
+    /*const*/ fn size() -> usize {
+        0
+    }
+
+    #[inline]
+    fn zero() -> Self {
+        Self
+    }
+
+    type BitsIter = EmptyBitQueue;
+
+    #[inline]
+    fn into_bits_iter(self) -> Self::BitsIter {
+        EmptyBitQueue
+    }
+
+    type Array = [u64;0];
+
+    #[inline]
+    fn as_array(&self) -> &Self::Array {
+        &[]
+    }
+
+    #[inline]
+    fn as_array_mut(&mut self) -> &mut Self::Array {
+        &mut[]
+    }
+}
+
+// TODO: impl BitAnd, BitOr, BitXor, etc - same as for Primitive

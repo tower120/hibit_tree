@@ -1,11 +1,11 @@
 use std::marker::PhantomData;
-use crate::BitBlock;
+use crate::bit_block::{EmptyBitBlock, IEmptyBitBlock, is_empty_bitblock};
 use crate::level_block::{HiBlock, LevelBlock};
 use crate::level_block::meta_ptr::EmptyPtr;
 
-pub struct BypassBlock<Mask>(PhantomData<Mask>);
+pub struct BypassBlock<Mask: IEmptyBitBlock = EmptyBitBlock>(PhantomData<Mask>);
 
-impl<Mask> LevelBlock for BypassBlock<Mask>{
+impl<Mask: IEmptyBitBlock> LevelBlock for BypassBlock<Mask>{
     fn empty() -> Self {
         Self(PhantomData)
     }
@@ -23,7 +23,7 @@ impl<Mask> LevelBlock for BypassBlock<Mask>{
     }
 }
 
-impl<Mask: BitBlock> HiBlock for BypassBlock<Mask>{
+impl<Mask: IEmptyBitBlock> HiBlock for BypassBlock<Mask>{
     type Meta = EmptyPtr<Self>;
     type Mask = Mask;
 
@@ -48,4 +48,8 @@ impl<Mask: BitBlock> HiBlock for BypassBlock<Mask>{
     unsafe fn remove_unchecked(&mut self, index: usize) {
         unreachable!()
     }
+}
+
+pub(crate) /*const*/ fn is_bypass_block<T: HiBlock>() -> bool {
+    is_empty_bitblock::<T::Mask>()
 }

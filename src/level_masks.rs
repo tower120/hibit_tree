@@ -2,9 +2,13 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::mem::{ManuallyDrop, MaybeUninit};
 use crate::{BitBlock, IntoOwned};
-use crate::bool_type::BoolType;
+use crate::bit_block::is_empty_bitblock;
 
 /// Basic interface for accessing level_block masks. Can work with `SimpleIter`.
+///
+/// # Level bypass
+/// 
+/// TODO
 /// 
 // We need xxxxType for each concrete level_block/mask type to avoid the need for use `for<'a>`,
 // which is still not working (at Rust level) in cases, where we need it most. 
@@ -14,7 +18,6 @@ pub trait LevelMasks{
         where Self: 'a;
     fn level0_mask(&self) -> Self::Level0Mask<'_>;
 
-    type Level1Bypass: BoolType;
     type Level1MaskType: BitBlock;
     type Level1Mask<'a>: Borrow<Self::Level1MaskType> + IntoOwned<Self::Level1MaskType>
         where Self: 'a;
@@ -23,14 +26,47 @@ pub trait LevelMasks{
     /// index is not checked
     unsafe fn level1_mask(&self, level0_index: usize) -> Self::Level1Mask<'_>;
     
+    type Level2MaskType: BitBlock;
+    type Level2Mask<'a>: Borrow<Self::Level2MaskType> + IntoOwned<Self::Level2MaskType>
+        where Self: 'a;
+    /// # Safety
+    ///
+    /// index is not checked
+    unsafe fn level2_mask(&self, level0_index: usize, level1_index: usize) -> Self::Level2Mask<'_>;
+    
     type DataBlockType;
     type DataBlock<'a>: Borrow<Self::DataBlockType> + IntoOwned<Self::DataBlockType> 
         where Self: 'a;
     /// # Safety
     ///
     /// indices are not checked
-    unsafe fn data_block(&self, level0_index: usize, level1_index: usize)
+    unsafe fn data_block(&self, level0_index: usize, level1_index: usize, level2_index: usize)
         -> Self::DataBlock<'_>;
+}
+
+pub enum LevelBypass {
+    None,
+    Level2,
+    Level1Level2
+}
+
+// TODO: move to LevelMasks
+/// This acts as `const`.
+pub /*const*/ fn level_bypass<T: LevelMasks>() -> LevelBypass {
+    // This is somewhat vague, but do the job.
+    //let lvl1 = TypeId::of::<<T::Level1MaskType as BitBlock>::BitsIter>() == TypeId::of::<EmptyBitQueue>(); 
+    //let lvl2 = TypeId::of::<<T::Level2MaskType as BitBlock>::BitsIter>() == TypeId::of::<EmptyBitQueue>();
+    let lvl1 = is_empty_bitblock::<T::Level1MaskType>();
+    let lvl2 = is_empty_bitblock::<T::Level2MaskType>();
+    
+    if lvl1{
+        assert!(lvl2);
+        LevelBypass::Level1Level2
+    } else if lvl2 {
+        LevelBypass::Level2
+    } else {
+        LevelBypass::None
+    }
 }
 
 /// Iterator state for LevelMasksIter.
@@ -95,7 +131,6 @@ pub trait LevelMasksIter: LevelMasks{
     /// without traversing whole hierarchy for getting each level_block during iteration.
     type Level1BlockMeta: Default;
     
-    
     /// Init `level1_block_data` and return (Level1Mask, is_not_empty).
     /// 
     /// Called by iterator for each traversed level1 level_block.
@@ -123,14 +158,34 @@ pub trait LevelMasksIter: LevelMasks{
         level1_block_meta: &mut MaybeUninit<Self::Level1BlockMeta>,
         level0_index: usize
     ) -> (Self::Level1Mask<'_>, bool);    
+    
+    
+    type Level2BlockMeta: Default;
+    unsafe fn init_level2_block_meta(
+        &self,
+        state: &mut Self::IterState,
+        level1_block_meta: &Self::Level1BlockMeta,
+        level2_block_meta: &mut MaybeUninit<Self::Level2BlockMeta>,
+        level1_index: usize
+    ) -> (Self::Level2Mask<'_>, bool);    
 
     /// Called by iterator for each traversed data level_block.
+    /// 
+    /// `level_index` depending on LevelBypass could be either level0, level1 or level2 in-block index.
     /// 
     /// # Safety
     ///
     /// indices are not checked.
     unsafe fn data_block_from_meta(
         &self,
-        level1_block_meta: &Self::Level1BlockMeta, level1_index: usize
+        level1_block_meta: &Self::Level1BlockMeta,
+        level2_block_meta: &Self::Level2BlockMeta, 
+        level_index: usize
     ) -> Self::DataBlock<'_>;
+}
+
+// TODO: As long as iterator works with &LevelMasks - we can just
+//       use Borrow<impl LevelMasks> everywhere
+pub trait LevelMasksBorrow: Borrow<Self::Type>{
+    type Type: LevelMasks;
 }

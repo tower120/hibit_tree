@@ -6,8 +6,7 @@ mod bypass;
 pub use small_block::*;
 pub use cluster_block::*;
 pub use block::*;
-
-pub(crate) use bypass::*;
+pub use bypass::*;
 
 use std::marker::PhantomData;
 use std::ptr::NonNull;

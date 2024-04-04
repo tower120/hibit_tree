@@ -7,6 +7,22 @@ use crate::bit_block::BitBlock;
 use crate::{LevelMasks, IntoOwned, LevelMasksBorrow};
 use crate::level_masks::{LevelMasksIter, LevelMasksIterState};
 
+/// &mut MaybeUninit<(T0, T1)> = (&mut MaybeUninit<T0>, &mut MaybeUninit<T1>)
+#[inline] 
+fn uninit_as_mut_pair<T0, T1>(pair: &mut MaybeUninit<(T0, T1)>)
+    -> (&mut MaybeUninit<T0>, &mut MaybeUninit<T1>)
+{
+    unsafe{
+        let ptr  = pair.as_mut_ptr();
+        let ptr0 = addr_of_mut!((*ptr).0);
+        let ptr1 = addr_of_mut!((*ptr).1);
+        (
+            &mut* mem::transmute::<_, *mut MaybeUninit<T0>>(ptr0),
+            &mut* mem::transmute::<_, *mut MaybeUninit<T1>>(ptr1)
+        )
+    }
+}
+
 // We need more advanced GAT in Rust to make `DataBlock<'a>` work here 
 // in a meaningful way.
 // For now, should be good enough as-is for Apply.
@@ -22,6 +38,12 @@ pub trait Op {
         left : impl Borrow<Self::Level1Mask> + IntoOwned<Self::Level1Mask>,
         right: impl Borrow<Self::Level1Mask> + IntoOwned<Self::Level1Mask>
     ) -> Self::Level1Mask;
+    
+    type Level2Mask;
+    fn lvl2_op(&self,
+        left : impl Borrow<Self::Level2Mask> + IntoOwned<Self::Level2Mask>,
+        right: impl Borrow<Self::Level2Mask> + IntoOwned<Self::Level2Mask>
+    ) -> Self::Level2Mask;
     
     type DataBlock;
     fn data_op(&self,
@@ -43,14 +65,15 @@ where
     S2: LevelMasksBorrow,
     S2::Type: LevelMasks<
         Level0MaskType = <S1::Type as LevelMasks>::Level0MaskType,
-        Level1Bypass   = <S1::Type as LevelMasks>::Level1Bypass,
         Level1MaskType = <S1::Type as LevelMasks>::Level1MaskType,
+        Level2MaskType = <S1::Type as LevelMasks>::Level2MaskType,
         DataBlockType  = <S1::Type as LevelMasks>::DataBlockType,
     >,
 
     Op: self::Op<
         Level0Mask = <S1::Type as LevelMasks>::Level0MaskType,
         Level1Mask = <S1::Type as LevelMasks>::Level1MaskType,
+        Level2Mask = <S1::Type as LevelMasks>::Level2MaskType,
         DataBlock  = <S1::Type as LevelMasks>::DataBlockType,
     >
 {
@@ -63,7 +86,6 @@ where
         self.op.lvl0_op(s1.level0_mask(), s2.level0_mask())
     }
 
-    type Level1Bypass   = <S1::Type as LevelMasks>::Level1Bypass;
     type Level1MaskType = <S1::Type as LevelMasks>::Level1MaskType;
     type Level1Mask<'a> = Self::Level1MaskType where Self:'a;
     #[inline]
@@ -75,16 +97,28 @@ where
             s2.level1_mask(level0_index)
         )
     }
+    
+    type Level2MaskType = <S1::Type as LevelMasks>::Level2MaskType;
+    type Level2Mask<'a> = Self::Level2MaskType where Self:'a;
+    #[inline]
+    unsafe fn level2_mask(&self, level0_index: usize, level1_index: usize) -> Self::Level2Mask<'_> {
+        let s1 = self.s1.borrow(); 
+        let s2 = self.s2.borrow();
+        self.op.lvl2_op(
+            s1.level2_mask(level0_index, level1_index),
+            s2.level2_mask(level0_index, level1_index)
+        )
+    }
 
     type DataBlockType = Op::DataBlock;
     type DataBlock<'a> = Op::DataBlock where Self:'a;
     #[inline]
-    unsafe fn data_block(&self, level0_index: usize, level1_index: usize) -> Self::DataBlock<'_> {
+    unsafe fn data_block(&self, level0_index: usize, level1_index: usize, level2_index: usize) -> Self::DataBlock<'_> {
         let s1 = self.s1.borrow(); 
         let s2 = self.s2.borrow();
         self.op.data_op(
-            s1.data_block(level0_index, level1_index),
-            s2.data_block(level0_index, level1_index)
+            s1.data_block(level0_index, level1_index, level2_index),
+            s2.data_block(level0_index, level1_index, level2_index)
         )
     }
 }
@@ -137,64 +171,88 @@ where
 
     S2: LevelMasksBorrow,
     S2::Type: LevelMasksIter<
-        Level0MaskType = <S1::Type as LevelMasks>::Level0MaskType, 
-        Level1Bypass   = <S1::Type as LevelMasks>::Level1Bypass,
+        Level0MaskType = <S1::Type as LevelMasks>::Level0MaskType,
         Level1MaskType = <S1::Type as LevelMasks>::Level1MaskType,
+        Level2MaskType = <S1::Type as LevelMasks>::Level2MaskType,
         DataBlockType  = <S1::Type as LevelMasks>::DataBlockType,
     >,
 
     Op: self::Op<
-        Level0Mask = <S1::Type as LevelMasks>::Level0MaskType, 
+        Level0Mask = <S1::Type as LevelMasks>::Level0MaskType,
         Level1Mask = <S1::Type as LevelMasks>::Level1MaskType,
+        Level2Mask = <S1::Type as LevelMasks>::Level2MaskType,
         DataBlock  = <S1::Type as LevelMasks>::DataBlockType,
     >
 {
     type IterState = ApplyIterState<Op, S1, S2>;
+    
     type Level1BlockMeta = (
         <S1::Type as LevelMasksIter>::Level1BlockMeta,
         <S2::Type as LevelMasksIter>::Level1BlockMeta
     );
-
+    
     #[inline]
     unsafe fn init_level1_block_meta(
         &self,
         state: &mut Self::IterState,
-        level1_block_data: &mut MaybeUninit<Self::Level1BlockMeta>,
+        level1_block_meta: &mut MaybeUninit<Self::Level1BlockMeta>,
         level0_index: usize
     ) -> (Self::Level1Mask<'_>, bool) {
-        // &mut MaybeUninit<(T0, T1)> = (&mut MaybeUninit<T0>, &mut MaybeUninit<T1>) 
-        let (level1_block_data0, level1_block_data1) = {
-            let ptr = level1_block_data.as_mut_ptr();
-            let ptr0 = addr_of_mut!((*ptr).0);
-            let ptr1 = addr_of_mut!((*ptr).1);
-            (
-                &mut*mem::transmute::<_, *mut MaybeUninit<<S1::Type as LevelMasksIter>::Level1BlockMeta>>(ptr0),
-                &mut*mem::transmute::<_, *mut MaybeUninit<<S2::Type as LevelMasksIter>::Level1BlockMeta>>(ptr1)
-            )
-        };   
+        let level1_block_meta = uninit_as_mut_pair(level1_block_meta);   
         
         let (mask1, v1) = self.s1.borrow().init_level1_block_meta(
-            &mut state.s1, level1_block_data0, level0_index
+            &mut state.s1, level1_block_meta.0, level0_index
         );
         let (mask2, v2) = self.s2.borrow().init_level1_block_meta(
-            &mut state.s2, level1_block_data1, level0_index
+            &mut state.s2, level1_block_meta.1, level0_index
         );
         
         let mask = self.op.lvl1_op(mask1, mask2);
+        (mask, v1 | v2)
+    }
+    
+    type Level2BlockMeta = (
+        <S1::Type as LevelMasksIter>::Level2BlockMeta,
+        <S2::Type as LevelMasksIter>::Level2BlockMeta
+    );
+    
+    #[inline]
+    unsafe fn init_level2_block_meta(
+        &self,
+        state: &mut Self::IterState,
+        level1_block_meta: &Self::Level1BlockMeta,
+        level2_block_meta: &mut MaybeUninit<Self::Level2BlockMeta>,
+        level1_index: usize
+    ) -> (Self::Level2Mask<'_>, bool) {
+        let level2_block_meta = uninit_as_mut_pair(level2_block_meta);
+
+        let (mask1, v1) = self.s1.borrow().init_level2_block_meta(
+            &mut state.s1, &level1_block_meta.0, level2_block_meta.0, level1_index
+        );
+        let (mask2, v2) = self.s2.borrow().init_level2_block_meta(
+            &mut state.s2, &level1_block_meta.1, level2_block_meta.1, level1_index
+        );
+        
+        let mask = self.op.lvl2_op(mask1, mask2);
         (mask, v1 | v2)
     }
 
     #[inline]
     unsafe fn data_block_from_meta(
         &self,
-        level1_block_info: &Self::Level1BlockMeta,
-        level1_index: usize
+        level1_block_meta: &Self::Level1BlockMeta,
+        level2_block_meta: &Self::Level2BlockMeta,
+        level_index: usize
     ) -> Self::DataBlock<'_> {
         let m0 = self.s1.borrow().data_block_from_meta(
-            &level1_block_info.0, level1_index
+            &level1_block_meta.0,
+            &level2_block_meta.0,
+            level_index
         );
         let m1 = self.s2.borrow().data_block_from_meta(
-            &level1_block_info.1, level1_index
+            &level1_block_meta.1,
+            &level2_block_meta.1,
+            level_index
         ); 
         self.op.data_op(m0, m1)
     }

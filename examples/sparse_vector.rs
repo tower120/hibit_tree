@@ -3,10 +3,11 @@ use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
 use wide::f32x4;
 use hi_sparse_array::{Apply, apply, BitBlock, Op, IntoOwned, SparseBlockArray};
+use hi_sparse_array::bit_queue::EmptyBitQueue;
 use hi_sparse_array::level_block::{LevelBlock, Block};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::level::{BypassLevel, Level};
-use hi_sparse_array::simple_iter::SimpleBlockIter;
+//use hi_sparse_array::simple_iter::SimpleBlockIter;
 
 #[derive(Clone)]
 struct DataBlock(f32x4);
@@ -40,12 +41,46 @@ impl LevelBlock for DataBlock{
     }
 }
 
+#[derive(Clone)]
+struct EmptyMask;
+impl BitBlock for EmptyMask{
+    const SIZE_POT_EXPONENT: usize = 0;
+
+    fn zero() -> Self {
+        Self
+    }
+
+    type BitsIter = EmptyBitQueue;
+
+    fn into_bits_iter(self) -> Self::BitsIter {
+        EmptyBitQueue
+    }
+
+    type Array = [u64; 0];
+
+    fn as_array(&self) -> &Self::Array {
+        todo!()
+    }
+
+    fn as_array_mut(&mut self) -> &mut Self::Array {
+        todo!()
+    }
+} 
+impl BitAnd for EmptyMask{
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        todo!()
+    }
+}
+
 type Lvl0Block = Block<u64, [u8; 64]>;
 type Lvl1Block = Block<u64, [u16; 64]>;
 type SparseArray = SparseBlockArray<
     Lvl0Block,
     //Level<Lvl1Block>,
-    BypassLevel<Lvl1Block>,
+    BypassLevel<EmptyMask>,
+    BypassLevel<EmptyMask>,
     Level<DataBlock>
 >;
 
@@ -68,16 +103,16 @@ impl SparseVector{
     }
 }
 
-pub struct MulOp<L0, L1, LD>(PhantomData<(L0, L1, LD)>);
-impl<L0, L1, LD> Default for MulOp<L0, L1, LD>{
+pub struct MulOp<L0, L1, L2, LD>(PhantomData<(L0, L1, L2, LD)>);
+impl<L0, L1, L2, LD> Default for MulOp<L0, L1, L2, LD>{
     fn default() -> Self {
         Self(PhantomData)
     }
 } 
 
-impl<L0, L1, LD> Op for MulOp<L0, L1, LD>
+impl<L0, L1, L2, LD> Op for MulOp<L0, L1, L2, LD>
 where
-    L0: BitAnd<Output = L0>, L1: BitAnd<Output = L1>, LD: Mul<Output = LD>/* + Clone*/
+    L0: BitAnd<Output = L0>, L1: BitAnd<Output = L1>, L2: BitAnd<Output = L2>, LD: Mul<Output = LD>
 {
     type Level0Mask = L0;
     fn lvl0_op(&self, left: impl IntoOwned<L0>, right: impl IntoOwned<L0>) -> Self::Level0Mask {
@@ -88,17 +123,27 @@ where
     fn lvl1_op(&self, left: impl IntoOwned<L1>, right: impl IntoOwned<L1>) -> Self::Level1Mask {
         left.into_owned() & right.into_owned()
     }
+    
+    type Level2Mask = L2;
+    fn lvl2_op(&self, left: impl IntoOwned<L2>, right: impl IntoOwned<L2>) -> Self::Level2Mask {
+        left.into_owned() & right.into_owned()
+    }
 
     type DataBlock = LD;
-    fn data_op(&self, left: impl Borrow<LD> + IntoOwned<LD>, right: impl Borrow<LD> + IntoOwned<LD>) -> Self::DataBlock 
-    {
+    fn data_op(&self, left: impl Borrow<LD> + IntoOwned<LD>, right: impl Borrow<LD> + IntoOwned<LD>) -> Self::DataBlock {
         left.into_owned() * right.into_owned()
     }
 }
 
 // TODO: should be lazy in all ways.
 /// Per-element multiplication
-pub fn mul<'a>(v1: &'a SparseVector, v2: &'a SparseVector) -> Apply<MulOp<u64, u64, DataBlock>, &'a SparseArray, &'a SparseArray>{
+pub fn mul<'a>(v1: &'a SparseVector, v2: &'a SparseVector) 
+    -> Apply<
+        MulOp<u64, EmptyMask, EmptyMask, DataBlock>, 
+        &'a SparseArray, 
+        &'a SparseArray
+    >
+{
     apply(
         Default::default(),
         &v1.sparse_array,

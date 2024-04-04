@@ -1,9 +1,12 @@
 use std::marker::PhantomData;
+use crate::bit_block::{EmptyBitBlock, IEmptyBitBlock};
 use crate::bool_type::{BoolType, FalseType, TrueType};
 use crate::level_block::{BypassBlock, HiBlock, LevelBlock};
 use crate::primitive::Primitive;
 
 pub trait ILevel: Default {
+    // TODO: remove. Now unused
+    #[deprecated]
     type Bypass: BoolType;
     type Block: LevelBlock;
     
@@ -112,17 +115,18 @@ impl<Block: LevelBlock> ILevel for Level<Block> {
     }
 }
 
-pub struct BypassLevel<Block = BypassBlock<u64>>(PhantomData<Block>);
-impl<Block> Default for BypassLevel<Block>{
+// TODO: there should be #derive(EmptyBitBlock)  
+pub struct BypassLevel<EmptyMask: IEmptyBitBlock = EmptyBitBlock>(PhantomData<EmptyMask>);
+impl<EmptyMask: IEmptyBitBlock> Default for BypassLevel<EmptyMask>{
     #[inline]
     fn default() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<Block: HiBlock> ILevel for BypassLevel<Block> {
+impl<EmptyMask: IEmptyBitBlock> ILevel for BypassLevel<EmptyMask> {
     type Bypass = TrueType;
-    type Block = BypassBlock<Block::Mask>;
+    type Block = BypassBlock<EmptyMask>;
 
     fn blocks(&self) -> &[Self::Block] {
         unreachable!()
