@@ -99,6 +99,7 @@ pub trait LevelMasksIterState {
     fn drop(container: &Self::Container, this: &mut ManuallyDrop<Self>);
 }
 
+// TODO: consider returning back to LevelMasksIter
 pub struct NoState<C: LevelMasksIter>(PhantomData<C>);
 impl<C: LevelMasksIter> LevelMasksIterState for NoState<C> {
     type Container = C;
@@ -122,14 +123,14 @@ impl<C: LevelMasksIter> LevelMasksIterState for NoState<C> {
 pub trait LevelMasksIter: LevelMasks{
     type IterState: LevelMasksIterState<Container = Self>;
     
-    /// Level1 level_block related data, used to speed up data level_block access.
+    /*/// Level1 level_block related data, used to speed up data level_block access.
     ///
     /// Prefer POD, or any kind of drop-less, since it will be dropped
     /// before the iteration of each next level1 level_block.
     /// 
     /// In library, used to cache Level1Block pointers for faster DataBlock access,
     /// without traversing whole hierarchy for getting each level_block during iteration.
-    type Level1BlockMeta: Default;
+    type Level1BlockMeta: Default;*/
     
     /// Init `level1_block_data` and return (Level1Mask, is_not_empty).
     /// 
@@ -155,17 +156,17 @@ pub trait LevelMasksIter: LevelMasks{
     unsafe fn init_level1_block_meta(
         &self,
         state: &mut Self::IterState,
-        level1_block_meta: &mut MaybeUninit<Self::Level1BlockMeta>,
+        //level1_block_meta: &mut MaybeUninit<Self::Level1BlockMeta>,
         level0_index: usize
     ) -> (Self::Level1Mask<'_>, bool);    
     
     
-    type Level2BlockMeta: Default;
+    //type Level2BlockMeta: Default;
     unsafe fn init_level2_block_meta(
         &self,
         state: &mut Self::IterState,
-        level1_block_meta: &Self::Level1BlockMeta,
-        level2_block_meta: &mut MaybeUninit<Self::Level2BlockMeta>,
+        // level1_block_meta: &Self::Level1BlockMeta,
+        // level2_block_meta: &mut MaybeUninit<Self::Level2BlockMeta>,
         level1_index: usize
     ) -> (Self::Level2Mask<'_>, bool);    
 
@@ -178,14 +179,19 @@ pub trait LevelMasksIter: LevelMasks{
     /// indices are not checked.
     unsafe fn data_block_from_meta(
         &self,
-        level1_block_meta: &Self::Level1BlockMeta,
-        level2_block_meta: &Self::Level2BlockMeta, 
+        state: &Self::IterState,
+        // level1_block_meta: &Self::Level1BlockMeta,
+        // level2_block_meta: &Self::Level2BlockMeta, 
         level_index: usize
     ) -> Self::DataBlock<'_>;
 }
 
 // TODO: As long as iterator works with &LevelMasks - we can just
 //       use Borrow<impl LevelMasks> everywhere
+
 pub trait LevelMasksBorrow: Borrow<Self::Type>{
     type Type: LevelMasks;
+}
+impl<T: LevelMasks> LevelMasksBorrow for T{
+    type Type = T;
 }

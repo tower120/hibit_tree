@@ -1,6 +1,6 @@
 use std::any::TypeId;
 use std::mem;
-use std::ops::ControlFlow;
+use std::ops::{BitAnd, ControlFlow};
 use std::ptr::NonNull;
 use crate::bit_queue::{ArrayBitQueue, BitQueue, EmptyBitQueue, PrimitiveBitQueue};
 use crate::bit_utils;
@@ -136,6 +136,14 @@ impl BitBlock for EmptyBitBlock{
     #[inline]
     fn as_array_mut(&mut self) -> &mut Self::Array {
         &mut[]
+    }
+}
+impl BitAnd for EmptyBitBlock{
+    type Output = Self;
+
+    #[inline]
+    fn bitand(self, _: Self) -> Self::Output {
+        self
     }
 }
 

@@ -3,7 +3,7 @@ use criterion::{black_box, Criterion, criterion_group, criterion_main};
 use hi_sparse_array::SparseBlockArray;
 use hi_sparse_array::level_block::{LevelBlock, Block, SmallBlock, ClusterBlock};
 use hi_sparse_array::caching_iter::CachingBlockIter;
-use hi_sparse_array::level::Level;
+use hi_sparse_array::level::{BypassLevel, Level};
 
 type Lvl0Block = Block<u64, [u8;64]>;
 type Lvl1Block = Block<u64, [u16;64]>;
@@ -30,9 +30,9 @@ impl LevelBlock for DataBlock{
     }
 }
 
-type BlockArray = SparseBlockArray<Lvl0Block, Level<Lvl1Block>, Level<DataBlock>>;
-type SmallBlockArray = SparseBlockArray<Lvl0Block, Level<CompactLvl1Block>, Level<DataBlock>>;
-type ClusterBlockArray = SparseBlockArray<Lvl0Block, Level<ClusterLvl1Block>, Level<DataBlock>>;
+type BlockArray = SparseBlockArray<Lvl0Block, Level<Lvl1Block>, BypassLevel/*Level<Lvl1Block>*/, Level<DataBlock>>;
+type SmallBlockArray = SparseBlockArray<Lvl0Block, Level<CompactLvl1Block>, BypassLevel, Level<DataBlock>>;
+type ClusterBlockArray = SparseBlockArray<Lvl0Block, Level<ClusterLvl1Block>, BypassLevel, Level<DataBlock>>;
 
 
 fn cluster_array_iter(array: &ClusterBlockArray) -> u64 {

@@ -13,15 +13,18 @@ pub mod bit_queue;
 pub mod caching_iter;
 //mod ref_or_val;
 pub mod level_block;
+mod reduce;
 
 //pub use ref_or_val::*;
-pub use bit_block::{BitBlock, IEmptyBitBlock};
+pub use bit_block::{BitBlock, IEmptyBitBlock, EmptyBitBlock};
 pub use primitive::Primitive;
 pub use primitive_array::PrimitiveArray;
 pub use array::SparseBlockArray;
 pub use apply::{Apply, Op};
+pub use reduce::Reduce;
 
 use std::borrow::Borrow;
+use std::marker::PhantomData;
 use bool_type::BoolType;
 use level_masks::LevelMasks;
 use crate::level_masks::{level_bypass, LevelBypass, LevelMasksBorrow, LevelMasksIter};
@@ -71,11 +74,22 @@ impl<T: Clone> IntoOwned<T> for &T{
 }
 
 #[inline]
-pub fn apply<Op, S1, S2>(op: Op, s1: S1, s2: S2) -> Apply<Op, S1, S2>
+pub fn apply<Op, B1, B2, T1, T2>(op: Op, s1: B1, s2: B2) -> Apply<Op, B1, B2, T1, T2>
 where
     Op: apply::Op,
-    S1: LevelMasksBorrow,
-    S2: LevelMasksBorrow,
+    B1: Borrow<T1>,
+    B2: Borrow<T2>,
 {
-    Apply{op, s1, s2}
+    Apply{op, s1, s2, phantom: PhantomData}
+}
+
+#[inline]
+pub fn reduce<Op, ArrayIter, Array>(op: Op, array_iter: ArrayIter) -> Reduce<Op, ArrayIter, Array>
+where
+    Op: apply::Op,
+    ArrayIter: Iterator + Clone,
+    ArrayIter::Item: Borrow<Array>,
+    Array: LevelMasks,
+{
+    Reduce{op, array_iter, phantom: PhantomData}
 }

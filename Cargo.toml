@@ -16,3 +16,7 @@ itertools = "0.12.1"
 [[bench]]
 name = "iteration"
 harness = false
+
+[[bench]]
+name = "reduce_and"
+harness = false

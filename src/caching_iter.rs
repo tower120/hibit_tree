@@ -16,8 +16,10 @@ where
     level1_index: usize,
 
     state: ManuallyDrop<T::IterState>,
+    
+    /*// TODO: whats a point in MaybeUninit here?
     level1_block_meta: MaybeUninit<T::Level1BlockMeta>,
-    level2_block_meta: MaybeUninit<T::Level2BlockMeta>,
+    level2_block_meta: MaybeUninit<T::Level2BlockMeta>,*/
 }
 
 impl<'a, T> CachingBlockIter<'a, T>
@@ -42,8 +44,8 @@ where
             level1_index: usize::MAX,    
 
             state: ManuallyDrop::new(state),
-            level1_block_meta: MaybeUninit::new(Default::default()),
-            level2_block_meta: MaybeUninit::new(Default::default()),
+            /*level1_block_meta: MaybeUninit::new(Default::default()),
+            level2_block_meta: MaybeUninit::new(Default::default()),*/
         }
     }
 }
@@ -69,12 +71,12 @@ where
                     
                     self.level1_index = index;
                     let level2_mask = unsafe {
-                        self.level2_block_meta.assume_init_drop();
+                        // self.level2_block_meta.assume_init_drop();
                         let (level_mask, _) = 
                             self.container.init_level2_block_meta(
                                 &mut self.state,
-                                self.level1_block_meta.assume_init_ref(),
-                                &mut self.level2_block_meta,
+                                // self.level1_block_meta.assume_init_ref(),
+                                // &mut self.level2_block_meta,
                                 index
                             );
                         level_mask
@@ -89,11 +91,11 @@ where
                         
                         self.level0_index = index;
                         let level1_mask = unsafe {
-                            self.level1_block_meta.assume_init_drop();
+                            // self.level1_block_meta.assume_init_drop();
                             let (level1_mask, _) = 
                                 self.container.init_level1_block_meta(
                                     &mut self.state,
-                                    &mut self.level1_block_meta,
+                                    // &mut self.level1_block_meta,
                                     index
                                 );
                             level1_mask
@@ -139,8 +141,9 @@ where
         let data_block = unsafe {
             T::data_block_from_meta(
                 &self.container,
-                self.level1_block_meta.assume_init_ref(),
-                self.level2_block_meta.assume_init_ref(),
+                &self.state,
+                // self.level1_block_meta.assume_init_ref(),
+                // self.level2_block_meta.assume_init_ref(),
                 level_index
             )
         };
@@ -156,7 +159,8 @@ where
     #[inline]
     fn drop(&mut self) {
         unsafe{
-            self.level1_block_meta.assume_init_drop();
+            // self.level1_block_meta.assume_init_drop();
+            // self.level2_block_meta.assume_init_drop();
             
             T::IterState
                 ::drop(self.container, &mut self.state);

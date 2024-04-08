@@ -112,7 +112,10 @@ impl<L0, L1, L2, LD> Default for MulOp<L0, L1, L2, LD>{
 
 impl<L0, L1, L2, LD> Op for MulOp<L0, L1, L2, LD>
 where
-    L0: BitAnd<Output = L0>, L1: BitAnd<Output = L1>, L2: BitAnd<Output = L2>, LD: Mul<Output = LD>
+    L0: BitBlock + BitAnd<Output = L0>, 
+    L1: BitBlock + BitAnd<Output = L1>, 
+    L2: BitBlock + BitAnd<Output = L2>, 
+    LD: Mul<Output = LD>
 {
     type Level0Mask = L0;
     fn lvl0_op(&self, left: impl IntoOwned<L0>, right: impl IntoOwned<L0>) -> Self::Level0Mask {
@@ -141,11 +144,13 @@ pub fn mul<'a>(v1: &'a SparseVector, v2: &'a SparseVector)
     -> Apply<
         MulOp<u64, EmptyMask, EmptyMask, DataBlock>, 
         &'a SparseArray, 
-        &'a SparseArray
+        &'a SparseArray,
+        SparseArray,
+        SparseArray
     >
 {
     apply(
-        Default::default(),
+        MulOp::default(),
         &v1.sparse_array,
         &v2.sparse_array
     )
