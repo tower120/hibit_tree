@@ -202,15 +202,16 @@ where
         state: &mut Self::IterState,
         level0_index: usize
     ) -> (Self::Level1Mask<'_>, bool) {
-        let (mask1, v1) = self.s1.borrow().init_level1_block_meta(
+        let (mask1, _) = self.s1.borrow().init_level1_block_meta(
             &mut state.s1, level0_index
         );
-        let (mask2, v2) = self.s2.borrow().init_level1_block_meta(
+        let (mask2, _) = self.s2.borrow().init_level1_block_meta(
             &mut state.s2, level0_index
         );
         
         let mask = self.op.lvl1_op(mask1, mask2);
-        (mask, v1 | v2)
+        let is_empty = mask.is_zero();
+        (mask, !is_empty)
     }
     
     #[inline]
@@ -219,15 +220,16 @@ where
         state: &mut Self::IterState,
         level1_index: usize
     ) -> (Self::Level2Mask<'_>, bool) {
-        let (mask1, v1) = self.s1.borrow().init_level2_block_meta(
+        let (mask1, _) = self.s1.borrow().init_level2_block_meta(
             &mut state.s1, level1_index
         );
-        let (mask2, v2) = self.s2.borrow().init_level2_block_meta(
+        let (mask2, _) = self.s2.borrow().init_level2_block_meta(
             &mut state.s2, level1_index
         );
         
         let mask = self.op.lvl2_op(mask1, mask2);
-        (mask, v1 | v2)
+        let is_empty = mask.is_zero();
+        (mask, !is_empty)
     }
 
     #[inline]

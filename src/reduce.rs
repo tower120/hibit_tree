@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ptr::NonNull;
 use arrayvec::ArrayVec;
-use crate::IntoOwned;
+use crate::{BitBlock, IntoOwned};
 use crate::level_masks::{level_bypass, LevelBypass, LevelMasks, LevelMasksBorrow, LevelMasksIter/*, LevelMasksIterState*/};
 
 pub struct Reduce<'a, Op, ArrayIter, Array>{
@@ -150,32 +150,35 @@ where
     
     #[inline]
     unsafe fn init_level1_block_meta(&self, state: &mut Self::IterState, level0_index: usize) -> (Self::Level1Mask<'_>, bool) {
-        let mut states_iter = state.states.iter_mut();
-        
-        let (first_array, first_state) = states_iter.next().unwrap_unchecked();
-        
-        let (acc_mask, mut acc_v) = first_array.init_level1_block_meta(first_state, level0_index);
-        let mut acc_mask = acc_mask.into_owned();
-        
         if Op::SKIP_EMPTY_HIERARCHIES{
             state.lvl1_non_empty_states.clear();
         }
-        let mut i = 0;
+        
+        let mut states_iter = state.states.iter_mut();
+        let (first_array, first_state) = states_iter.next().unwrap_unchecked();
+        let (acc_mask, v) = first_array.init_level1_block_meta(first_state, level0_index);
+        if Op::SKIP_EMPTY_HIERARCHIES{
+            if v{
+                state.lvl1_non_empty_states.push_unchecked(0);
+            }
+        }
+        
+        let mut i = 1;
+        let mut acc_mask = acc_mask.into_owned();
         for (array, array_state) in states_iter{
             let (mask, v) = array.init_level1_block_meta(array_state, level0_index);
+            acc_mask = self.op.lvl1_op(acc_mask, mask);
             
             if Op::SKIP_EMPTY_HIERARCHIES{
                 if v{
                     state.lvl1_non_empty_states.push_unchecked(i);
-                    i += 1;
                 }
+                i += 1;
             }
-            
-            acc_mask = self.op.lvl1_op(acc_mask, mask);
-            acc_v = acc_v | v;      // not empty if at least one not-empty TODO: This is approximation!!!
         }
         
-        (acc_mask, acc_v)
+        let is_empty = acc_mask.is_zero(); 
+        (acc_mask, !is_empty)
     }
 
     #[inline]

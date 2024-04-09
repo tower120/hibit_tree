@@ -6,7 +6,7 @@ use crate::bit_queue::{ArrayBitQueue, BitQueue, EmptyBitQueue, PrimitiveBitQueue
 use crate::bit_utils;
 use crate::primitive_array::PrimitiveArray;
 
-pub trait BitBlock: Sized + Clone + 'static{
+pub trait BitBlock: Eq + Sized + Clone + 'static{
     // TODO: Try use SIZE instead. There is const ilog2
     /// 2^N bits
     const SIZE_POT_EXPONENT: usize;
@@ -18,6 +18,11 @@ pub trait BitBlock: Sized + Clone + 'static{
     }
     
     fn zero() -> Self;
+    
+    #[inline]
+    fn is_zero(&self) -> bool{
+        self == &Self::zero()
+    }
     
     /// Returns previous bit
     /// 
@@ -102,7 +107,7 @@ pub(crate) /*const*/ fn is_empty_bitblock<T: BitBlock>() -> bool {
     TypeId::of::<T::BitsIter>() == TypeId::of::<EmptyBitQueue>()
 }
 
-#[derive(Default, Copy, Clone)]
+#[derive(Eq, PartialEq, Default, Copy, Clone)]
 pub struct EmptyBitBlock;
 impl BitBlock for EmptyBitBlock{
     // TODO: This is actually wrong

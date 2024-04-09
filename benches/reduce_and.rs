@@ -122,11 +122,10 @@ pub fn bench_iter(c: &mut Criterion) {
         *block_array3.get_or_insert(i*20) = DataBlock(i as u64);
         *block_array4.get_or_insert(i*20) = DataBlock(i as u64);
     }
-    let arrays = [block_array1, block_array2, block_array3];
+    let arrays = [block_array1, block_array2/*, block_array3*/];
 
-    //c.bench_function("apply", |b| b.iter(|| apply_iter(black_box(&block_array1), black_box(&block_array2))));
-    //c.bench_function("reduce", |b| b.iter(|| reduce_iter(black_box(&block_array1), black_box(&block_array2))));
-    c.bench_function("reduce", |b| b.iter(|| reduce_iter(/*black_box(*/&arrays/*.iter()*//*)*/)));
+    c.bench_function("apply", |b| b.iter(|| apply_iter(black_box(&arrays[0]), black_box(&arrays[1]))));
+    c.bench_function("reduce", |b| b.iter(|| reduce_iter(black_box(&arrays))));
     
 }
 
