@@ -110,13 +110,12 @@ pub struct ReduceIterState<'a, Array>
 where
     Array: LevelMasksIter
 {
-    // TODO: try to put &'a Array here - looks like thats faster!
-    states: ArrayVec<Array::IterState, N>,
+    states: ArrayVec<(&'a Array, Array::IterState), N>,
     
     // TODO: ZST when not in use 
     /// In-use only when `Op::SKIP_EMPTY_HIERARCHIES` raised.
-    lvl1_non_empty_states: ArrayVec<(&'a Array, usize), N>,
-    lvl2_non_empty_states: ArrayVec<(&'a Array, usize), N>,
+    lvl1_non_empty_states: ArrayVec<usize, N>,
+    lvl2_non_empty_states: ArrayVec<usize, N>,
 }
 
 impl<'a, Op, ArrayIter, Array> LevelMasksIter for Reduce<'a, Op, ArrayIter, Array>
@@ -137,7 +136,9 @@ where
     fn make_state(&self) -> Self::IterState{
         let mut states = ArrayVec::new();
         for array in self.array_iter.clone(){
-            unsafe{ states.push_unchecked(array.make_state()); }
+            unsafe{ 
+                states.push_unchecked((array, array.make_state())); 
+            }
         }
         
         ReduceIterState{
@@ -149,11 +150,9 @@ where
     
     #[inline]
     unsafe fn init_level1_block_meta(&self, state: &mut Self::IterState, level0_index: usize) -> (Self::Level1Mask<'_>, bool) {
-        let mut array_iter = self.array_iter.clone();
         let mut states_iter = state.states.iter_mut();
         
-        let first_array = array_iter.next().unwrap_unchecked();
-        let first_state = states_iter.next().unwrap_unchecked();
+        let (first_array, first_state) = states_iter.next().unwrap_unchecked();
         
         let (acc_mask, mut acc_v) = first_array.init_level1_block_meta(first_state, level0_index);
         let mut acc_mask = acc_mask.into_owned();
@@ -162,13 +161,12 @@ where
             state.lvl1_non_empty_states.clear();
         }
         let mut i = 0;
-        for array in array_iter{
-            let array_state = states_iter.next().unwrap_unchecked();
+        for (array, array_state) in states_iter{
             let (mask, v) = array.init_level1_block_meta(array_state, level0_index);
             
             if Op::SKIP_EMPTY_HIERARCHIES{
                 if v{
-                    state.lvl1_non_empty_states.push_unchecked((array, i));
+                    state.lvl1_non_empty_states.push_unchecked(i);
                     i += 1;
                 }
             }
@@ -197,19 +195,16 @@ where
                     debug_assert!(LevelBypass::None == level_bypass::<Self>());
                     state.lvl2_non_empty_states.iter()
                 }
-                .map(|(array, i)| (
-                    *array, state.states.get_unchecked(*i)
-                ));
+                .map(|i|{
+                    let s = state.states.get_unchecked(*i);
+                    (s.0, &s.1)
+                });
             return Self::do_data_block_from_meta(states, &self.op, level_index);
         }
         
-        let mut array_iter = self.array_iter.clone();
-        let states = (0..state.states.len()).map(|i|{
-            (
-                array_iter.next().unwrap_unchecked(),
-                state.states.get_unchecked(i)
-            )
-        });
+        let states = state.states.iter().map(|s|
+            (s.0, &s.1)
+        );        
         Self::do_data_block_from_meta(states, &self.op, level_index)
     }
 }
