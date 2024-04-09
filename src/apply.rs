@@ -1,11 +1,11 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::mem;
-use std::mem::{ManuallyDrop, MaybeUninit};
+use std::mem::MaybeUninit;
 use std::ptr::addr_of_mut;
 use crate::bit_block::BitBlock;
-use crate::{LevelMasks, IntoOwned, LevelMasksBorrow};
-use crate::level_masks::{LevelMasksIter, LevelMasksIterState};
+use crate::{LevelMasks, IntoOwned};
+use crate::level_masks::LevelMasksIter;
 
 // TODO: unused now
 /// &mut MaybeUninit<(T0, T1)> = (&mut MaybeUninit<T0>, &mut MaybeUninit<T1>)
@@ -24,10 +24,39 @@ fn uninit_as_mut_pair<T0, T1>(pair: &mut MaybeUninit<(T0, T1)>)
     }
 }
 
+// TODO: move out from apply.
 // We need more advanced GAT in Rust to make `DataBlock<'a>` work here 
 // in a meaningful way.
 // For now, should be good enough as-is for Apply.
 pub trait Op {
+    /// Check and skip empty hierarchies? Any value is safe. Use `false` as default.
+    /// 
+    /// This incurs some performance overhead, but can greatly reduce
+    /// algorithmic complexity of some [Reduce] operations.
+    /// 
+    /// # In-depth
+    /// 
+    /// For example, merge operation will OR level1 mask, and some of the
+    /// raised bits of resulting bitmask will not correspond to the raised bits
+    /// of each source bitmask:
+    /// ```text
+    /// L 01100001      
+    /// R 00101000
+    /// ----------
+    /// O 01101001    
+    /// ```
+    /// R's second bit is 0, but resulting bitmask's bit is 1.
+    /// This means that in level2 R's second block's mask will be loaded, 
+    /// thou its empty and can be skipped.
+    /// 
+    /// [Reduce] cache hierarchy blocks for faster traverse. And when this flag
+    /// is raised - it checks and does not add empty blocks to the cache list. 
+    ///
+    /// Notice though, that such thing cannot happen with intersection. 
+    /// So trying to apply such optimization there, would be a waste of resources.   
+    /// 
+    const SKIP_EMPTY_HIERARCHIES: bool;
+    
     type Level0Mask: BitBlock;
     fn lvl0_op(&self,
         left : impl Borrow<Self::Level0Mask> + IntoOwned<Self::Level0Mask>,
@@ -127,42 +156,13 @@ where
     }
 }
 
-pub struct ApplyIterState<Op, B1, B2, T1, T2>
+pub struct ApplyIterState<T1, T2>
 where
     T1: LevelMasksIter,
     T2: LevelMasksIter,
 {
     s1: <T1 as LevelMasksIter>::IterState, 
     s2: <T2 as LevelMasksIter>::IterState,
-    phantom: PhantomData<(Op, B1, B2)>
-}
-
-impl<Op, B1, B2, T1, T2> LevelMasksIterState for ApplyIterState<Op, B1, B2, T1, T2>
-where
-    B1: Borrow<T1>,
-    B2: Borrow<T2>,
-
-    T1: LevelMasksIter,
-    T2: LevelMasksIter,
-{
-    type Container = Apply<Op, B1, B2, T1, T2>;
-
-    #[inline]
-    fn make(container: &Self::Container) -> Self {
-        Self{
-            s1: T1::IterState::make(container.s1.borrow()),
-            s2: T2::IterState::make(container.s2.borrow()),
-            phantom: PhantomData
-        }
-    }
-
-    #[inline]
-    fn drop(container: &Self::Container, this: &mut ManuallyDrop<Self>) {
-        unsafe{
-            T1::IterState::drop(container.s1.borrow(), mem::transmute(&mut this.s1));
-            T2::IterState::drop(container.s2.borrow(), mem::transmute(&mut this.s2));
-        }
-    }
 }
 
 impl<Op, B1, B2, T1, T2> LevelMasksIter for Apply<Op, B1, B2, T1, T2>
@@ -186,53 +186,44 @@ where
         DataBlock  = T1::DataBlockType,
     >
 {
-    type IterState = ApplyIterState<Op, B1, B2, T1, T2>;
+    type IterState = ApplyIterState<T1, T2>;
     
-    /*type Level1BlockMeta = (
-        <S1::Type as LevelMasksIter>::Level1BlockMeta,
-        <S2::Type as LevelMasksIter>::Level1BlockMeta
-    );*/
+    #[inline]
+    fn make_state(&self) -> Self::IterState {
+        ApplyIterState{
+            s1: self.s1.borrow().make_state(), 
+            s2: self.s2.borrow().make_state(),
+        }
+    }
     
     #[inline]
     unsafe fn init_level1_block_meta(
         &self,
         state: &mut Self::IterState,
-        // level1_block_meta: &mut MaybeUninit<Self::Level1BlockMeta>,
         level0_index: usize
     ) -> (Self::Level1Mask<'_>, bool) {
-        // let level1_block_meta = uninit_as_mut_pair(level1_block_meta);   
-        
         let (mask1, v1) = self.s1.borrow().init_level1_block_meta(
-            &mut state.s1, /*level1_block_meta.0,*/ level0_index
+            &mut state.s1, level0_index
         );
         let (mask2, v2) = self.s2.borrow().init_level1_block_meta(
-            &mut state.s2, /*level1_block_meta.1,*/ level0_index
+            &mut state.s2, level0_index
         );
         
         let mask = self.op.lvl1_op(mask1, mask2);
         (mask, v1 | v2)
     }
     
-    /*type Level2BlockMeta = (
-        <S1::Type as LevelMasksIter>::Level2BlockMeta,
-        <S2::Type as LevelMasksIter>::Level2BlockMeta
-    );*/
-    
     #[inline]
     unsafe fn init_level2_block_meta(
         &self,
         state: &mut Self::IterState,
-        // level1_block_meta: &Self::Level1BlockMeta,
-        // level2_block_meta: &mut MaybeUninit<Self::Level2BlockMeta>,
         level1_index: usize
     ) -> (Self::Level2Mask<'_>, bool) {
-        // let level2_block_meta = uninit_as_mut_pair(level2_block_meta);
-
         let (mask1, v1) = self.s1.borrow().init_level2_block_meta(
-            &mut state.s1, /*&level1_block_meta.0, level2_block_meta.0,*/ level1_index
+            &mut state.s1, level1_index
         );
         let (mask2, v2) = self.s2.borrow().init_level2_block_meta(
-            &mut state.s2, /*&level1_block_meta.1, level2_block_meta.1,*/ level1_index
+            &mut state.s2, level1_index
         );
         
         let mask = self.op.lvl2_op(mask1, mask2);
@@ -243,21 +234,13 @@ where
     unsafe fn data_block_from_meta(
         &self,
         state: &Self::IterState,
-        // level1_block_meta: &Self::Level1BlockMeta,
-        // level2_block_meta: &Self::Level2BlockMeta,
         level_index: usize
     ) -> Self::DataBlock<'_> {
         let m0 = self.s1.borrow().data_block_from_meta(
-            &state.s1,
-            // &level1_block_meta.0,
-            // &level2_block_meta.0,
-            level_index
+            &state.s1, level_index
         );
         let m1 = self.s2.borrow().data_block_from_meta(
-            &state.s2,
-            // &level1_block_meta.1,
-            // &level2_block_meta.1,
-            level_index
+            &state.s2, level_index
         ); 
         self.op.data_op(m0, m1)
     }

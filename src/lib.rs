@@ -84,11 +84,10 @@ where
 }
 
 #[inline]
-pub fn reduce<Op, ArrayIter, Array>(op: Op, array_iter: ArrayIter) -> Reduce<Op, ArrayIter, Array>
+pub fn reduce<'a, Op, ArrayIter, Array>(op: Op, array_iter: ArrayIter) -> Reduce<'a, Op, ArrayIter, Array>
 where
     Op: apply::Op,
-    ArrayIter: Iterator + Clone,
-    ArrayIter::Item: Borrow<Array>,
+    ArrayIter: Iterator<Item = &'a Array> + Clone,
     Array: LevelMasks,
 {
     Reduce{op, array_iter, phantom: PhantomData}

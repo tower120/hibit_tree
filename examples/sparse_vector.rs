@@ -117,6 +117,8 @@ where
     L2: BitBlock + BitAnd<Output = L2>, 
     LD: Mul<Output = LD>
 {
+    const SKIP_EMPTY_HIERARCHIES: bool = false;
+    
     type Level0Mask = L0;
     fn lvl0_op(&self, left: impl IntoOwned<L0>, right: impl IntoOwned<L0>) -> Self::Level0Mask {
         left.into_owned() & right.into_owned()

@@ -57,38 +57,43 @@ where
     L2: BitBlock + BitAnd<Output = L2>, 
     LD: BitAnd<Output = LD>
 {
+    const SKIP_EMPTY_HIERARCHIES: bool = false;
+     
     type Level0Mask = L0;
+    #[inline]
     fn lvl0_op(&self, left: impl IntoOwned<L0>, right: impl IntoOwned<L0>) -> Self::Level0Mask {
         left.into_owned() & right.into_owned()
     }
 
     type Level1Mask = L1;
+    #[inline]
     fn lvl1_op(&self, left: impl IntoOwned<L1>, right: impl IntoOwned<L1>) -> Self::Level1Mask {
         left.into_owned() & right.into_owned()
     }
     
     type Level2Mask = L2;
+    #[inline]
     fn lvl2_op(&self, left: impl IntoOwned<L2>, right: impl IntoOwned<L2>) -> Self::Level2Mask {
         left.into_owned() & right.into_owned()
     }
 
     type DataBlock = LD;
+    #[inline]
     fn data_op(&self, left: impl Borrow<LD> + IntoOwned<LD>, right: impl Borrow<LD> + IntoOwned<LD>) -> Self::DataBlock {
         left.into_owned() & right.into_owned()
     }
 }
 
 
-fn reduce_iter(array1: &BlockArray, array2: &BlockArray) -> u64 {
-    let list = [array1, array2];
+fn reduce_iter(list: &[BlockArray]) -> u64 {
+    let list = list.iter();
     
     let and_op: AndOp<u64, u64, EmptyBitBlock, DataBlock> = AndOp(PhantomData);
-    let reduce: Reduce<_, _, BlockArray> = reduce(and_op, list.iter().copied());
+    let reduce: Reduce<_, _, BlockArray> = reduce(and_op, list/*.iter().copied()*/);
     
     let mut s = 0;
     for (_, i) in CachingBlockIter::new(&reduce){
-        //s += i.0;
-        s += 1;
+        s += i.0;
     }
     s
 }
@@ -99,8 +104,7 @@ fn apply_iter(array1: &BlockArray, array2: &BlockArray) -> u64 {
     
     let mut s = 0;
     for (_, i) in CachingBlockIter::new(&reduce){
-        //s += i.0;
-        s += 1;
+        s += i.0;
     }
     s
 }
@@ -109,14 +113,20 @@ fn apply_iter(array1: &BlockArray, array2: &BlockArray) -> u64 {
 pub fn bench_iter(c: &mut Criterion) {
     let mut block_array1 = BlockArray::default();
     let mut block_array2 = BlockArray::default();
+    let mut block_array3 = BlockArray::default();
+    let mut block_array4 = BlockArray::default();
 
     for i in 0..100{
         *block_array1.get_or_insert(i*20) = DataBlock(i as u64);
         *block_array2.get_or_insert(i*20) = DataBlock(i as u64);
+        *block_array3.get_or_insert(i*20) = DataBlock(i as u64);
+        *block_array4.get_or_insert(i*20) = DataBlock(i as u64);
     }
+    let arrays = [block_array1, block_array2, block_array3];
 
-    c.bench_function("apply", |b| b.iter(|| apply_iter(black_box(&block_array1), black_box(&block_array2))));
-    c.bench_function("reduce", |b| b.iter(|| reduce_iter(black_box(&block_array1), black_box(&block_array2))));
+    //c.bench_function("apply", |b| b.iter(|| apply_iter(black_box(&block_array1), black_box(&block_array2))));
+    //c.bench_function("reduce", |b| b.iter(|| reduce_iter(black_box(&block_array1), black_box(&block_array2))));
+    c.bench_function("reduce", |b| b.iter(|| reduce_iter(/*black_box(*/&arrays/*.iter()*//*)*/)));
     
 }
 
