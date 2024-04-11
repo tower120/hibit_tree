@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use std::mem::{ManuallyDrop, MaybeUninit};
 use crate::{BitBlock, IntoOwned};
 use crate::bit_block::is_empty_bitblock;
+use crate::level_block::LevelBlock;
 
 /// Basic interface for accessing level_block masks. Can work with `SimpleIter`.
 ///
@@ -34,7 +35,8 @@ pub trait LevelMasks{
     /// index is not checked
     unsafe fn level2_mask(&self, level0_index: usize, level1_index: usize) -> Self::Level2Mask<'_>;
     
-    type DataBlockType;
+    // TODO: remove LevelBlock bound
+    type DataBlockType: LevelBlock;
     type DataBlock<'a>: Borrow<Self::DataBlockType> + IntoOwned<Self::DataBlockType> 
         where Self: 'a;
     /// # Safety

@@ -4,47 +4,23 @@ use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ptr::NonNull;
 use arrayvec::ArrayVec;
 use crate::{BitBlock, IntoOwned};
-use crate::level_block::LevelBlock;
 use crate::level_masks::{level_bypass, LevelBypass, LevelMasks, LevelMasksBorrow, LevelMasksIter/*, LevelMasksIterState*/};
 
-pub struct Reduce<'a, Op, ArrayIter, Array>{
+// TODO: We can go without ArrayIter being Clone!
+
+pub struct Fold<'a, Op, Init, ArrayIter, Array>{
     pub(crate) op: Op,
+    pub(crate) init: &'a Init,
     pub(crate) array_iter: ArrayIter,
     pub(crate) phantom: PhantomData<&'a Array>,
 }
 
-impl<'a, Op, ArrayIter, Array> Reduce<'a, Op, ArrayIter, Array>
+impl<'a, Op, Init, ArrayIter, Array> LevelMasks for Fold<'a, Op, Init, ArrayIter, Array>
 where
-    Array: LevelMasksIter,
-
-    Op: crate::apply::Op<
-        Level0Mask = Array::Level0MaskType,
-        Level1Mask = Array::Level1MaskType,
-        Level2Mask = Array::Level2MaskType,
-        DataBlock  = Array::DataBlockType,
+    Init: LevelMasks<
+        Level0MaskType = Array::Level0MaskType 
     >,
-{
-    // Should be inside data_block_from_meta. But not in current Rust.
-    #[inline]
-    unsafe fn do_data_block_from_meta<'b, States>(mut states: States, op: &Op, level_index: usize)
-        -> Op::DataBlock 
-    where
-        States: Iterator<Item = (&'a Array, &'b Array::IterState)>,
-        Array::IterState: 'b
-    {
-        let first = states.next().unwrap_unchecked();
-        let mut acc = first.0.data_block_from_meta(&first.1, level_index).into_owned();
-        
-        for (array, state) in states{
-            let data = array.data_block_from_meta(state, level_index);
-            acc = op.data_op(acc, data);
-        }
-        acc
-    }
-}
 
-impl<'a, Op, ArrayIter, Array> LevelMasks for Reduce<'a, Op, ArrayIter, Array>
-where
     ArrayIter: Iterator<Item = &'a Array> + Clone,
     Array: LevelMasks,
 
@@ -60,20 +36,10 @@ where
 
     #[inline]
     fn level0_mask(&self) -> Self::Level0Mask<'_> {
-        /*let mut arrays_iter = self.arrays.clone();
-        let mut first = unsafe{ arrays_iter.next().unwrap_unchecked() };
-        let mut out = first.borrow().level0_mask().into_owned();
+        // TODO: Can use cached states instead, but this will be called only once per iterator.
         
-        while let Some(array) = arrays_iter.next(){
-            out = self.op.lvl0_op(out, array.borrow().level0_mask());
-        }
-        
-        out*/
-        
-        let mut array_iter = self.array_iter.clone();
-        let mut first = unsafe{ array_iter.next().unwrap_unchecked() };
-        array_iter.fold(
-            first.level0_mask().into_owned(), 
+        self.array_iter.clone().fold(
+            self.init.level0_mask().into_owned(), 
             |acc, array|{
                 self.op.lvl0_op(acc, array.level0_mask())
             }
@@ -107,10 +73,12 @@ where
 
 const N: usize = 32;
 
-pub struct ReduceIterState<'a, Array>
+pub struct ReduceIterState<'a, Init, Array>
 where
-    Array: LevelMasksIter
+    Init: LevelMasksIter,
+    Array: LevelMasksIter,
 {
+    init_state: Init::IterState,
     states: ArrayVec<(&'a Array, Array::IterState), N>,
     
     // TODO: ZST when not in use 
@@ -119,8 +87,14 @@ where
     lvl2_non_empty_states: ArrayVec<usize, N>,
 }
 
-impl<'a, Op, ArrayIter, Array> LevelMasksIter for Reduce<'a, Op, ArrayIter, Array>
+impl<'a, Op, Init, ArrayIter, Array> LevelMasksIter for Fold<'a, Op, Init, ArrayIter, Array>
 where
+    Init: LevelMasksIter<
+        Level0MaskType = Array::Level0MaskType,
+        Level1MaskType = Array::Level1MaskType,
+        Level2MaskType = Array::Level2MaskType,
+        DataBlockType  = Array::DataBlockType,
+    >,
     ArrayIter: Iterator<Item = &'a Array> + Clone,
     Array: LevelMasksIter,
 
@@ -131,7 +105,7 @@ where
         DataBlock  = Array::DataBlockType,
     >,
 {
-    type IterState = ReduceIterState<'a, Array>;
+    type IterState = ReduceIterState<'a, Init, Array>;
     
     #[inline]
     fn make_state(&self) -> Self::IterState{
@@ -143,6 +117,7 @@ where
         }
         
         ReduceIterState{
+            init_state: self.init.make_state(),
             states,
             lvl1_non_empty_states: Default::default(),
             lvl2_non_empty_states: Default::default(),
@@ -151,31 +126,23 @@ where
     
     #[inline]
     unsafe fn init_level1_block_meta(&self, state: &mut Self::IterState, level0_index: usize) -> (Self::Level1Mask<'_>, bool) {
+        let (acc_mask, _) = self.init.init_level1_block_meta(&mut state.init_state, level0_index);
+        let mut acc_mask = acc_mask.into_owned();
+        
         if Op::SKIP_EMPTY_HIERARCHIES{
             state.lvl1_non_empty_states.clear();
-        }
-        
-        let mut states_iter = state.states.iter_mut();
-        let (first_array, first_state) = states_iter.next().unwrap_unchecked();
-        let (acc_mask, v) = first_array.init_level1_block_meta(first_state, level0_index);
-        if Op::SKIP_EMPTY_HIERARCHIES{
-            if v{
-                state.lvl1_non_empty_states.push_unchecked(0);
+            for i in 0..state.states.len(){
+                let (array, array_state) = state.states.get_unchecked_mut(i);
+                let (mask, _) = array.init_level1_block_meta(array_state, level0_index);
+                acc_mask = self.op.lvl1_op(acc_mask, mask);
+                
+                state.lvl1_non_empty_states.push_unchecked(i);
             }
-        }
-        
-        let mut i = 1;
-        let mut acc_mask = acc_mask.into_owned();
-        for (array, array_state) in states_iter{
-            let (mask, v) = array.init_level1_block_meta(array_state, level0_index);
-            acc_mask = self.op.lvl1_op(acc_mask, mask);
-            
-            if Op::SKIP_EMPTY_HIERARCHIES{
-                if v{
-                    state.lvl1_non_empty_states.push_unchecked(i);
-                }
-                i += 1;
-            }
+        } else {
+            for (array, array_state) in state.states.iter_mut(){
+                let (mask, v) = array.init_level1_block_meta(array_state, level0_index);
+                acc_mask = self.op.lvl1_op(acc_mask, mask);
+            }            
         }
         
         let is_empty = acc_mask.is_zero(); 
@@ -184,34 +151,58 @@ where
 
     #[inline]
     unsafe fn init_level2_block_meta(&self, state: &mut Self::IterState, level1_index: usize) -> (Self::Level2Mask<'_>, bool) {
-        todo!()
+        let (acc_mask, _) = self.init.init_level2_block_meta(&mut state.init_state, level1_index);
+        let mut acc_mask = acc_mask.into_owned();
+        
+        if Op::SKIP_EMPTY_HIERARCHIES{
+            state.lvl2_non_empty_states.clear();
+            for &i in &state.lvl1_non_empty_states{
+                let (array, array_state) = state.states.get_unchecked_mut(i);
+                let (mask, v) = array.init_level2_block_meta(array_state, level1_index);
+                acc_mask = self.op.lvl2_op(acc_mask, mask);
+                
+                if v{
+                    state.lvl2_non_empty_states.push_unchecked(i);
+                }
+            }
+        } else {
+            for (array, array_state) in state.states.iter_mut(){
+                let (mask, _) = array.init_level2_block_meta(array_state, level1_index);
+                acc_mask = self.op.lvl2_op(acc_mask, mask);
+            }
+        }
+        
+        let is_empty = acc_mask.is_zero(); 
+        (acc_mask, !is_empty)
     }
-
+    
     #[inline]
     unsafe fn data_block_from_meta(&self, state: &Self::IterState, level_index: usize) -> Self::DataBlock<'_> {
+        let mut acc = self.init.data_block_from_meta(&state.init_state, level_index).into_owned();
+        
         if Op::SKIP_EMPTY_HIERARCHIES
         && level_bypass::<Self>() != LevelBypass::Level1Level2
         {
-            let states =
+            let state_indices =
                 if LevelBypass::Level2 == level_bypass::<Self>(){
                     state.lvl1_non_empty_states.iter()
                 } else {
                     debug_assert!(LevelBypass::None == level_bypass::<Self>());
                     state.lvl2_non_empty_states.iter()
-                }
-                .map(|i|{
-                    let s = state.states.get_unchecked(*i);
-                    (s.0, &s.1)
-                });
-            if states.len() == 0{
-                return Self::DataBlock::empty();
+                };
+            
+            for &i in state_indices {
+                let (array, array_state) = state.states.get_unchecked(i);
+                let data = array.data_block_from_meta(array_state, level_index);
+                acc = self.op.data_op(acc, data);
             }
-            return Self::do_data_block_from_meta(states, &self.op, level_index);
+        } else {
+            for (array, state) in &state.states {
+                let data = array.data_block_from_meta(state, level_index);
+                acc = self.op.data_op(acc, data);
+            }
         }
         
-        let states = state.states.iter().map(|s|
-            (s.0, &s.1)
-        );        
-        Self::do_data_block_from_meta(states, &self.op, level_index)
-    }
+        acc        
+    }    
 }

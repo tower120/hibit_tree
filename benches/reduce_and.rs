@@ -1,10 +1,9 @@
 use std::borrow::Borrow;
 use std::collections::HashMap;
-use std::fs::ReadDir;
 use std::marker::PhantomData;
-use std::ops::{BitAnd, Mul};
+use std::ops::{BitAnd, BitOr, Mul};
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
-use hi_sparse_array::{apply, Apply, BitBlock, EmptyBitBlock, IntoOwned, Op, reduce, Reduce, SparseBlockArray};
+use hi_sparse_array::{apply, Apply, BitBlock, Empty, EmptyBitBlock, fold, IntoOwned, Op, reduce, Reduce, SparseBlockArray};
 use hi_sparse_array::level_block::{LevelBlock, Block, SmallBlock, ClusterBlock};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::level::{BypassLevel, Level};
@@ -20,6 +19,14 @@ impl BitAnd for DataBlock{
     #[inline]
     fn bitand(self, rhs: Self) -> Self::Output {
         Self(self.0 & rhs.0)
+    }
+}
+impl BitOr for DataBlock{
+    type Output = Self;
+
+    #[inline]
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self(self.0 | rhs.0)
     }
 }
 impl LevelBlock for DataBlock{
@@ -84,12 +91,53 @@ where
     }
 }
 
+pub struct OrOp<L0, L1, L2, LD>(PhantomData<(L0, L1, L2, LD)>);
+impl<L0, L1, L2, LD> Default for OrOp<L0, L1, L2, LD> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+} 
+
+impl<L0, L1, L2, LD> Op for OrOp<L0, L1, L2, LD>
+where
+    L0: BitBlock + BitOr<Output = L0>, 
+    L1: BitBlock + BitOr<Output = L1>, 
+    L2: BitBlock + BitOr<Output = L2>, 
+    LD: BitOr<Output = LD>
+{
+    const SKIP_EMPTY_HIERARCHIES: bool = false;
+     
+    type Level0Mask = L0;
+    #[inline]
+    fn lvl0_op(&self, left: impl IntoOwned<L0>, right: impl IntoOwned<L0>) -> Self::Level0Mask {
+        left.into_owned() | right.into_owned()
+    }
+
+    type Level1Mask = L1;
+    #[inline]
+    fn lvl1_op(&self, left: impl IntoOwned<L1>, right: impl IntoOwned<L1>) -> Self::Level1Mask {
+        left.into_owned() | right.into_owned()
+    }
+    
+    type Level2Mask = L2;
+    #[inline]
+    fn lvl2_op(&self, left: impl IntoOwned<L2>, right: impl IntoOwned<L2>) -> Self::Level2Mask {
+        left.into_owned() | right.into_owned()
+    }
+
+    type DataBlock = LD;
+    #[inline]
+    fn data_op(&self, left: impl Borrow<LD> + IntoOwned<LD>, right: impl Borrow<LD> + IntoOwned<LD>) -> Self::DataBlock {
+        left.into_owned() | right.into_owned()
+    }
+}
+
 
 fn reduce_iter(list: &[BlockArray]) -> u64 {
     let list = list.iter();
     
-    let and_op: AndOp<u64, u64, EmptyBitBlock, DataBlock> = AndOp(PhantomData);
-    let reduce: Reduce<_, _, BlockArray> = reduce(and_op, list/*.iter().copied()*/);
+    let and_op: OrOp<u64, u64, EmptyBitBlock, DataBlock> = OrOp(PhantomData);
+    let reduce = reduce(and_op, list/*.iter().copied()*/);
     
     let mut s = 0;
     for (_, i) in CachingBlockIter::new(&reduce){
@@ -97,6 +145,36 @@ fn reduce_iter(list: &[BlockArray]) -> u64 {
     }
     s
 }
+
+fn fold_iter(list: &[BlockArray]) -> u64 {
+    let and_op: OrOp<u64, u64, EmptyBitBlock, DataBlock> = OrOp(PhantomData);
+    
+    let init = unsafe{ list.get_unchecked(0) };
+    let other = unsafe{ list.get_unchecked(1..) };
+    
+    
+    let fold = fold(and_op, init, other.iter());
+    
+    let mut s = 0;
+    for (_, i) in CachingBlockIter::new(&fold){
+        s += i.0;
+    }
+    s
+}
+
+fn fold_w_empty_iter(list: &[BlockArray]) -> u64 {
+    let and_op: OrOp<u64, u64, EmptyBitBlock, DataBlock> = OrOp(PhantomData);
+    let empty = Empty::<u64, u64, EmptyBitBlock, DataBlock>::default();
+    
+    let fold = fold(and_op, &empty, list.iter());
+    
+    let mut s = 0;
+    for (_, i) in CachingBlockIter::new(&fold){
+        s += i.0;
+    }
+    s
+}
+
 
 fn apply_iter(array1: &BlockArray, array2: &BlockArray) -> u64 {
     let and_op: AndOp<u64, u64, EmptyBitBlock, DataBlock> = AndOp(PhantomData);
@@ -122,11 +200,12 @@ pub fn bench_iter(c: &mut Criterion) {
         *block_array3.get_or_insert(i*20) = DataBlock(i as u64);
         *block_array4.get_or_insert(i*20) = DataBlock(i as u64);
     }
-    let arrays = [block_array1, block_array2/*, block_array3*/];
+    let arrays = [block_array1, block_array2, block_array3];
 
-    c.bench_function("apply", |b| b.iter(|| apply_iter(black_box(&arrays[0]), black_box(&arrays[1]))));
+    //c.bench_function("apply", |b| b.iter(|| apply_iter(black_box(&arrays[0]), black_box(&arrays[1]))));
+    c.bench_function("fold", |b| b.iter(|| fold_iter(black_box(&arrays))));
+    //c.bench_function("fold_w_empty", |b| b.iter(|| fold_w_empty_iter(black_box(&arrays))));
     c.bench_function("reduce", |b| b.iter(|| reduce_iter(black_box(&arrays))));
-    
 }
 
 criterion_group!(benches_iter, bench_iter);

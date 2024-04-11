@@ -14,6 +14,8 @@ pub mod caching_iter;
 //mod ref_or_val;
 pub mod level_block;
 mod reduce;
+mod fold;
+mod empty;
 
 //pub use ref_or_val::*;
 pub use bit_block::{BitBlock, IEmptyBitBlock, EmptyBitBlock};
@@ -22,6 +24,9 @@ pub use primitive_array::PrimitiveArray;
 pub use array::SparseBlockArray;
 pub use apply::{Apply, Op};
 pub use reduce::Reduce;
+pub use fold::Fold;
+pub use empty::Empty;
+
 
 use std::borrow::Borrow;
 use std::marker::PhantomData;
@@ -91,4 +96,15 @@ where
     Array: LevelMasks,
 {
     Reduce{op, array_iter, phantom: PhantomData}
+}
+
+#[inline]
+pub fn fold<'a, Op, Init, ArrayIter, Array>(op: Op, init: &'a Init, array_iter: ArrayIter) -> Fold<'a, Op, Init, ArrayIter, Array>
+where
+    Op: apply::Op,
+    ArrayIter: Iterator<Item = &'a Array> + Clone,
+    Array: LevelMasks,
+    Init: LevelMasks,
+{
+    Fold{op, init, array_iter, phantom: PhantomData}
 }

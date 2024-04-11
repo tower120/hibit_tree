@@ -29,11 +29,11 @@ impl LevelBlock for DataBlock{
 fn bypass_test(){
     type Lvl0Block = Block<u64, [u8;64]>;
     //type Array = SparseBlockArray<Lvl0Block, BypassLevel, BypassLevel, Level<DataBlock>>;
-    type Array = SparseBlockArray<Lvl0Block, Level<Block<u64, [u16;64]>>, /*Level<Block<u64, [u32;64]>>*/BypassLevel, Level<DataBlock>>;
+    type Array = SparseBlockArray<Lvl0Block, Level<Block<u64, [u16;64]>>, Level<Block<u64, [u32;64]>>/*BypassLevel*/, Level<DataBlock>>;
     
     let mut array: Array = Default::default(); 
     
-    let range = 0..60;
+    let range = 0..60000;
     for i in range.clone(){
         *array.get_or_insert(i as usize) = DataBlock(i as u64);
     }

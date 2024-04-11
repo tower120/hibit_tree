@@ -1,6 +1,6 @@
 use std::any::TypeId;
 use std::mem;
-use std::ops::{BitAnd, ControlFlow};
+use std::ops::{BitAnd, BitOr, ControlFlow};
 use std::ptr::NonNull;
 use crate::bit_queue::{ArrayBitQueue, BitQueue, EmptyBitQueue, PrimitiveBitQueue};
 use crate::bit_utils;
@@ -151,5 +151,14 @@ impl BitAnd for EmptyBitBlock{
         self
     }
 }
+impl BitOr for EmptyBitBlock{
+    type Output = Self;
+
+    #[inline]
+    fn bitor(self, _: Self) -> Self::Output {
+        self
+    }
+}
+
 
 // TODO: impl BitAnd, BitOr, BitXor, etc - same as for Primitive

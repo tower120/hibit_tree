@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
-use hi_sparse_array::{BitBlock, EmptyBitBlock, IntoOwned, Op, reduce, Reduce, SparseBlockArray};
+use hi_sparse_array::{BitBlock, EmptyBitBlock, fold, IntoOwned, Op, reduce, Reduce, SparseBlockArray};
 use hi_sparse_array::level_block::{LevelBlock, Block, SmallBlock, ClusterBlock};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::level::{BypassLevel, Level};
@@ -37,7 +37,7 @@ impl LevelBlock for DataBlock{
     }
 }
 
-type BlockArray = SparseBlockArray<Lvl0Block, Level<Lvl1Block>, BypassLevel/*Level<Lvl1Block>*/, Level<DataBlock>>;
+type BlockArray = SparseBlockArray<Lvl0Block, Level<Lvl1Block>, /*BypassLevel*/Level<Lvl1Block>, Level<DataBlock>>;
 
 
 pub struct AndOp<L0, L1, L2, LD>(PhantomData<(L0, L1, L2, LD)>);
@@ -54,7 +54,7 @@ where
     L2: BitBlock + BitAnd<Output = L2>, 
     LD: BitAnd<Output = LD>
 {
-    const SKIP_EMPTY_HIERARCHIES: bool = false;
+    const SKIP_EMPTY_HIERARCHIES: bool = true;
     
     type Level0Mask = L0;
     fn lvl0_op(&self, left: impl IntoOwned<L0>, right: impl IntoOwned<L0>) -> Self::Level0Mask {
@@ -79,10 +79,12 @@ where
 
 
 fn array_iter(array1: &BlockArray, array2: &BlockArray) -> u64 {
-    let list = [array1, array2];
+    //let list = [array1, array2];
+    let list = [array2];
     
-    let and_op: AndOp<u64, u64, EmptyBitBlock, DataBlock> = AndOp(PhantomData);
-    let reduce: Reduce<_, _, BlockArray> = reduce(and_op, list.iter().map(|a|*a));
+    let and_op = AndOp(PhantomData);
+    //let reduce: Reduce<_, _, BlockArray> = reduce(and_op, list.iter().map(|a|*a));
+    let reduce = fold(and_op, array1, list.iter().map(|a|*a));
     
     let mut s = 0;
     for (_, i) in CachingBlockIter::new(&reduce){
