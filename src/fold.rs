@@ -1,10 +1,8 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
-use std::mem::{ManuallyDrop, MaybeUninit};
-use std::ptr::NonNull;
 use arrayvec::ArrayVec;
 use crate::{BitBlock, IntoOwned};
-use crate::sparse_hierarchy::{DefaultState, level_bypass, LevelBypass, SparseHierarchy};
+use crate::sparse_hierarchy::{DefaultState, level_bypass, LevelBypass, SparseHierarchy, SparseHierarchyState};
 
 // TODO: We can go without ArrayIter being Clone!
 
@@ -97,30 +95,33 @@ where
 
 const N: usize = 32;
 
-/*pub struct ReduceIterState<'a, Init, Array>
+pub struct FoldState<'a, Op, Init, ArrayIter, Array>
 where
-    Init: LevelMasksIter,
-    Array: LevelMasksIter,
+    Init: SparseHierarchy,
+    Array: SparseHierarchy,
 {
-    init_state: Init::IterState,
-    states: ArrayVec<(&'a Array, Array::IterState), N>,
+    init_state: Init::State,
+    states: ArrayVec<(&'a Array, Array::State), N>,
     
     // TODO: ZST when not in use 
     /// In-use only when `Op::SKIP_EMPTY_HIERARCHIES` raised.
     lvl1_non_empty_states: ArrayVec<usize, N>,
     lvl2_non_empty_states: ArrayVec<usize, N>,
+
+    phantom_data: PhantomData<Fold<'a, Op, Init, ArrayIter, Array>>
 }
 
-impl<'a, Op, Init, ArrayIter, Array> LevelMasksIter for Fold<'a, Op, Init, ArrayIter, Array>
+impl<'a, Op, Init, ArrayIter, Array> SparseHierarchyState for FoldState<'a, Op, Init, ArrayIter, Array>
 where
-    Init: LevelMasksIter<
+    Init: SparseHierarchy<
         Level0MaskType = Array::Level0MaskType,
         Level1MaskType = Array::Level1MaskType,
         Level2MaskType = Array::Level2MaskType,
         DataBlockType  = Array::DataBlockType,
     >,
+
     ArrayIter: Iterator<Item = &'a Array> + Clone,
-    Array: LevelMasksIter,
+    Array: SparseHierarchy,
 
     Op: crate::apply::Op<
         Level0Mask = Array::Level0MaskType,
@@ -129,43 +130,48 @@ where
         DataBlock  = Array::DataBlockType,
     >,
 {
-    type IterState = ReduceIterState<'a, Init, Array>;
-    
+    type This = Fold<'a, Op, Init, ArrayIter, Array>;
+
     #[inline]
-    fn make_state(&self) -> Self::IterState{
+    fn new(this: &Self::This) -> Self {
         let mut states = ArrayVec::new();
-        for array in self.array_iter.clone(){
-            unsafe{ 
-                states.push_unchecked((array, array.make_state())); 
-            }
+        for array in this.array_iter.clone(){
+            states.push((array, SparseHierarchyState::new(array))); 
         }
         
-        ReduceIterState{
-            init_state: self.init.make_state(),
+        // TODO: reserve lvl1_non_empty_states, lvl2_non_empty_states
+        
+        Self{
+            init_state: SparseHierarchyState::new(this.init.borrow()),
             states,
             lvl1_non_empty_states: Default::default(),
             lvl2_non_empty_states: Default::default(),
+            phantom_data: PhantomData,
         }
     }
-    
+
     #[inline]
-    unsafe fn init_level1_block_meta(&self, state: &mut Self::IterState, level0_index: usize) -> (Self::Level1Mask<'_>, bool) {
-        let (acc_mask, _) = self.init.init_level1_block_meta(&mut state.init_state, level0_index);
+    unsafe fn select_level1<'this>(&mut self, this: &'this Self::This, level0_index: usize) 
+        -> (<Self::This as SparseHierarchy>::Level1Mask<'this>, bool) 
+    {
+        let (acc_mask, _) = self.init_state.select_level1(this.init.borrow(), level0_index);
         let mut acc_mask = acc_mask.into_owned();
         
         if Op::SKIP_EMPTY_HIERARCHIES{
-            state.lvl1_non_empty_states.clear();
-            for i in 0..state.states.len(){
-                let (array, array_state) = state.states.get_unchecked_mut(i);
-                let (mask, _) = array.init_level1_block_meta(array_state, level0_index);
-                acc_mask = self.op.lvl1_op(acc_mask, mask);
+            self.lvl1_non_empty_states.clear();
+            for i in 0..self.states.len(){
+                let (array, array_state) = self.states.get_unchecked_mut(i);
+                let (mask, v) = array_state.select_level1(array, level0_index);
+                acc_mask = this.op.lvl1_op(acc_mask, mask);
                 
-                state.lvl1_non_empty_states.push_unchecked(i);
+                if v{
+                    self.lvl1_non_empty_states.push_unchecked(i);
+                }
             }
         } else {
-            for (array, array_state) in state.states.iter_mut(){
-                let (mask, v) = array.init_level1_block_meta(array_state, level0_index);
-                acc_mask = self.op.lvl1_op(acc_mask, mask);
+            for (array, array_state) in self.states.iter_mut(){
+                let (mask, _) = array_state.select_level1(array, level0_index);
+                acc_mask = this.op.lvl1_op(acc_mask, mask);
             }            
         }
         
@@ -174,25 +180,27 @@ where
     }
 
     #[inline]
-    unsafe fn init_level2_block_meta(&self, state: &mut Self::IterState, level1_index: usize) -> (Self::Level2Mask<'_>, bool) {
-        let (acc_mask, _) = self.init.init_level2_block_meta(&mut state.init_state, level1_index);
+    unsafe fn select_level2<'this>(&mut self, this: &'this Self::This, level1_index: usize) 
+        -> (<Self::This as SparseHierarchy>::Level2Mask<'this>, bool) 
+    {
+        let (acc_mask, _) = self.init_state.select_level2(this.init.borrow(), level1_index);
         let mut acc_mask = acc_mask.into_owned();
         
         if Op::SKIP_EMPTY_HIERARCHIES{
-            state.lvl2_non_empty_states.clear();
-            for &i in &state.lvl1_non_empty_states{
-                let (array, array_state) = state.states.get_unchecked_mut(i);
-                let (mask, v) = array.init_level2_block_meta(array_state, level1_index);
-                acc_mask = self.op.lvl2_op(acc_mask, mask);
+            self.lvl2_non_empty_states.clear();
+            for &i in &self.lvl1_non_empty_states{
+                let (array, array_state) = self.states.get_unchecked_mut(i);
+                let (mask, v) = array_state.select_level2(array, level1_index);
+                acc_mask = this.op.lvl2_op(acc_mask, mask);
                 
                 if v{
-                    state.lvl2_non_empty_states.push_unchecked(i);
+                    self.lvl2_non_empty_states.push_unchecked(i);
                 }
             }
         } else {
-            for (array, array_state) in state.states.iter_mut(){
-                let (mask, _) = array.init_level2_block_meta(array_state, level1_index);
-                acc_mask = self.op.lvl2_op(acc_mask, mask);
+            for (array, array_state) in self.states.iter_mut(){
+                let (mask, _) = array_state.select_level2(array, level1_index);
+                acc_mask = this.op.lvl2_op(acc_mask, mask);
             }
         }
         
@@ -201,32 +209,34 @@ where
     }
     
     #[inline]
-    unsafe fn data_block_from_meta(&self, state: &Self::IterState, level_index: usize) -> Self::DataBlock<'_> {
-        let mut acc = self.init.data_block_from_meta(&state.init_state, level_index).into_owned();
+    unsafe fn data_block<'this>(&self, this: &'this Self::This, level_index: usize) 
+        -> <Self::This as SparseHierarchy>::DataBlock<'this> 
+    {
+        let mut acc = self.init_state.data_block(this.init.borrow(), level_index).into_owned(); 
         
         if Op::SKIP_EMPTY_HIERARCHIES
-        && level_bypass::<Self>() != LevelBypass::Level1Level2
+        && level_bypass::<Self::This>() != LevelBypass::Level1Level2
         {
             let state_indices =
-                if LevelBypass::Level2 == level_bypass::<Self>(){
-                    state.lvl1_non_empty_states.iter()
+                if LevelBypass::Level2 == level_bypass::<Self::This>(){
+                    self.lvl1_non_empty_states.iter()
                 } else {
-                    debug_assert!(LevelBypass::None == level_bypass::<Self>());
-                    state.lvl2_non_empty_states.iter()
+                    debug_assert!(LevelBypass::None == level_bypass::<Self::This>());
+                    self.lvl2_non_empty_states.iter()
                 };
             
             for &i in state_indices {
-                let (array, array_state) = state.states.get_unchecked(i);
-                let data = array.data_block_from_meta(array_state, level_index);
-                acc = self.op.data_op(acc, data);
+                let (array, array_state) = self.states.get_unchecked(i);
+                let data = array_state.data_block(array, level_index);
+                acc = this.op.data_op(acc, data);
             }
         } else {
-            for (array, state) in &state.states {
-                let data = array.data_block_from_meta(state, level_index);
-                acc = self.op.data_op(acc, data);
+            for (array, array_state) in &self.states {
+                let data = array_state.data_block(array, level_index);
+                acc = this.op.data_op(acc, data);
             }
         }
         
-        acc        
+        acc
     }    
-}*/
+}

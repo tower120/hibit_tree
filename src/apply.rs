@@ -162,7 +162,7 @@ where
     type State = DefaultState<Self>;
 }
 
-pub struct ApplyIterState<Op, B1, B2, T1, T2>
+pub struct ApplyState<Op, B1, B2, T1, T2>
 where
     T1: SparseHierarchy,
     T2: SparseHierarchy,
@@ -172,7 +172,7 @@ where
     phantom_data: PhantomData<Apply<Op, B1, B2, T1, T2>>
 }
 
-impl<Op, B1, B2, T1, T2> SparseHierarchyState for ApplyIterState<Op, B1, B2, T1, T2>
+impl<Op, B1, B2, T1, T2> SparseHierarchyState for ApplyState<Op, B1, B2, T1, T2>
 where
     B1: Borrow<T1>,
     B2: Borrow<T2>,
