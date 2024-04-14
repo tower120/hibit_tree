@@ -3,7 +3,7 @@ use std::mem::{ManuallyDrop, MaybeUninit};
 use crate::bit_block::BitBlock;
 use crate::level_block::{HiBlock, is_bypass_block, LevelBlock};
 use crate::level::ILevel;
-use crate::level_masks::{DefaultState, SparseHierarchy};
+use crate::level_masks::{DefaultState, SparseHierarchy, SparseHierarchyState};
 use crate::bool_type::{BoolType};
 use crate::primitive::Primitive;
 
@@ -63,11 +63,11 @@ where
 }
 
 pub struct SparseBlockArray<Level0Block, Level1, Level2, DataLevel>
-where
+/*where
     Level0Block: HiBlock, 
     Level1   : ILevel,
     Level2   : ILevel,
-    DataLevel: ILevel
+    DataLevel: ILevel*/
 {
     level0: Level0Block,
     level1: Level1,
@@ -311,10 +311,10 @@ where
         self.data.blocks().get_unchecked(data_block_index)
     }
 
-    type State = DefaultState<Self>;
+    type State = SparseBlockArrayState<Level0Block, Level1, Level2, DataLevel>;
 }
 
-pub struct SparseBlockArrayState<Level1, Level2>
+pub struct SparseBlockArrayState<Level0Block, Level1, Level2, DataLevel>
 where
     Level1: ILevel,
     Level1::Block: HiBlock,
@@ -325,10 +325,12 @@ where
     level1_block_meta: <Level1::Block as HiBlock>::Meta,
     /// Points to the element in the heap. Guaranteed to be stable.
     level2_block_meta: <Level2::Block as HiBlock>::Meta,
+
+    phantom_data: PhantomData<SparseBlockArray<Level0Block, Level1, Level2, DataLevel>>
 }
 
-/*impl<Level0Block, Level1, Level2, DataLevel> LevelMasksIter for 
-    SparseBlockArray<Level0Block, Level1, Level2, DataLevel>
+impl<Level0Block, Level1, Level2, DataLevel> SparseHierarchyState for 
+    SparseBlockArrayState<Level0Block, Level1, Level2, DataLevel>
 where
     Level0Block: HiBlock,
     Level1: ILevel,
@@ -338,61 +340,61 @@ where
     DataLevel: ILevel,
     DataLevel::Block: Clone,
 {
-    type IterState = SparseBlockArrayState<Level1, Level2>;
-    
+    type This = SparseBlockArray<Level0Block, Level1, Level2, DataLevel>;
+
     #[inline]
-    fn make_state(&self) -> Self::IterState {
-        SparseBlockArrayState{
+    fn new(_: &Self::This) -> Self {
+        Self{
             level1_block_meta: Default::default(),
             level2_block_meta: Default::default(),
+            phantom_data: PhantomData
         }
+    }
+
+    #[inline]
+    unsafe fn select_level1<'a>(
+        &mut self,
+        this: &'a Self::This,
+        level0_index: usize
+    ) -> (<Self::This as SparseHierarchy>::Level1Mask<'a>, bool){
+        let level1_block_index = this.level0.get_or_zero(level0_index);
+        let level1_block = this.level1.blocks().get_unchecked(level1_block_index.as_usize());
+        self.level1_block_meta = From::from(level1_block);
+        (level1_block.mask(), !level1_block_index.is_zero())
     }
     
     #[inline]
-    unsafe fn init_level1_block_meta(
-        &self,
-        state: &mut Self::IterState,
-        level0_index: usize
-    ) -> (Self::Level1Mask<'_>, bool) {
-        let level1_block_index = self.level0.get_or_zero(level0_index);
-        let level1_block = self.level1.blocks().get_unchecked(level1_block_index.as_usize());
-        state.level1_block_meta = From::from(level1_block);
-        (level1_block.mask(), !level1_block_index.is_zero())
-    }
-
-
-    #[inline]
-    unsafe fn init_level2_block_meta(
-        &self, 
-        state: &mut Self::IterState,
+    unsafe fn select_level2<'a>(
+        &mut self,
+        this: &'a Self::This,
         level1_index: usize
-    ) -> (Self::Level2Mask<'_>, bool) {
-        let level1_block = state.level1_block_meta.as_ref();
+    ) -> (<Self::This as SparseHierarchy>::Level2Mask<'a>, bool){
+        let level1_block = self.level1_block_meta.as_ref();
         let level2_block_index = level1_block.get_or_zero(level1_index);
-        let level2_block = self.level2.blocks().get_unchecked(level2_block_index.as_usize());
-        state.level2_block_meta = From::from(level2_block);
-        (level2_block.mask(), !level2_block_index.is_zero())
+        let level2_block = this.level2.blocks().get_unchecked(level2_block_index.as_usize());
+        self.level2_block_meta = From::from(level2_block);
+        (level2_block.mask(), !level2_block_index.is_zero())        
     }
-
+    
     #[inline]
-    unsafe fn data_block_from_meta(
+    unsafe fn data_block<'a>(
         &self,
-        state: &Self::IterState,
+        this: &'a Self::This,
         level_index: usize
-    ) -> Self::DataBlock<'_> {
+    ) -> <Self::This as SparseHierarchy>::DataBlock<'a> {
         let data_block_index = 
         if is_bypass_level::<Level1>(){
-            self.level0.get_or_zero(level_index).as_usize()
+            this.level0.get_or_zero(level_index).as_usize()
         } else if is_bypass_level::<Level2>(){
-            let level1_block = state.level1_block_meta.as_ref();
+            let level1_block = self.level1_block_meta.as_ref();
             level1_block.get_or_zero(level_index).as_usize()
         } else {
-            let level2_block = state.level2_block_meta.as_ref();
+            let level2_block = self.level2_block_meta.as_ref();
             level2_block.get_or_zero(level_index).as_usize()
         };
-        self.data.blocks().get_unchecked(data_block_index)
+        this.data.blocks().get_unchecked(data_block_index)        
     }
-}*/
+}
 
 
 /*impl <Level0Block, Level1, Level2, DataLevel> LevelMasksBorrow
