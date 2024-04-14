@@ -5,7 +5,7 @@ use std::mem::MaybeUninit;
 use std::ptr::addr_of_mut;
 use crate::bit_block::BitBlock;
 use crate::{SparseHierarchy, IntoOwned};
-use crate::level_masks::DefaultState;
+use crate::sparse_hierarchy::{DefaultState, SparseHierarchyState};
 
 // TODO: unused now
 /// &mut MaybeUninit<(T0, T1)> = (&mut MaybeUninit<T0>, &mut MaybeUninit<T1>)
@@ -162,23 +162,24 @@ where
     type State = DefaultState<Self>;
 }
 
-/*pub struct ApplyIterState<T1, T2>
+pub struct ApplyIterState<Op, B1, B2, T1, T2>
 where
-    T1: LevelMasksIter,
-    T2: LevelMasksIter,
+    T1: SparseHierarchy,
+    T2: SparseHierarchy,
 {
-    s1: <T1 as LevelMasksIter>::IterState, 
-    s2: <T2 as LevelMasksIter>::IterState,
+    s1: T1::State, 
+    s2: T2::State,
+    phantom_data: PhantomData<Apply<Op, B1, B2, T1, T2>>
 }
 
-impl<Op, B1, B2, T1, T2> LevelMasksIter for Apply<Op, B1, B2, T1, T2>
+impl<Op, B1, B2, T1, T2> SparseHierarchyState for ApplyIterState<Op, B1, B2, T1, T2>
 where
     B1: Borrow<T1>,
     B2: Borrow<T2>,
 
-    T1: LevelMasksIter,
+    T1: SparseHierarchy,
 
-    T2: LevelMasksIter<
+    T2: SparseHierarchy<
         Level0MaskType = T1::Level0MaskType,
         Level1MaskType = T1::Level1MaskType,
         Level2MaskType = T1::Level2MaskType,
@@ -192,66 +193,59 @@ where
         DataBlock  = T1::DataBlockType,
     >
 {
-    type IterState = ApplyIterState<T1, T2>;
-    
+    type This = Apply<Op, B1, B2, T1, T2>;
+
     #[inline]
-    fn make_state(&self) -> Self::IterState {
-        ApplyIterState{
-            s1: self.s1.borrow().make_state(), 
-            s2: self.s2.borrow().make_state(),
+    fn new(this: &Self::This) -> Self {
+        Self{
+            s1: SparseHierarchyState::new(this.s1.borrow()), 
+            s2: SparseHierarchyState::new(this.s2.borrow()),
+            phantom_data: PhantomData
         }
     }
     
     #[inline]
-    unsafe fn init_level1_block_meta(
-        &self,
-        state: &mut Self::IterState,
-        level0_index: usize
-    ) -> (Self::Level1Mask<'_>, bool) {
-        let (mask1, _) = self.s1.borrow().init_level1_block_meta(
-            &mut state.s1, level0_index
+    unsafe fn select_level1<'a>(&mut self, this: &'a Self::This, level0_index: usize) 
+        -> (<Self::This as SparseHierarchy>::Level1Mask<'a>, bool) 
+    {
+        let (mask1, _) = self.s1.select_level1(
+            this.s1.borrow(), level0_index
         );
-        let (mask2, _) = self.s2.borrow().init_level1_block_meta(
-            &mut state.s2, level0_index
+        let (mask2, _) = self.s2.select_level1(
+            this.s2.borrow(), level0_index
         );
         
-        let mask = self.op.lvl1_op(mask1, mask2);
+        let mask = this.op.lvl1_op(mask1, mask2);
         let is_empty = mask.is_zero();
         (mask, !is_empty)
     }
     
     #[inline]
-    unsafe fn init_level2_block_meta(
-        &self,
-        state: &mut Self::IterState,
-        level1_index: usize
-    ) -> (Self::Level2Mask<'_>, bool) {
-        let (mask1, _) = self.s1.borrow().init_level2_block_meta(
-            &mut state.s1, level1_index
+    unsafe fn select_level2<'a>(&mut self, this: &'a Self::This, level1_index: usize) 
+        -> (<Self::This as SparseHierarchy>::Level2Mask<'a>, bool) 
+    {
+        let (mask1, _) = self.s1.select_level2(
+            this.s1.borrow(), level1_index
         );
-        let (mask2, _) = self.s2.borrow().init_level2_block_meta(
-            &mut state.s2, level1_index
+        let (mask2, _) = self.s2.select_level2(
+            this.s2.borrow(), level1_index
         );
         
-        let mask = self.op.lvl2_op(mask1, mask2);
+        let mask = this.op.lvl2_op(mask1, mask2);
         let is_empty = mask.is_zero();
         (mask, !is_empty)
     }
-
+    
     #[inline]
-    unsafe fn data_block_from_meta(
-        &self,
-        state: &Self::IterState,
-        level_index: usize
-    ) -> Self::DataBlock<'_> {
-        let m0 = self.s1.borrow().data_block_from_meta(
-            &state.s1, level_index
+    unsafe fn data_block<'a>(&self, this: &'a Self::This, level_index: usize) 
+        -> <Self::This as SparseHierarchy>::DataBlock<'a> 
+    {
+        let m0 = self.s1.data_block(
+            this.s1.borrow(), level_index
         );
-        let m1 = self.s2.borrow().data_block_from_meta(
-            &state.s2, level_index
-        ); 
-        self.op.data_op(m0, m1)
+        let m1 = self.s2.data_block(
+            this.s2.borrow(), level_index
+        );
+        this.op.data_op(m0, m1)        
     }
-}*/
-
-// TODO: other array read operations
+}

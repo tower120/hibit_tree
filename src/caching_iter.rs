@@ -1,5 +1,5 @@
 use std::mem::{ManuallyDrop, MaybeUninit};
-use crate::level_masks::{SparseHierarchy, level_bypass, LevelBypass, SparseHierarchyState};
+use crate::sparse_hierarchy::{SparseHierarchy, level_bypass, LevelBypass, SparseHierarchyState};
 use crate::{BitBlock, data_block_index, IntoOwned};
 use crate::bit_queue::BitQueue;
 

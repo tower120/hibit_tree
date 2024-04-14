@@ -1,9 +1,7 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
-use std::mem::{ManuallyDrop, MaybeUninit};
 use crate::{BitBlock, IntoOwned};
 use crate::bit_block::is_empty_bitblock;
-use crate::level_block::LevelBlock;
 
 /// 
 /// TODO: Change description
@@ -78,7 +76,7 @@ pub trait SparseHierarchyState{
     
     fn new(this: &Self::This) -> Self;
 
-    // TODO: select_level1_block
+    // TODO: select_level1_block?
     /// Returns (level_mask, is_not_empty).
     /// 
     /// `is_not_empty` - mask not empty flag. Allowed to be false-positive.
@@ -191,79 +189,4 @@ pub /*const*/ fn level_bypass<T: SparseHierarchy>() -> LevelBypass {
     } else {
         LevelBypass::None
     }
-}
-
-/*/// More sophisticated masks interface, optimized for iteration speed of 
-/// generative/lazy bitset.
-/// 
-/// For example, in [Reduce] this achieved through
-/// caching level1 level_block pointers of all sets. Which also allows to discard
-/// bitsets with empty level1 blocks in final stage of getting data blocks.
-/// Properly implementing this gave [Reduce] and [Apply] 25-100% performance boost.  
-///
-pub trait LevelMasksIter: SparseHierarchy {
-    /// Constructed at the start of iteration with [make_state], dropped at the end.
-    type IterState;
-    
-    fn make_state(&self) -> Self::IterState;
-    
-    // TODO: rename and adjust doc
-    /// Init `level1_block_data` and return (Level1Mask, is_not_empty).
-    /// 
-    /// Called by iterator for each traversed level1 level_block.
-    /// 
-    /// - `level1_block_data` will come in undefined state - rewrite it completely.
-    /// - `is_not_empty` is not used by iterator itself, but can be used by other 
-    /// generative bitsets (namely [Reduce]). We expect compiler to optimize away non-used code.
-    /// It exists - because sometimes you may have faster ways of checking emptiness,
-    /// then checking simd register (bitblock) for zero in general case.
-    /// For example, in BitSet - it is done by checking of level_block indirection index for zero.
-    /// False positive is OK, though may incur unnecessary overhead.
-    /// 
-    /// # Safety
-    ///
-    /// indices are not checked.
-    /// 
-    /// [Reduce]: crate::Reduce
-    // Performance-wise it is important to use this in-place construct style, 
-    // instead of just returning Level1BlockData. Even if we return Level1BlockData,
-    // and then immediately write it to MaybeUninit - compiler somehow still can't
-    // optimize it as direct memory write without an intermediate bitwise copy.
-    unsafe fn init_level1_block_meta(
-        &self,
-        state: &mut Self::IterState,
-        level0_index: usize
-    ) -> (Self::Level1Mask<'_>, bool);    
-    
-    
-    // TODO: rename
-    unsafe fn init_level2_block_meta(
-        &self,
-        state: &mut Self::IterState,
-        level1_index: usize
-    ) -> (Self::Level2Mask<'_>, bool);    
-
-    // TODO: rename
-    /// Called by iterator for each traversed data level_block.
-    /// 
-    /// `level_index` depending on LevelBypass could be either level0, level1 or level2 in-block index.
-    /// 
-    /// # Safety
-    ///
-    /// indices are not checked.
-    unsafe fn data_block_from_meta(
-        &self,
-        state: &Self::IterState,
-        level_index: usize
-    ) -> Self::DataBlock<'_>;
-}*/
-
-// TODO: As long as iterator works with &LevelMasks - we can just
-//       use Borrow<impl LevelMasks> everywhere
-
-pub trait LevelMasksBorrow: Borrow<Self::Type>{
-    type Type: SparseHierarchy;
-}
-impl<T: SparseHierarchy> LevelMasksBorrow for T{
-    type Type = T;
 }

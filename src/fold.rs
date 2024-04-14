@@ -4,7 +4,7 @@ use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ptr::NonNull;
 use arrayvec::ArrayVec;
 use crate::{BitBlock, IntoOwned};
-use crate::level_masks::{DefaultState, level_bypass, LevelBypass, SparseHierarchy};
+use crate::sparse_hierarchy::{DefaultState, level_bypass, LevelBypass, SparseHierarchy};
 
 // TODO: We can go without ArrayIter being Clone!
 

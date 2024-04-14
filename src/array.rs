@@ -3,7 +3,7 @@ use std::mem::{ManuallyDrop, MaybeUninit};
 use crate::bit_block::BitBlock;
 use crate::level_block::{HiBlock, is_bypass_block, LevelBlock};
 use crate::level::ILevel;
-use crate::level_masks::{DefaultState, SparseHierarchy, SparseHierarchyState};
+use crate::sparse_hierarchy::{DefaultState, SparseHierarchy, SparseHierarchyState};
 use crate::bool_type::{BoolType};
 use crate::primitive::Primitive;
 
@@ -18,7 +18,7 @@ where
 }
 
 
-// TODO: bypass return duplicates from last active level
+// TODO: bypass return duplicates from last active level?
 #[inline]
 fn level_indices<Level1, Level2>(index: usize) 
     -> (usize/*level0*/, usize/*level1*/, usize/*level2*/)
@@ -395,32 +395,3 @@ where
         this.data.blocks().get_unchecked(data_block_index)        
     }
 }
-
-
-/*impl <Level0Block, Level1, Level2, DataLevel> LevelMasksBorrow
-    for SparseBlockArray<Level0Block, Level1, Level2, DataLevel>
-where
-    Level0Block: HiBlock,
-    Level1: ILevel,
-    Level1::Block: HiBlock,
-    Level2: ILevel,
-    Level2::Block: HiBlock,
-    DataLevel: ILevel,
-    DataLevel::Block: Clone,
-{
-    type Type = Self;
-}
-
-impl <Level0Block, Level1, Level2, DataLevel> LevelMasksBorrow
-    for &SparseBlockArray<Level0Block, Level1, Level2, DataLevel>
-where
-    Level0Block: HiBlock,
-    Level1: ILevel,
-    Level1::Block: HiBlock,
-    Level2: ILevel,
-    Level2::Block: HiBlock,
-    DataLevel: ILevel,
-    DataLevel::Block: Clone,
-{
-    type Type = SparseBlockArray<Level0Block, Level1, Level2, DataLevel>;
-}*/
