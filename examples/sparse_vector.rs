@@ -41,7 +41,7 @@ impl LevelBlock for DataBlock{
     }
 }
 
-#[derive(Clone)]
+#[derive(Eq, PartialEq, Copy, Clone)]
 struct EmptyMask;
 impl BitBlock for EmptyMask{
     const SIZE_POT_EXPONENT: usize = 0;
@@ -117,6 +117,7 @@ where
     L2: BitBlock + BitAnd<Output = L2>, 
     LD: Mul<Output = LD>
 {
+    const EXACT_HIERARCHY: bool = false;
     const SKIP_EMPTY_HIERARCHIES: bool = false;
     
     type Level0Mask = L0;

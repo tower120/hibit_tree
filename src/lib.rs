@@ -13,9 +13,9 @@ pub mod bit_queue;
 pub mod caching_iter;
 //mod ref_or_val;
 pub mod level_block;
-mod reduce;
+//mod reduce;
 mod fold;
-mod empty;
+//mod empty;
 
 //pub use ref_or_val::*;
 pub use bit_block::{BitBlock, IEmptyBitBlock, EmptyBitBlock};
@@ -23,19 +23,19 @@ pub use primitive::Primitive;
 pub use primitive_array::PrimitiveArray;
 pub use array::SparseBlockArray;
 pub use apply::{Apply, Op};
-pub use reduce::Reduce;
+//pub use reduce::Reduce;
 pub use fold::Fold;
-pub use empty::Empty;
+//pub use empty::Empty;
 
 
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use bool_type::BoolType;
-use level_masks::LevelMasks;
-use crate::level_masks::{level_bypass, LevelBypass, LevelMasksBorrow, LevelMasksIter};
+use level_masks::SparseHierarchy;
+use crate::level_masks::{level_bypass, LevelBypass, LevelMasksBorrow};
 
 #[inline]
-pub(crate) fn data_block_index<T: LevelMasks>(
+pub(crate) fn data_block_index<T: SparseHierarchy>(
     level0_index: usize, 
     level1_index: usize,
     index: usize
@@ -88,23 +88,23 @@ where
     Apply{op, s1, s2, phantom: PhantomData}
 }
 
-#[inline]
+/*#[inline]
 pub fn reduce<'a, Op, ArrayIter, Array>(op: Op, array_iter: ArrayIter) -> Reduce<'a, Op, ArrayIter, Array>
 where
     Op: apply::Op,
     ArrayIter: Iterator<Item = &'a Array> + Clone,
-    Array: LevelMasks,
+    Array: SparseHierarchy,
 {
     Reduce{op, array_iter, phantom: PhantomData}
-}
+}*/
 
 #[inline]
 pub fn fold<'a, Op, Init, ArrayIter, Array>(op: Op, init: &'a Init, array_iter: ArrayIter) -> Fold<'a, Op, Init, ArrayIter, Array>
 where
     Op: apply::Op,
     ArrayIter: Iterator<Item = &'a Array> + Clone,
-    Array: LevelMasks,
-    Init: LevelMasks,
+    Array: SparseHierarchy,
+    Init: SparseHierarchy,
 {
     Fold{op, init, array_iter, phantom: PhantomData}
 }

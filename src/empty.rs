@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use crate::BitBlock;
 use crate::level_block::LevelBlock;
-use crate::level_masks::{LevelMasks, LevelMasksIter};
+use crate::level_masks::{SparseHierarchy};
 
 // TODO: Full
 /// Empty array. ZST.
@@ -12,13 +12,15 @@ impl<Level0Mask, Level1Mask, Level2Mask, Data> Default for Empty<Level0Mask, Lev
     fn default() -> Self { Self(PhantomData) }
 }
 
-impl<Level0Mask, Level1Mask, Level2Mask, Data> LevelMasks for Empty<Level0Mask, Level1Mask, Level2Mask, Data>
+impl<Level0Mask, Level1Mask, Level2Mask, Data> SparseHierarchy for Empty<Level0Mask, Level1Mask, Level2Mask, Data>
 where
     Level0Mask: BitBlock,
     Level1Mask: BitBlock,
     Level2Mask: BitBlock,
     Data: LevelBlock
 {
+    const EXACT_HIERARCHY: bool = true;
+    
     type Level0MaskType = Level0Mask;
     type Level0Mask<'a> where Self: 'a = Level0Mask;
 

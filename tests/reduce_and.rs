@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
-use hi_sparse_array::{BitBlock, EmptyBitBlock, fold, IntoOwned, Op, reduce, Reduce, SparseBlockArray};
+use hi_sparse_array::{BitBlock, EmptyBitBlock, fold, IntoOwned, Op, /*reduce, Reduce, */SparseBlockArray};
 use hi_sparse_array::level_block::{LevelBlock, Block, SmallBlock, ClusterBlock};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::level::{BypassLevel, Level};
@@ -54,6 +54,7 @@ where
     L2: BitBlock + BitAnd<Output = L2>, 
     LD: BitAnd<Output = LD>
 {
+    const EXACT_HIERARCHY: bool = false;
     const SKIP_EMPTY_HIERARCHIES: bool = true;
     
     type Level0Mask = L0;

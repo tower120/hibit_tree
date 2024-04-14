@@ -3,7 +3,7 @@ use std::mem::{ManuallyDrop, MaybeUninit};
 use crate::bit_block::BitBlock;
 use crate::level_block::{HiBlock, is_bypass_block, LevelBlock};
 use crate::level::ILevel;
-use crate::level_masks::{LevelMasks, LevelMasksIter, LevelMasksBorrow};
+use crate::level_masks::{DefaultState, SparseHierarchy};
 use crate::bool_type::{BoolType};
 use crate::primitive::Primitive;
 
@@ -17,6 +17,8 @@ where
     is_bypass_block::<L::Block>()   
 }
 
+
+// TODO: bypass return duplicates from last active level
 #[inline]
 fn level_indices<Level1, Level2>(index: usize) 
     -> (usize/*level0*/, usize/*level1*/, usize/*level2*/)
@@ -243,7 +245,7 @@ where
 
 
 
-impl<Level0Block, Level1, Level2, DataLevel> LevelMasks for 
+impl<Level0Block, Level1, Level2, DataLevel> SparseHierarchy for 
     SparseBlockArray<Level0Block, Level1, Level2, DataLevel>
 where
     Level0Block: HiBlock,
@@ -254,14 +256,15 @@ where
     DataLevel: ILevel,
     DataLevel::Block: Clone,
 {
+    const EXACT_HIERARCHY: bool = true;
+    
     type Level0MaskType = Level0Block::Mask;
     type Level0Mask<'a> = &'a Level0Block::Mask where Self: 'a;
     #[inline]
     fn level0_mask(&self) -> Self::Level0Mask<'_> {
         self.level0.mask()
     }
-
-    //type Level1Bypass   = Level1::Bypass;
+    
     type Level1MaskType = <Level1::Block as HiBlock>::Mask;
     type Level1Mask<'a> = &'a <Level1::Block as HiBlock>::Mask where Self: 'a;
     #[inline]
@@ -271,30 +274,44 @@ where
         level1_block.mask()
     }
     
-    //type Level2Bypass   = Level2::Bypass;
     type Level2MaskType = <Level2::Block as HiBlock>::Mask;
     type Level2Mask<'a> = &'a <Level2::Block as HiBlock>::Mask where Self: 'a;
     #[inline]
     unsafe fn level2_mask(&self, level0_index: usize, level1_index: usize) -> Self::Level2Mask<'_> {
-        todo!()
-        /*let level1_block_index = self.level0.get_or_zero(level0_index).as_usize();
+        let level1_block_index = self.level0.get_or_zero(level0_index).as_usize();
         let level1_block = self.level1.blocks().get_unchecked(level1_block_index);
-        level1_block.mask()*/
+
+        let level2_block_index = level1_block.get_or_zero(level1_index).as_usize();
+        let level2_block = self.level2.blocks().get_unchecked(level2_block_index);
+        
+        level2_block.mask()
     }    
 
     type DataBlockType = DataLevel::Block;
     type DataBlock<'a> = &'a DataLevel::Block where Self: 'a;
     #[inline]
     unsafe fn data_block(&self, level0_index: usize, level1_index: usize, level2_index: usize) -> Self::DataBlock<'_> {
-        todo!()
-        /*// TODO: bypass
         let level1_block_index = self.level0.get_or_zero(level0_index).as_usize();
-        let level1_block = self.level1.blocks().get_unchecked(level1_block_index);
+        
+        let data_block_index =
+        if is_bypass_level::<Level1>(){
+            level1_block_index
+        } else {
+            let level1_block = self.level1.blocks().get_unchecked(level1_block_index);
+            let level2_block_index = level1_block.get_or_zero(level1_index).as_usize();
+            
+            if is_bypass_level::<Level2>(){
+                level2_block_index
+            } else {
+                let level2_block = self.level2.blocks().get_unchecked(level2_block_index);
+                level2_block.get_or_zero(level2_index).as_usize()
+            }
+        };
 
-        let data_block_index = level1_block.get_or_zero(level1_index).as_usize();
-        let data_block = self.data.blocks().get_unchecked(data_block_index);
-        data_block*/
+        self.data.blocks().get_unchecked(data_block_index)
     }
+
+    type State = DefaultState<Self>;
 }
 
 pub struct SparseBlockArrayState<Level1, Level2>
@@ -310,7 +327,7 @@ where
     level2_block_meta: <Level2::Block as HiBlock>::Meta,
 }
 
-impl<Level0Block, Level1, Level2, DataLevel> LevelMasksIter for 
+/*impl<Level0Block, Level1, Level2, DataLevel> LevelMasksIter for 
     SparseBlockArray<Level0Block, Level1, Level2, DataLevel>
 where
     Level0Block: HiBlock,
@@ -375,7 +392,7 @@ where
         };
         self.data.blocks().get_unchecked(data_block_index)
     }
-}
+}*/
 
 
 /*impl <Level0Block, Level1, Level2, DataLevel> LevelMasksBorrow

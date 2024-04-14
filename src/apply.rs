@@ -4,8 +4,8 @@ use std::mem;
 use std::mem::MaybeUninit;
 use std::ptr::addr_of_mut;
 use crate::bit_block::BitBlock;
-use crate::{LevelMasks, IntoOwned};
-use crate::level_masks::LevelMasksIter;
+use crate::{SparseHierarchy, IntoOwned};
+use crate::level_masks::DefaultState;
 
 // TODO: unused now
 /// &mut MaybeUninit<(T0, T1)> = (&mut MaybeUninit<T0>, &mut MaybeUninit<T1>)
@@ -29,6 +29,8 @@ fn uninit_as_mut_pair<T0, T1>(pair: &mut MaybeUninit<(T0, T1)>)
 // in a meaningful way.
 // For now, should be good enough as-is for Apply.
 pub trait Op {
+    const EXACT_HIERARCHY: bool;
+    
     /// Check and skip empty hierarchies? Any value is safe. Use `false` as default.
     /// 
     /// This incurs some performance overhead, but can greatly reduce
@@ -89,14 +91,14 @@ pub struct Apply<Op, B1, B2, T1, T2>{
     pub(crate) phantom: PhantomData<(T1, T2)>,
 }
 
-impl<Op, B1, B2, T1, T2> LevelMasks for Apply<Op, B1, B2, T1, T2>
+impl<Op, B1, B2, T1, T2> SparseHierarchy for Apply<Op, B1, B2, T1, T2>
 where
     B1: Borrow<T1>,
     B2: Borrow<T2>,
 
-    T1: LevelMasks,
+    T1: SparseHierarchy,
 
-    T2: LevelMasks<
+    T2: SparseHierarchy<
         Level0MaskType = T1::Level0MaskType,
         Level1MaskType = T1::Level1MaskType,
         Level2MaskType = T1::Level2MaskType,
@@ -110,6 +112,8 @@ where
         DataBlock  = T1::DataBlockType,
     >
 {
+    const EXACT_HIERARCHY: bool = Op::EXACT_HIERARCHY;
+    
     type Level0MaskType = T1::Level0MaskType;
     type Level0Mask<'a> = Self::Level0MaskType where Self:'a;
     #[inline]
@@ -154,9 +158,11 @@ where
             s2.data_block(level0_index, level1_index, level2_index)
         )
     }
+    
+    type State = DefaultState<Self>;
 }
 
-pub struct ApplyIterState<T1, T2>
+/*pub struct ApplyIterState<T1, T2>
 where
     T1: LevelMasksIter,
     T2: LevelMasksIter,
@@ -246,6 +252,6 @@ where
         ); 
         self.op.data_op(m0, m1)
     }
-}
+}*/
 
 // TODO: other array read operations

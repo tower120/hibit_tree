@@ -1,11 +1,11 @@
 use std::mem::{ManuallyDrop, MaybeUninit};
-use crate::level_masks::{LevelMasksIter, LevelMasks/*, LevelMasksIterState*/, level_bypass, LevelBypass};
+use crate::level_masks::{SparseHierarchy, level_bypass, LevelBypass, SparseHierarchyState};
 use crate::{BitBlock, data_block_index, IntoOwned};
 use crate::bit_queue::BitQueue;
 
 pub struct CachingBlockIter<'a, T>
 where
-    T: LevelMasksIter,
+    T: SparseHierarchy,
 {
     container: &'a T,
     level0_iter: <T::Level0MaskType as BitBlock>::BitsIter,
@@ -16,12 +16,12 @@ where
     level0_index: usize,
     level1_index: usize,
 
-    state: T::IterState,
+    state: T::State,
 }
 
 impl<'a, T> CachingBlockIter<'a, T>
 where
-    T: LevelMasksIter,
+    T: SparseHierarchy,
 {
     #[inline]
     pub fn new(container: &'a T) -> Self {
@@ -39,14 +39,14 @@ where
             level0_index: usize::MAX,
             level1_index: usize::MAX,    
 
-            state: container.make_state(),
+            state: SparseHierarchyState::new(container),
         }
     }
 }
 
 impl<'a, T> Iterator for CachingBlockIter<'a, T>
 where
-    T: LevelMasksIter,
+    T: SparseHierarchy,
 {
     type Item = (usize/*index*/, T::DataBlock<'a>);
 
@@ -65,10 +65,7 @@ where
                     
                     self.level1_index = index;
                     let level2_mask = unsafe {
-                        let (level_mask, _) = 
-                            self.container.init_level2_block_meta(
-                                &mut self.state, index
-                            );
+                        let (level_mask, _) = self.state.select_level2(&self.container, index);
                         level_mask
                     };
                     self.level2_iter = level2_mask.into_owned().into_bits_iter();                    
@@ -81,11 +78,7 @@ where
                         
                         self.level0_index = index;
                         let level1_mask = unsafe {
-                            let (level1_mask, _) = 
-                                self.container.init_level1_block_meta(
-                                    &mut self.state,
-                                    index
-                                );
+                            let (level1_mask, _) = self.state.select_level1(&self.container, index);
                             level1_mask
                         };
                         self.level1_iter = level1_mask.into_owned().into_bits_iter();
@@ -99,7 +92,7 @@ where
         // TODO: Specialization for TRUSTED_HIERARCHY without loop
 
         let data_block = unsafe {
-            T::data_block_from_meta(&self.container, &self.state, level_index)
+            self.state.data_block(&self.container, level_index)
         };
         let block_index = data_block_index::<T>(self.level0_index, self.level1_index, level_index);
         Some((block_index, data_block))

@@ -5,7 +5,7 @@ use std::ptr::NonNull;
 use arrayvec::ArrayVec;
 use crate::{BitBlock, IntoOwned};
 use crate::level_block::LevelBlock;
-use crate::level_masks::{level_bypass, LevelBypass, LevelMasks, LevelMasksBorrow, LevelMasksIter/*, LevelMasksIterState*/};
+use crate::level_masks::{level_bypass, LevelBypass, SparseHierarchy, LevelMasksBorrow, LevelMasksIter/*, LevelMasksIterState*/};
 
 pub struct Reduce<'a, Op, ArrayIter, Array>{
     pub(crate) op: Op,
@@ -43,10 +43,10 @@ where
     }
 }
 
-impl<'a, Op, ArrayIter, Array> LevelMasks for Reduce<'a, Op, ArrayIter, Array>
+impl<'a, Op, ArrayIter, Array> SparseHierarchy for Reduce<'a, Op, ArrayIter, Array>
 where
     ArrayIter: Iterator<Item = &'a Array> + Clone,
-    Array: LevelMasks,
+    Array: SparseHierarchy,
 
     Op: crate::apply::Op<
         Level0Mask = Array::Level0MaskType,
@@ -55,6 +55,8 @@ where
         DataBlock  = Array::DataBlockType,
     >,
 {
+    const EXACT_HIERARCHY: bool = Op::EXACT_HIERARCHY;
+    
     type Level0MaskType = Array::Level0MaskType;
     type Level0Mask<'b> = Self::Level0MaskType where Self: 'b;
 

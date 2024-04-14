@@ -4,7 +4,7 @@ use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ptr::NonNull;
 use arrayvec::ArrayVec;
 use crate::{BitBlock, IntoOwned};
-use crate::level_masks::{level_bypass, LevelBypass, LevelMasks, LevelMasksBorrow, LevelMasksIter/*, LevelMasksIterState*/};
+use crate::level_masks::{DefaultState, level_bypass, LevelBypass, SparseHierarchy};
 
 // TODO: We can go without ArrayIter being Clone!
 
@@ -15,14 +15,17 @@ pub struct Fold<'a, Op, Init, ArrayIter, Array>{
     pub(crate) phantom: PhantomData<&'a Array>,
 }
 
-impl<'a, Op, Init, ArrayIter, Array> LevelMasks for Fold<'a, Op, Init, ArrayIter, Array>
+impl<'a, Op, Init, ArrayIter, Array> SparseHierarchy for Fold<'a, Op, Init, ArrayIter, Array>
 where
-    Init: LevelMasks<
-        Level0MaskType = Array::Level0MaskType 
+    Init: SparseHierarchy<
+        Level0MaskType = Array::Level0MaskType,
+        Level1MaskType = Array::Level1MaskType,
+        Level2MaskType = Array::Level2MaskType,
+        DataBlockType  = Array::DataBlockType,
     >,
 
     ArrayIter: Iterator<Item = &'a Array> + Clone,
-    Array: LevelMasks,
+    Array: SparseHierarchy,
 
     Op: crate::apply::Op<
         Level0Mask = Array::Level0MaskType,
@@ -31,13 +34,13 @@ where
         DataBlock  = Array::DataBlockType,
     >,
 {
+    const EXACT_HIERARCHY: bool = true;
+    
     type Level0MaskType = Array::Level0MaskType;
     type Level0Mask<'b> = Self::Level0MaskType where Self: 'b;
 
     #[inline]
     fn level0_mask(&self) -> Self::Level0Mask<'_> {
-        // TODO: Can use cached states instead, but this will be called only once per iterator.
-        
         self.array_iter.clone().fold(
             self.init.level0_mask().into_owned(), 
             |acc, array|{
@@ -51,29 +54,50 @@ where
 
     #[inline]
     unsafe fn level1_mask(&self, level0_index: usize) -> Self::Level1Mask<'_> {
-        todo!()
+        self.array_iter.clone().fold(
+            self.init.level1_mask(level0_index).into_owned(), 
+            |acc, array|{
+                self.op.lvl1_op(acc, array.level1_mask(level0_index))
+            }
+        )
     }
 
     type Level2MaskType = Op::Level2Mask;
     type Level2Mask<'b> where Self: 'b = Op::Level2Mask;
 
     #[inline]
-    unsafe fn level2_mask(&self, level0_index: usize, level1_index: usize) -> Self::Level2Mask<'_> {
-        todo!()
+    unsafe fn level2_mask(&self, level0_index: usize, level1_index: usize) 
+        -> Self::Level2Mask<'_> 
+    {
+        self.array_iter.clone().fold(
+            self.init.level2_mask(level0_index, level1_index).into_owned(), 
+            |acc, array|{
+                self.op.lvl2_op(acc, array.level2_mask(level0_index, level1_index))
+            }
+        )
     }
 
     type DataBlockType =  Op::DataBlock;
     type DataBlock<'b> where Self: 'b = Op::DataBlock;
 
     #[inline]
-    unsafe fn data_block(&self, level0_index: usize, level1_index: usize, level2_index: usize) -> Self::DataBlock<'_> {
-        todo!()
+    unsafe fn data_block(&self, level0_index: usize, level1_index: usize, level2_index: usize) 
+        -> Self::DataBlock<'_> 
+    {
+        self.array_iter.clone().fold(
+            self.init.data_block(level0_index, level1_index, level2_index).into_owned(), 
+            |acc, array|{
+                self.op.data_op(acc, array.data_block(level0_index, level1_index, level2_index))
+            }
+        )
     }
+    
+    type State = DefaultState<Self>;
 }
 
 const N: usize = 32;
 
-pub struct ReduceIterState<'a, Init, Array>
+/*pub struct ReduceIterState<'a, Init, Array>
 where
     Init: LevelMasksIter,
     Array: LevelMasksIter,
@@ -205,4 +229,4 @@ where
         
         acc        
     }    
-}
+}*/
