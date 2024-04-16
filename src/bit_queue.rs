@@ -78,19 +78,20 @@ impl BitQueue for EmptyBitQueue{
     }
 
     fn filled() -> Self {
-        todo!()
+        Self
     }
 
-    fn trim_to(&mut self, n: usize) {
-        todo!()
-    }
+    fn trim_to(&mut self, _n: usize) {}
 
     fn current(&self) -> usize {
-        todo!()
+        0
     }
 
-    fn traverse<F>(self, f: F) -> ControlFlow<()> where F: FnMut(usize) -> ControlFlow<()> {
-        todo!()
+    fn traverse<F>(self, _f: F) -> ControlFlow<()> 
+    where 
+        F: FnMut(usize) -> ControlFlow<()> 
+    {
+        ControlFlow::Continue(())
     }
 }
 

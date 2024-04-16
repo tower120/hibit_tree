@@ -1,5 +1,4 @@
 use std::marker::PhantomData;
-use std::mem::{ManuallyDrop, MaybeUninit};
 use crate::bit_block::BitBlock;
 use crate::level_block::{HiBlock, is_bypass_block, LevelBlock};
 use crate::level::ILevel;
@@ -33,7 +32,7 @@ where
     }
     
     // this should be const and act as const.
-    /*const*/ let level2_block_capacity_pot_exp : usize = if Level2::Bypass::VALUE{0} else {<Level2::Block as HiBlock>::Mask::SIZE_POT_EXPONENT};
+    /*const*/ let level2_block_capacity_pot_exp : usize = if is_bypass_level::<Level2>(){0} else {<Level2::Block as HiBlock>::Mask::SIZE_POT_EXPONENT};
     /*const*/ let level2_block_capacity         : usize = 1 << level2_block_capacity_pot_exp;
 
     /*const*/ let level1_block_capacity_pot_exp: usize = <Level1::Block as HiBlock>::Mask::SIZE_POT_EXPONENT

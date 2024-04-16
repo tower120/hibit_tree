@@ -63,7 +63,8 @@ pub struct ClusterBlock<Mask, SubBlockIndices/*: PrimitiveArray*/, SubBlock/*: P
     mask: Mask,
     sub_blocks: SubBlockIndices,
     
-    // Move to level
+    // TODO: Use Vec here
+    // Move to level.
     sub_block_storage: ArrayVec<SubBlock, 4>,
     phantom: PhantomData<SubBlock>
 }

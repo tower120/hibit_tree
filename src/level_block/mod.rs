@@ -75,6 +75,7 @@ mod meta_ptr{
 
 /// Hierarchy level level_block
 pub trait HiBlock: LevelBlock {
+    // TODO: rename
     type Meta: AsRef<Self> + Default + for<'a> From<&'a Self>;
     type Mask: BitBlock;
     
@@ -83,7 +84,7 @@ pub trait HiBlock: LevelBlock {
     // TODO: this is probably not needed
     unsafe fn mask_mut(&mut self) -> &mut Self::Mask;
     
-    // TODO: BlockIndex
+    // TODO: BlockIndex, IndexPointer ?
     type Item: Primitive;
     
     /*/// # Safety
@@ -115,10 +116,4 @@ pub trait HiBlock: LevelBlock {
     /// * `index` must be set
     /// * `index` is not checked for out-of-bounds.
     unsafe fn remove_unchecked(&mut self, index: usize);
-    
-/*    #[inline]
-    fn is_empty(&self) -> bool {
-        todo!()
-        //Self::Mask::is_zero(self.mask())
-    }*/
 }

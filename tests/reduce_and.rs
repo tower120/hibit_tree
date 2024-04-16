@@ -94,6 +94,7 @@ fn array_iter(array1: &BlockArray, array2: &BlockArray) -> u64 {
     s
 }
 
+// Same as bench/reduce_and, but we can debug it here
 #[test]
 pub fn bench_iter() {
     let mut block_array1 = BlockArray::default();
