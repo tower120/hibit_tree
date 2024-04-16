@@ -159,7 +159,7 @@ where
         )
     }
     
-    type State = DefaultState<Self>;
+    type State = ApplyState<Op, B1, B2, T1, T2>;
 }
 
 pub struct ApplyState<Op, B1, B2, T1, T2>

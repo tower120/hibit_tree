@@ -32,7 +32,7 @@ where
         DataBlock  = Array::DataBlockType,
     >,
 {
-    const EXACT_HIERARCHY: bool = true;
+    const EXACT_HIERARCHY: bool = Op::EXACT_HIERARCHY;
     
     type Level0MaskType = Array::Level0MaskType;
     type Level0Mask<'b> = Self::Level0MaskType where Self: 'b;
@@ -90,7 +90,7 @@ where
         )
     }
     
-    type State = DefaultState<Self>;
+    type State = FoldState<'a, Op, Init, ArrayIter, Array>;
 }
 
 const N: usize = 32;

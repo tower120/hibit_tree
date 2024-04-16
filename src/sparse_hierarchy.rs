@@ -27,7 +27,8 @@ pub trait SparseHierarchy {
         where Self: 'a;
     /// # Safety
     ///
-    /// index is not checked
+    /// - `index` is not checked.
+    /// - This should not be called if Level1 bypassed.
     unsafe fn level1_mask(&self, level0_index: usize) -> Self::Level1Mask<'_>;
     
     type Level2MaskType: BitBlock;
@@ -35,15 +36,20 @@ pub trait SparseHierarchy {
         where Self: 'a;
     /// # Safety
     ///
-    /// index is not checked
+    /// - `index` is not checked.
+    /// - This should not be called if Level2 bypassed.
     unsafe fn level2_mask(&self, level0_index: usize, level1_index: usize) -> Self::Level2Mask<'_>;
     
     type DataBlockType;
     type DataBlock<'a>: Borrow<Self::DataBlockType> + IntoOwned<Self::DataBlockType> 
         where Self: 'a;
+    /// # Implementation
+    /// 
+    /// Indices of bypassed levels can be any, and should be ignored.
+    /// 
     /// # Safety
     ///
-    /// indices are not checked
+    /// indices of existent levels are not checked.
     unsafe fn data_block(&self, level0_index: usize, level1_index: usize, level2_index: usize)
         -> Self::DataBlock<'_>;
     
