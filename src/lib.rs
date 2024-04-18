@@ -15,6 +15,7 @@ pub mod caching_iter;
 pub mod level_block;
 mod fold;
 //mod empty;
+pub mod const_int;
 
 //pub use ref_or_val::*;
 pub use bit_block::{BitBlock, IEmptyBitBlock, EmptyBitBlock};
