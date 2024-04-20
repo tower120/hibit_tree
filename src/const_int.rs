@@ -1,5 +1,14 @@
-use std::fmt::Debug;
-use std::marker::PhantomData;
+use std::fmt;
+use std::fmt::{Debug, Display};
+use std::ops::RangeTo;
+
+pub trait IntVisitor{
+    fn visit<I: ConstInteger>(&mut self, i: I);
+}
+
+pub fn const_for<I: ConstInteger, V: IntVisitor>(range: RangeTo<I>, mut v: V){
+    range.end.iterate_as_range(&mut v);
+}
 
 /// Ala C++ integral_constant.
 /// 
@@ -18,10 +27,22 @@ pub trait ConstInteger: Default + Copy + Eq + Debug {
     fn next(self) -> Self::Next{
         Self::Next::DEFAULT
     }
+    
+    /// const for 0..N
+    fn iterate_as_range<V: IntVisitor>(self, visitor: &mut V){
+        self.prev().iterate_as_range(visitor);
+        visitor.visit(self.prev());    
+    }    
 }
 
-#[derive(Default, Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Default, Copy, Clone, Eq, PartialEq)]
 pub struct ConstInt<const N: usize>;
+
+impl<const N: usize> Debug for ConstInt<N> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ConstInt<{}>", N)
+    }
+}
 
 macro_rules! gen_const_int {
     (first $i:literal) => {
@@ -31,6 +52,8 @@ macro_rules! gen_const_int {
             
             type Prev = ConstIntInvalid;
             type Next = ConstInt<{$i+1}>;
+            
+            fn iterate_as_range<V: IntVisitor>(self, visitor: &mut V){}
         }
     };
     ($i:literal) => {
@@ -63,15 +86,13 @@ macro_rules! gen_const_seq {
     }
 }
 
-gen_const_seq!(0,1,2,3,4,5,6,7,8,9,10,11,12;13);
+gen_const_seq!(0,1,2,3,4,5,6,7,8;9);
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub struct ConstIntInvalid(PhantomData<()>);
+pub struct ConstIntInvalid;
 impl ConstInteger for ConstIntInvalid{
-    #[doc(hidden)]
-    const N: usize = panic!();
-    #[doc(hidden)]
-    const DEFAULT: Self = panic!();
+    const N      : usize = panic!();
+    const DEFAULT: Self  = panic!();
     
     type Prev = ConstIntInvalid;
     type Next = ConstIntInvalid;
@@ -88,11 +109,23 @@ mod test{
     
     #[test]
     fn test(){
-        type One  = ConstInt::<1>;
-        type Zero = ConstInt::<0>;
-        type Two  = ConstInt::<2>;
+        type One  = ConstInt<1>;
+        type Zero = ConstInt<0>;
+        type Two  = ConstInt<2>;
         
         assert_eq!(One::DEFAULT.next(), Two::DEFAULT);         
         assert_eq!(One::DEFAULT.prev(), Zero::DEFAULT);
+    }
+    
+    #[test]
+    fn loop_test(){
+        ConstInt::<3>.iterate_as_range(&mut V);
+        const_for(..ConstInt::<0>, V);
+        struct V;
+        impl IntVisitor for V{
+            fn visit<I: ConstInteger>(&mut self, i: I) {
+                println!("{:?}", i);
+            }
+        }
     }
 }
