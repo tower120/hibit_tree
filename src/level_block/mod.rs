@@ -76,6 +76,8 @@ mod meta_ptr{
 /// Hierarchy level level_block
 pub trait HiBlock: LevelBlock {
     // TODO: rename
+    // TODO: remove
+    #[deprecated]
     type Meta: AsRef<Self> + Default + for<'a> From<&'a Self>;
     type Mask: BitBlock;
     

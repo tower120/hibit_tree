@@ -1,3 +1,5 @@
+#![feature(associated_type_bounds)]
+
 mod primitive;
 mod primitive_array;
 mod array;
@@ -5,7 +7,9 @@ pub mod level;
 mod bit_utils;
 mod bool_type;
 mod bit_block;
-mod apply;
+//mod apply;
+//mod fold;
+//mod empty;
 
 pub mod sparse_hierarchy;
 pub mod bit_queue;
@@ -13,17 +17,15 @@ pub mod bit_queue;
 pub mod caching_iter;
 //mod ref_or_val;
 pub mod level_block;
-mod fold;
-//mod empty;
 pub mod const_int;
 
 //pub use ref_or_val::*;
 pub use bit_block::{BitBlock, IEmptyBitBlock, EmptyBitBlock};
 pub use primitive::Primitive;
 pub use primitive_array::PrimitiveArray;
-pub use array::SparseBlockArray;
-pub use apply::{Apply, Op};
-pub use fold::Fold;
+pub use array::{SparseBlockArray, ArrayLevels};
+//pub use apply::{Apply, Op};
+//pub use fold::Fold;
 //pub use empty::Empty;
 
 
@@ -31,9 +33,9 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use bool_type::BoolType;
 use sparse_hierarchy::SparseHierarchy;
-use crate::sparse_hierarchy::{level_bypass, LevelBypass};
+//use crate::sparse_hierarchy::{level_bypass, LevelBypass};
 
-#[inline]
+/*#[inline]
 pub(crate) fn data_block_index<T: SparseHierarchy>(
     level0_index: usize, 
     level1_index: usize,
@@ -53,7 +55,7 @@ pub(crate) fn data_block_index<T: SparseHierarchy>(
             index
         }
     }
-}
+}*/
 
 /// convert T to value. noop for value, clone - for reference.
 ///
@@ -77,7 +79,7 @@ impl<T: Clone> IntoOwned<T> for &T{
     }
 }
 
-#[inline]
+/*#[inline]
 pub fn apply<Op, B1, B2, T1, T2>(op: Op, s1: B1, s2: B2) -> Apply<Op, B1, B2, T1, T2>
 where
     Op: apply::Op,
@@ -111,4 +113,4 @@ where
     } else {
         None
     }
-}
+}*/

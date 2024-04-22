@@ -4,7 +4,7 @@ use std::ops::{BitAnd, BitOr, ControlFlow};
 use std::ptr::NonNull;
 use crate::bit_queue::{ArrayBitQueue, BitQueue, EmptyBitQueue, PrimitiveBitQueue};
 use crate::bit_utils;
-use crate::primitive_array::PrimitiveArray;
+use crate::primitive_array::{Array, PrimitiveArray};
 
 pub trait BitBlock: Eq + Sized + Clone + 'static{
     // TODO: Try use SIZE instead. There is const ilog2

@@ -1,10 +1,13 @@
+use std::ops::Range;
 use itertools::{assert_equal, Itertools};
 use hi_sparse_array::level_block::{Block, LevelBlock};
+//use hi_sparse_array::caching_iter::CachingBlockIter;
+use hi_sparse_array::level::{BypassLevel, ILevel, Level, SingleBlockLevel};
+use hi_sparse_array::{ArrayLevels, SparseBlockArray};
 use hi_sparse_array::caching_iter::CachingBlockIter;
-use hi_sparse_array::level::{BypassLevel, Level};
-use hi_sparse_array::SparseBlockArray;
+use hi_sparse_array::sparse_hierarchy::SparseHierarchy;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct DataBlock(u64);
 impl LevelBlock for DataBlock{
     fn empty() -> Self {
@@ -27,17 +30,40 @@ impl LevelBlock for DataBlock{
 
 #[test]
 fn bypass_test(){
-    type Lvl0Block = Block<u64, [u8;64]>;
-    //type Array = SparseBlockArray<Lvl0Block, BypassLevel, BypassLevel, Level<DataBlock>>;
-    type Array = SparseBlockArray<Lvl0Block, Level<Block<u64, [u16;64]>>, Level<Block<u64, [u32;64]>>/*BypassLevel*/, Level<DataBlock>>;
-    
-    let mut array: Array = Default::default(); 
-    
-    let range = 0..60000;
-    for i in range.clone(){
-        *array.get_or_insert(i as usize) = DataBlock(i as u64);
+    fn do_test<Levels, DataLevel>(mut array: SparseBlockArray<Levels, DataLevel>, range: Range<usize>)
+    where
+        DataLevel: ILevel<Block = DataBlock>, 
+        Levels: ArrayLevels    
+    {
+        for i in range.clone(){
+            *array.get_or_insert(i as usize) = DataBlock(i as u64);
+        }
+        
+        for i in range.clone(){
+            let data = unsafe{array.get_unchecked(i)};
+            assert_eq!(data, &DataBlock(i as u64));
+        }
+        
+        /*for (_, data) in CachingBlockIter::new(&array){
+            println!("{:}", data.0);
+        }*/
+        assert_equal(CachingBlockIter::new(&array).map(|(_,d)|d.0 as usize), range.clone());
     }
-
-    let values = CachingBlockIter::new(&array).map(|(_,v)|v.0);
-    assert_equal(values, range.clone());
+    
+    type Lvl0Block = Block<u64, [u8;64]>;
+    type Lvl1Block = Block<u64, [u16;64]>;
+    type Lvl2Block = Block<u64, [u32;64]>;
+    
+    {
+        type Array = SparseBlockArray<(SingleBlockLevel<Lvl0Block>, ), Level<DataBlock>>;
+        do_test(Array::default(), 0..64);
+    }
+    {
+        type Array = SparseBlockArray<(SingleBlockLevel<Lvl0Block>, Level<Lvl1Block>), Level<DataBlock>>;
+        do_test(Array::default(), 0..64*64);
+    }
+    {
+        type Array = SparseBlockArray<(SingleBlockLevel<Lvl0Block>, Level<Lvl1Block>, Level<Lvl2Block>), Level<DataBlock>>;
+        do_test(Array::default(), 0..64*64*64);
+    }
 }

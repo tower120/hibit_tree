@@ -1,13 +1,12 @@
 use std::marker::PhantomData;
+use std::ptr::NonNull;
+use std::slice;
 use crate::bit_block::{EmptyBitBlock, IEmptyBitBlock};
 use crate::bool_type::{BoolType, FalseType, TrueType};
 use crate::level_block::{BypassBlock, HiBlock, LevelBlock};
 use crate::primitive::Primitive;
 
 pub trait ILevel: Default {
-    // TODO: remove. Now unused
-    #[deprecated]
-    type Bypass: BoolType;
     type Block: LevelBlock;
     
     fn blocks(&self) -> &[Self::Block];
@@ -19,6 +18,38 @@ pub trait ILevel: Default {
     ///
     /// block_index and level_block emptiness are not checked.
     unsafe fn remove_empty_block_unchecked(&mut self, block_index: usize);
+}
+
+#[derive(Clone)]
+pub struct SingleBlockLevel<Block: LevelBlock>{
+    block: Block
+}
+
+impl<Block: LevelBlock> ILevel for SingleBlockLevel<Block>{
+    type Block = Block;
+
+    fn blocks(&self) -> &[Self::Block] {
+        unsafe{ slice::from_raw_parts(&self.block, 1) }
+    }
+
+    fn blocks_mut(&mut self) -> &mut [Self::Block] {
+        unsafe{ slice::from_raw_parts_mut(&mut self.block, 1) }
+    }
+
+    fn insert_empty_block(&mut self) -> usize {
+        unreachable!()
+    }
+
+    unsafe fn remove_empty_block_unchecked(&mut self, block_index: usize) {
+        unreachable!()
+    }
+}
+
+impl<Block: LevelBlock> Default for SingleBlockLevel<Block> {
+    #[inline]
+    fn default() -> Self {
+        Self{ block: Block::empty() }
+    }
 }
 
 #[derive(Clone)]
@@ -85,7 +116,6 @@ impl<Block: LevelBlock> Level<Block> {
 }
 
 impl<Block: LevelBlock> ILevel for Level<Block> {
-    type Bypass = FalseType;
     type Block = Block;
 
     #[inline]
@@ -115,17 +145,30 @@ impl<Block: LevelBlock> ILevel for Level<Block> {
     }
 }
 
-// TODO: there should be #derive(EmptyBitBlock)  
-pub struct BypassLevel<EmptyMask: IEmptyBitBlock = EmptyBitBlock>(PhantomData<EmptyMask>);
-impl<EmptyMask: IEmptyBitBlock> Default for BypassLevel<EmptyMask>{
+// TODO: remove - all not used now
+// TODO: there should be #derive(EmptyBitBlock) ?
+
+pub(crate) const fn bypass_level<EmptyMask>() -> BypassLevel<EmptyMask>{
+    BypassLevel(PhantomData)
+}
+
+pub(crate) const fn bypass_level_ref<EmptyMask>() -> &'static BypassLevel<EmptyMask>{
+    let ptr: NonNull<BypassLevel<EmptyMask>> = NonNull::dangling();
+    unsafe{
+        ptr.as_ref()
+    }
+}
+
+
+pub struct BypassLevel<EmptyMask/* : IEmptyBitBlock  */= EmptyBitBlock>(PhantomData<EmptyMask>);
+impl<EmptyMask/* : IEmptyBitBlock */> Default for BypassLevel<EmptyMask>{
     #[inline]
     fn default() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<EmptyMask: IEmptyBitBlock> ILevel for BypassLevel<EmptyMask> {
-    type Bypass = TrueType;
+impl<EmptyMask/* : IEmptyBitBlock */> ILevel for BypassLevel<EmptyMask> {
     type Block = BypassBlock<EmptyMask>;
 
     fn blocks(&self) -> &[Self::Block] {

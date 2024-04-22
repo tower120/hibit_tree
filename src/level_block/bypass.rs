@@ -2,10 +2,11 @@ use std::marker::PhantomData;
 use crate::bit_block::{EmptyBitBlock, IEmptyBitBlock, is_empty_bitblock};
 use crate::level_block::{HiBlock, LevelBlock};
 use crate::level_block::meta_ptr::EmptyPtr;
+use crate::BitBlock;
 
-pub struct BypassBlock<Mask: IEmptyBitBlock = EmptyBitBlock>(PhantomData<Mask>);
+pub struct BypassBlock<Mask/* : IEmptyBitBlock = EmptyBitBlock */>(PhantomData<Mask>);
 
-impl<Mask: IEmptyBitBlock> LevelBlock for BypassBlock<Mask>{
+impl<Mask/* : IEmptyBitBlock */> LevelBlock for BypassBlock<Mask>{
     fn empty() -> Self {
         Self(PhantomData)
     }
@@ -23,7 +24,7 @@ impl<Mask: IEmptyBitBlock> LevelBlock for BypassBlock<Mask>{
     }
 }
 
-impl<Mask: IEmptyBitBlock> HiBlock for BypassBlock<Mask>{
+impl<Mask: BitBlock/* : IEmptyBitBlock */> HiBlock for BypassBlock<Mask>{
     type Meta = EmptyPtr<Self>;
     type Mask = Mask;
 

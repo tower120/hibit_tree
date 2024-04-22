@@ -1,7 +1,10 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
-use crate::{BitBlock, IntoOwned};
+use crate::{BitBlock, IntoOwned, PrimitiveArray};
+use crate::array::level_indices_new;
+//use crate::array::level_indices_new;
 use crate::bit_block::is_empty_bitblock;
+use crate::const_int::ConstInteger;
 
 /// 
 /// TODO: Change description
@@ -15,51 +18,62 @@ use crate::bit_block::is_empty_bitblock;
 // We need xxxxType for each concrete level_block/mask type to avoid the need for use `for<'a>`,
 // which is still not working (at Rust level) in cases, where we need it most. 
 pub trait SparseHierarchy {
-    const EXACT_HIERARCHY: bool; 
+    const EXACT_HIERARCHY: bool;
+    type LevelCount: ConstInteger;
     
-    type Level0MaskType: BitBlock;
-    type Level0Mask<'a>: Borrow<Self::Level0MaskType> + IntoOwned<Self::Level0MaskType>
+    type LevelMaskType: BitBlock;
+    type LevelMask<'a>: Borrow<Self::LevelMaskType> + IntoOwned<Self::LevelMaskType>
         where Self: 'a;
-    fn level0_mask(&self) -> Self::Level0Mask<'_>;
-
-    type Level1MaskType: BitBlock;
-    type Level1Mask<'a>: Borrow<Self::Level1MaskType> + IntoOwned<Self::Level1MaskType>
-        where Self: 'a;
-    /// # Safety
-    ///
-    /// - `index` is not checked.
-    /// - This should not be called if Level1 bypassed.
-    unsafe fn level1_mask(&self, level0_index: usize) -> Self::Level1Mask<'_>;
     
-    type Level2MaskType: BitBlock;
-    type Level2Mask<'a>: Borrow<Self::Level2MaskType> + IntoOwned<Self::Level2MaskType>
-        where Self: 'a;
-    /// # Safety
-    ///
-    /// - `index` is not checked.
-    /// - This should not be called if Level2 bypassed.
-    unsafe fn level2_mask(&self, level0_index: usize, level1_index: usize) -> Self::Level2Mask<'_>;
+    /*/// `I::CAP` - level number. Starting from 0.
+    fn level_mask<I: PrimitiveArray<Item=usize>>(&self, level_indices: I) -> Self::LevelMask<'_>;*/
     
+    // TODO: Try to remove IntoOwned here. This requires Data to impl Clone. 
+    // We need to have Default here, because can't have it in PrimitiveArray,
+    // because only max [T;32] implements Default. 
+    /// Len/CAP = LEVELS_COUNT
+    type DataBlockIndices : PrimitiveArray<Item = usize> + Default;
     type DataBlockType;
     type DataBlock<'a>: Borrow<Self::DataBlockType> + IntoOwned<Self::DataBlockType> 
         where Self: 'a;
-    /// # Implementation
-    /// 
-    /// Indices of bypassed levels can be any, and should be ignored.
-    /// 
     /// # Safety
     ///
-    /// indices of existent levels are not checked.
-    unsafe fn data_block(&self, level0_index: usize, level1_index: usize, level2_index: usize)
+    /// indices are not checked.
+    unsafe fn data_block(&self, level_indices: Self::DataBlockIndices)
         -> Self::DataBlock<'_>;
+    
+    /*unsafe fn contains_unchecked(&self, index: usize) -> bool {
+        let indices = level_indices_new::<Self::LevelMaskType, Self::DataBlockIndices>(index);
+        // indices.split_last()
+        
+        self.level_mask(indices);
+        todo!()
+    }*/
+    
+    /// # Safety
+    ///
+    /// `index` must be in range.
+    #[inline]
+    unsafe fn get_unchecked(&self, index: usize) -> Self::DataBlock<'_>{
+        let indices = level_indices_new::<Self::LevelMaskType, Self::DataBlockIndices>(index);
+        self.data_block(indices)
+    }
+    
+    /// Returns None if `index` outside range.
+    #[inline]
+    fn get(&self, index: usize) -> Option<Self::DataBlock<'_>>{
+        if index > Self::max_range(){
+            None
+        } else {
+            Some(unsafe{ self.get_unchecked(index) })
+        }
+    }    
     
     type State: SparseHierarchyState<This = Self>;
     
     #[inline]
     /*const*/ fn max_range() -> usize {
-        Self::Level0MaskType::size() 
-        * Self::Level1MaskType::size() 
-        * Self::Level2MaskType::size()
+        Self::LevelMaskType::size().pow(Self::LevelCount::VALUE as _) 
     }
 }
 
@@ -81,8 +95,7 @@ pub trait SparseHierarchyState{
     type This: SparseHierarchy;
     
     fn new(this: &Self::This) -> Self;
-
-    // TODO: select_level1_block?
+    
     /// Returns (level_mask, is_not_empty).
     /// 
     /// `is_not_empty` - mask not empty flag. Allowed to be false-positive.
@@ -90,24 +103,12 @@ pub trait SparseHierarchyState{
     /// # Safety
     /// 
     /// level index is not checked 
-    unsafe fn select_level1<'a>(
+    unsafe fn select_level_bock<'a, L: ConstInteger>(
         &mut self,
+        level: L,   // TODO: find better name this is actually level hierarchy/depth index 
         this: &'a Self::This,
-        level0_index: usize
-    ) -> (<Self::This as SparseHierarchy>::Level1Mask<'a>, bool);        
-
-    /// Returns (level_mask, is_not_empty).
-    /// 
-    /// `is_not_empty` - mask not empty flag. Allowed to be false-positive.
-    /// 
-    /// # Safety
-    /// 
-    /// level index is not checked
-    unsafe fn select_level2<'a>(
-        &mut self,
-        this: &'a Self::This,
-        level1_index: usize
-    ) -> (<Self::This as SparseHierarchy>::Level2Mask<'a>, bool);               
+        level_index: usize
+    ) -> (<Self::This as SparseHierarchy>::LevelMask<'a>, bool);        
 
     /// # Safety
     /// 
@@ -119,6 +120,7 @@ pub trait SparseHierarchyState{
     ) -> <Self::This as SparseHierarchy>::DataBlock<'a>;    
 }
 
+/*
 /// Redirect to [SparseHierarchy] stateless methods.
 pub struct DefaultState<This>{
     level0_index: usize,
@@ -195,4 +197,4 @@ pub /*const*/ fn level_bypass<T: SparseHierarchy>() -> LevelBypass {
     } else {
         LevelBypass::None
     }
-}
+}*/

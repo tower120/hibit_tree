@@ -6,6 +6,7 @@ use arrayvec::ArrayVec;
 use crate::level_block::{LevelBlock, HiBlock};
 use crate::{BitBlock, Primitive, PrimitiveArray};
 use crate::level_block::meta_ptr::Ptr;
+use crate::primitive_array::Array;
 
 type SubBlockMask = u16;
 const SUB_BLOCK_SIZE: usize = size_of::<SubBlockMask>()*8;
