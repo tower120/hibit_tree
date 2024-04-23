@@ -32,12 +32,12 @@ trait ConstIntegerPrivate{
     where
         Self: ConstInteger
     {
-        let ctrl = self.prev().iterate_as_range(from, visitor);
+        let ctrl = self.dec().iterate_as_range(from, visitor);
         if ctrl.is_continue() {
             if self.value() == from.value() {
                 Continue(())
             } else {            
-                visitor.visit(self.prev())
+                visitor.visit(self.dec())
             }
         } else {
             ctrl
@@ -50,12 +50,12 @@ trait ConstIntegerPrivate{
     where
         Self: ConstInteger
     {
-        let ctrl = visitor.visit(self.prev());
+        let ctrl = visitor.visit(self.dec());
         if ctrl.is_continue(){
             if self.value() == from.value() {
                 Continue(())
             } else {
-                self.prev().iterate_as_range_rev(from, visitor)
+                self.dec().iterate_as_range_rev(from, visitor)
             }
         } else {
             ctrl
@@ -75,22 +75,18 @@ pub trait ConstInteger: ConstIntegerPrivate + Default + Copy + Eq + Debug {
         Self::VALUE
     }
     
-    type Prev: ConstInteger;
-    fn prev(self) -> Self::Prev{
-        Self::Prev::default()
+    type Dec: ConstInteger;
+    fn dec(self) -> Self::Dec {
+        Self::Dec::default()
     }
     
-    type Next: ConstInteger;
-    fn next(self) -> Self::Next{
-        Self::Next::default()
+    type Inc: ConstInteger;
+    fn inc(self) -> Self::Inc {
+        Self::Inc::default()
     }
     
     /// [T; Self::N]
     type SelfSizeArray<T>: ConstArray<Item=T, Cap=Self>;
-    
-    /*// Somehow, Rust can't figure out that Array<usize> is PrimitiveArray<usize>.
-    #[deprecated]
-    type PrimitiveArray<T: Primitive>: ConstArray<Item=T, Cap=Self> + PrimitiveArray/* + Default*/;*/
     
     /*type IsZero: BoolType;
     fn is_zero(self) -> Self::IsZero{
@@ -126,10 +122,9 @@ macro_rules! gen_const_int {
             const VALUE  : usize = $i;
             const DEFAULT: Self = ConstInt::<$i>;
             
-            type Prev = ConstIntInvalid;
-            type Next = ConstInt<{$i+1}>;
+            type Dec = ConstIntInvalid;
+            type Inc = ConstInt<{$i+1}>;
             type SelfSizeArray<T> = [T; $i];
-            //type PrimitiveArray<T: Primitive> = [T; $i];
 
             //type IsZero = TrueType;
         }
@@ -140,10 +135,9 @@ macro_rules! gen_const_int {
             const VALUE  : usize = $i;
             const DEFAULT: Self = ConstInt::<$i>;
             
-            type Prev = ConstInt<{$i-1}>;
-            type Next = ConstInt<{$i+1}>;
+            type Dec = ConstInt<{$i-1}>;
+            type Inc = ConstInt<{$i+1}>;
             type SelfSizeArray<T> = [T; $i];
-            //type PrimitiveArray<T: Primitive> = [T; $i];
             
             //type IsZero = FalseType;
         }
@@ -154,10 +148,9 @@ macro_rules! gen_const_int {
             const VALUE  : usize = $i;
             const DEFAULT: Self = ConstInt::<$i>;
             
-            type Prev = ConstInt<{$i-1}>;
-            type Next = ConstIntInvalid;
+            type Dec = ConstInt<{$i-1}>;
+            type Inc = ConstIntInvalid;
             type SelfSizeArray<T> = [T; $i];
-            //type PrimitiveArray<T: Primitive> = [T; $i];
             
             //type IsZero = FalseType;
         }
@@ -182,10 +175,9 @@ impl ConstInteger for ConstInt<MAX>{
     const VALUE  : usize = MAX;
     const DEFAULT: Self  = ConstInt::<MAX>;
     
-    type Prev = ConstInt<MAX>;
-    type Next = ConstInt<MAX>;
+    type Dec = ConstInt<MAX>;
+    type Inc = ConstInt<MAX>;
     type SelfSizeArray<T> = [T; MAX];
-    //type PrimitiveArray<T: Primitive> = [T; MAX];
     
     //type IsZero = FalseType;
 }
@@ -201,8 +193,8 @@ mod test{
         type Zero = ConstInt<0>;
         type Two  = ConstInt<2>;
         
-        assert_eq!(One::DEFAULT.next(), Two::DEFAULT);         
-        assert_eq!(One::DEFAULT.prev(), Zero::DEFAULT);
+        assert_eq!(One::DEFAULT.inc(), Two::DEFAULT);         
+        assert_eq!(One::DEFAULT.dec(), Zero::DEFAULT);
     }
     
     #[test]

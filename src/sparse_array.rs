@@ -457,7 +457,7 @@ where
                                     level.insert_empty_block()
                                 }
                             }
-                            self.this.as_mut().levels.visit_mut(i.next(), Insert)
+                            self.this.as_mut().levels.visit_mut(i.inc(), Insert)
                         };
                     Primitive::from_usize(block_index)
                 }).as_usize()
@@ -579,7 +579,7 @@ where
     /// Level0 skipped - we can get it from self/this.
     level_block_ptrs: ConstArrayType<
         *const u8, 
-        <Levels::LevelCount as ConstInteger>::Prev
+        <Levels::LevelCount as ConstInteger>::Dec
     >,
     phantom_data: PhantomData<SparseBlockArray<Levels, DataLevel>>
 }
@@ -612,7 +612,7 @@ where
         }
         
         // We do not store the root level's block.
-        let level_block_ptrs_index = level_n.prev().value();
+        let level_block_ptrs_index = level_n.dec().value();
         
         // 1. get level_block_index from prev level. 
         let level_block_index ={
@@ -624,7 +624,7 @@ where
                     self.level_block_ptrs.as_mut()[level_block_ptrs_index-1]
                 };
             
-            let level_block_index = this.get_block_index(level_n.prev(), prev_level_block_ptr, level_index);
+            let level_block_index = this.get_block_index(level_n.dec(), prev_level_block_ptr, level_index);
             level_block_index
         };
         
@@ -639,14 +639,14 @@ where
     unsafe fn data_block<'a>(&self, this: &'a Self::This, level_index: usize)
         -> <Self::This as SparseHierarchy>::DataBlock<'a> 
     {
-        let last_level_index = Levels::LevelCount::default().prev();
+        let last_level_index = Levels::LevelCount::default().dec();
         
         let level_block_ptr = 
             if Levels::LevelCount::VALUE == 1{
                 this.get_block_ptr(ConstInt::<0>, 0)
             } else {
                 // We do not store the root level's block.
-                let level_block_ptrs_index = last_level_index.prev();
+                let level_block_ptrs_index = last_level_index.dec();
                 let level_block_ptr = self.level_block_ptrs.as_ref()[level_block_ptrs_index.value()];
                 level_block_ptr
             };

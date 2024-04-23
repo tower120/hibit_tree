@@ -11,7 +11,7 @@ use crate::primitive_array::{Array, ConstArray, ConstArrayType};
 type LevelIndices<T: SparseHierarchy> =
     ConstArrayType<
         usize,
-        <T::LevelCount as ConstInteger>::Prev   
+        <T::LevelCount as ConstInteger>::Dec   
     >;
 
 /// Each hierarchy level has its own iterator.
@@ -84,7 +84,7 @@ where
             if let Some(index) = top_level_iter.next() {
                 break index;
             } else {
-                let ctrl = const_for_rev(ConstInt::<0>, T::LevelCount::DEFAULT.prev(), V(self)); 
+                let ctrl = const_for_rev(ConstInt::<0>, T::LevelCount::DEFAULT.dec(), V(self)); 
                 struct V<'b,'a,T: SparseHierarchy>(&'b mut CachingBlockIter<'a, T>); 
                 impl<'b,'a,T: SparseHierarchy> ConstIntVisitor for V<'b,'a,T> {
                     type Out = ();
@@ -104,7 +104,7 @@ where
                             }
                             
                             // 2. update level_iter from mask
-                            let level_depth = i.next();                            
+                            let level_depth = i.inc();                            
                             let (level_mask, _) = unsafe{
                                 self.0.state.select_level_bock(
                                     level_depth,
