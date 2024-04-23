@@ -3,7 +3,7 @@ use std::ptr::NonNull;
 use std::slice;
 use crate::bit_block::{EmptyBitBlock, IEmptyBitBlock};
 use crate::bool_type::{BoolType, FalseType, TrueType};
-use crate::level_block::{BypassBlock, HiBlock, LevelBlock};
+use crate::level_block::{HiBlock, LevelBlock};
 use crate::primitive::Primitive;
 
 pub trait ILevel: Default {
@@ -142,48 +142,5 @@ impl<Block: LevelBlock> ILevel for Level<Block> {
     #[inline]
     unsafe fn remove_empty_block_unchecked(&mut self, block_index: usize) {
         self.push_empty_block(block_index);
-    }
-}
-
-// TODO: remove - all not used now
-// TODO: there should be #derive(EmptyBitBlock) ?
-
-pub(crate) const fn bypass_level<EmptyMask>() -> BypassLevel<EmptyMask>{
-    BypassLevel(PhantomData)
-}
-
-pub(crate) const fn bypass_level_ref<EmptyMask>() -> &'static BypassLevel<EmptyMask>{
-    let ptr: NonNull<BypassLevel<EmptyMask>> = NonNull::dangling();
-    unsafe{
-        ptr.as_ref()
-    }
-}
-
-
-pub struct BypassLevel<EmptyMask/* : IEmptyBitBlock  */= EmptyBitBlock>(PhantomData<EmptyMask>);
-impl<EmptyMask/* : IEmptyBitBlock */> Default for BypassLevel<EmptyMask>{
-    #[inline]
-    fn default() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<EmptyMask/* : IEmptyBitBlock */> ILevel for BypassLevel<EmptyMask> {
-    type Block = BypassBlock<EmptyMask>;
-
-    fn blocks(&self) -> &[Self::Block] {
-        unreachable!()
-    }
-
-    fn blocks_mut(&mut self) -> &mut [Self::Block] {
-        unreachable!()
-    }
-
-    fn insert_empty_block(&mut self) -> usize {
-        unreachable!()
-    }
-
-    unsafe fn remove_empty_block_unchecked(&mut self, block_index: usize) {
-        unreachable!()
     }
 }

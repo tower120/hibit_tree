@@ -1,12 +1,10 @@
 mod cluster_block;
 mod small_block;
 mod block;
-mod bypass;
 
 pub use small_block::*;
 pub use cluster_block::*;
 pub use block::*;
-pub use bypass::*;
 
 use std::marker::PhantomData;
 use std::ptr::NonNull;
@@ -75,10 +73,6 @@ mod meta_ptr{
 
 /// Hierarchy level level_block
 pub trait HiBlock: LevelBlock {
-    // TODO: rename
-    // TODO: remove
-    #[deprecated]
-    type Meta: AsRef<Self> + Default + for<'a> From<&'a Self>;
     type Mask: BitBlock;
     
     fn mask(&self) -> &Self::Mask;

@@ -5,14 +5,12 @@ use std::ops::ControlFlow;
 use std::ops::ControlFlow::{Break, Continue};
 use std::ptr::{NonNull, null};
 use crate::bit_block::BitBlock;
-use crate::level_block::{HiBlock, is_bypass_block, LevelBlock};
-use crate::level::{bypass_level, bypass_level_ref, BypassLevel, ILevel, Level};
+use crate::level_block::HiBlock;
+use crate::level::{ILevel, Level};
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
-use crate::bool_type::{BoolType};
 use crate::const_int::{const_for, ConstInt, ConstInteger, ConstIntVisitor};
 use crate::primitive::Primitive;
 use crate::primitive_array::{Array, ConstArray, ConstArrayType};
-use crate::{IntoOwned, PrimitiveArray};
 
 // TODO: make public
 // Compile-time loop inside. Ends up with N (AND + SHR)s.

@@ -50,7 +50,6 @@ where
     Mask: BitBlock,
     BlockIndices: PrimitiveArray
 {
-    type Meta = Ptr<Self>;
     type Mask = Mask;
 
     #[inline]

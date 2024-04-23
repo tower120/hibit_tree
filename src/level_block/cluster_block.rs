@@ -142,7 +142,6 @@ where
     SubBlockIndices: PrimitiveArray,
     SubBlock: PrimitiveArray<Item = u16>
 {
-    type Meta = Ptr<Self>;
     type Mask = Mask;
 
     #[inline]

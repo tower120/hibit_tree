@@ -234,7 +234,6 @@ where
     BlockIndices: PrimitiveArray,
     SmallBlockIndices: PrimitiveArray<Item=BlockIndices::Item>,
 {
-    type Meta = Ptr<Self>;
     type Mask = Mask;
 
     #[inline]

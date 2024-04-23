@@ -12,10 +12,6 @@ use crate::primitive_array::{ConstArray};
 /// 
 /// Basic interface for accessing level_block masks. Can work with `SimpleIter`.
 ///
-/// # Level bypass
-/// 
-/// TODO
-/// 
 // We need xxxxType for each concrete level_block/mask type to avoid the need for use `for<'a>`,
 // which is still not working (at Rust level) in cases, where we need it most. 
 pub trait SparseHierarchy {
