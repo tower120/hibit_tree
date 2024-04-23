@@ -2,7 +2,7 @@
 
 mod primitive;
 mod primitive_array;
-mod array;
+mod sparse_array;
 pub mod level;
 mod bit_utils;
 mod bool_type;
@@ -23,7 +23,7 @@ pub mod const_int;
 pub use bit_block::{BitBlock, IEmptyBitBlock, EmptyBitBlock};
 pub use primitive::Primitive;
 pub use primitive_array::PrimitiveArray;
-pub use array::{SparseBlockArray, ArrayLevels};
+pub use sparse_array::{SparseBlockArray, ArrayLevels};
 //pub use apply::{Apply, Op};
 //pub use fold::Fold;
 //pub use empty::Empty;
@@ -31,31 +31,26 @@ pub use array::{SparseBlockArray, ArrayLevels};
 
 use std::borrow::Borrow;
 use std::marker::PhantomData;
+use std::ops::ControlFlow;
 use bool_type::BoolType;
 use sparse_hierarchy::SparseHierarchy;
+use crate::const_int::{const_for, ConstInt, ConstInteger, ConstIntVisitor};
+use crate::primitive_array::Array;
 //use crate::sparse_hierarchy::{level_bypass, LevelBypass};
 
-/*#[inline]
+// Compile-time loop inside. Ends up with N ADDs.
+#[inline]
 pub(crate) fn data_block_index<T: SparseHierarchy>(
-    level0_index: usize, 
-    level1_index: usize,
-    index: usize
+    level_indices: &impl PrimitiveArray<Item=usize>,
+    data_index: usize
 ) -> usize {
-    match level_bypass::<T>(){
-        LevelBypass::None => {
-            (level0_index << (T::Level1MaskType::SIZE_POT_EXPONENT + T::Level2MaskType::SIZE_POT_EXPONENT))
-            + (level1_index << T::Level2MaskType::SIZE_POT_EXPONENT)    
-            + index
-        }
-        LevelBypass::Level2 => {
-            (level0_index << T::Level1MaskType::SIZE_POT_EXPONENT)
-            + index
-        }
-        LevelBypass::Level1Level2 => {
-            index
-        }
+    let level_count = T::LevelCount::VALUE;
+    let mut acc = data_index;
+    for N in 0..level_count - 1{
+        acc += level_indices.as_ref()[N] << (T::LevelMaskType::SIZE_POT_EXPONENT* (level_count - N - 1));
     }
-}*/
+    acc
+}
 
 /// convert T to value. noop for value, clone - for reference.
 ///

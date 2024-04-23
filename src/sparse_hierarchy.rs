@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use crate::{BitBlock, IntoOwned, PrimitiveArray};
-use crate::array::level_indices_new;
+use crate::sparse_array::level_indices;
 //use crate::array::level_indices_new;
 use crate::bit_block::is_empty_bitblock;
 use crate::const_int::ConstInteger;
@@ -19,6 +19,8 @@ use crate::const_int::ConstInteger;
 // which is still not working (at Rust level) in cases, where we need it most. 
 pub trait SparseHierarchy {
     const EXACT_HIERARCHY: bool;
+    
+    /// Hierarchy levels count (without a data level).
     type LevelCount: ConstInteger;
     
     type LevelMaskType: BitBlock;
@@ -55,7 +57,7 @@ pub trait SparseHierarchy {
     /// `index` must be in range.
     #[inline]
     unsafe fn get_unchecked(&self, index: usize) -> Self::DataBlock<'_>{
-        let indices = level_indices_new::<Self::LevelMaskType, Self::DataBlockIndices>(index);
+        let indices = level_indices::<Self::LevelMaskType, Self::DataBlockIndices>(index);
         self.data_block(indices)
     }
     

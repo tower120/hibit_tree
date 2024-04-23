@@ -6,7 +6,7 @@ use crate::BitBlock;
 use crate::level_block::{LevelBlock, HiBlock};
 use crate::level_block::meta_ptr::Ptr;
 use crate::primitive::Primitive;
-use crate::primitive_array::{PrimitiveArray, UninitPrimitiveArray};
+use crate::primitive_array::{PrimitiveArray, UninitArray, UninitPrimitiveArray};
 
 #[repr(C)]
 union BigSmallArray<BlockIndices, SmallBlockIndices, MaskU64Populations>
@@ -202,7 +202,7 @@ where
             BigSmallArray::from(
                 (
                 /*mask_u64_populations:*/ unsafe{MaybeUninit::zeroed().assume_init()},
-                /*array:*/ SmallBlockIndices::UninitArray::uninit_array()
+                /*array:*/ SmallBlockIndices::uninit_array()
                 )
             )
         }

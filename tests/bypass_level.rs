@@ -44,10 +44,11 @@ fn bypass_test(){
             assert_eq!(data, &DataBlock(i as u64));
         }
         
-        /*for (_, data) in CachingBlockIter::new(&array){
-            println!("{:}", data.0);
+        /*for (index, data) in CachingBlockIter::new(&array){
+            println!("{index}: {:}", data.0);
         }*/
-        assert_equal(CachingBlockIter::new(&array).map(|(_,d)|d.0 as usize), range.clone());
+        assert_equal(CachingBlockIter::new(&array).map(|(_, d)|d.0 as usize), range.clone());
+        assert_equal(CachingBlockIter::new(&array).map(|(i, _)|i), range.clone());
     }
     
     type Lvl0Block = Block<u64, [u8;64]>;

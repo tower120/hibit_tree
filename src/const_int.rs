@@ -4,21 +4,23 @@ use std::ops::ControlFlow;
 use std::ops::ControlFlow::{Break, Continue};
 use crate::bool_type::{BoolType, TrueType, FalseType};
 use crate::primitive_array::Array;
+use crate::{Primitive, PrimitiveArray};
 
 pub trait ConstIntVisitor {
-    fn visit<I: ConstInteger>(&mut self, i: I) -> ControlFlow<()>;
+    type Out;
+    fn visit<I: ConstInteger>(&mut self, i: I) -> ControlFlow<Self::Out>;
 }
 
 /// for from..to
-pub fn const_for(from: impl ConstInteger, to: impl ConstInteger, mut v: impl ConstIntVisitor)
-     -> ControlFlow<()>
+pub fn const_for<V: ConstIntVisitor>(from: impl ConstInteger, to: impl ConstInteger, mut v: V)
+     -> ControlFlow<V::Out>
 {
     to.iterate_as_range(from, &mut v)
 }
 
 /// for (from..to).rev()
-pub fn const_for_rev(from: impl ConstInteger, to: impl ConstInteger, v: impl ConstIntVisitor)
-     -> ControlFlow<()>
+pub fn const_for_rev<V: ConstIntVisitor>(from: impl ConstInteger, to: impl ConstInteger, v: V)
+     -> ControlFlow<V::Out>
 {
     to.iterate_as_range_rev(from, v)
 }
@@ -46,8 +48,8 @@ pub trait ConstInteger: Default + Copy + Eq + Debug {
     }
     
     /// const for from..N
-    fn iterate_as_range(self, from: impl ConstInteger, visitor: &mut impl ConstIntVisitor)
-       -> ControlFlow<()>
+    fn iterate_as_range<V: ConstIntVisitor>(self, from: impl ConstInteger, visitor: &mut V)
+       -> ControlFlow<V::Out>
     {
         let ctrl = self.prev().iterate_as_range(from, visitor);
         if ctrl.is_continue() {
@@ -57,13 +59,13 @@ pub trait ConstInteger: Default + Copy + Eq + Debug {
                 visitor.visit(self.prev())
             }
         } else {
-            Break(())
+            ctrl
         }
     }
     
     /// const for (from..N).rev()
     fn iterate_as_range_rev<V: ConstIntVisitor>(self, from: impl ConstInteger, mut visitor: V)
-        -> ControlFlow<()>
+        -> ControlFlow<V::Out>
     {
         let ctrl = visitor.visit(self.prev());
         if ctrl.is_continue(){
@@ -73,12 +75,15 @@ pub trait ConstInteger: Default + Copy + Eq + Debug {
                 self.prev().iterate_as_range_rev(from, visitor)
             }
         } else {
-            Break(())
+            ctrl
         }
     }
     
     /// [T; Self::N]
     type Array<T>: Array<Item = T>;
+    
+    // Somehow, Rust can't figure out that Array<usize> is PrimitiveArray<usize>.
+    type PrimitiveArray<T: Primitive>: PrimitiveArray<Item = T>;
     
     /*type IsZero: BoolType;
     fn is_zero(self) -> Self::IsZero{
@@ -104,15 +109,16 @@ macro_rules! gen_const_int {
             type Prev = ConstIntInvalid;
             type Next = ConstInt<{$i+1}>;
             type Array<T> = [T; $i];
+            type PrimitiveArray<T: Primitive> = [T; $i];
             
-            fn iterate_as_range(self, from: impl ConstInteger, visitor: &mut impl ConstIntVisitor) 
-                -> ControlFlow<()> 
+            fn iterate_as_range<V: ConstIntVisitor>(self, from: impl ConstInteger, visitor: &mut V) 
+                -> ControlFlow<V::Out> 
             {
                 Continue(())
             }
             
             fn iterate_as_range_rev<V: ConstIntVisitor>(self, from: impl ConstInteger, visitor: V) 
-                -> ControlFlow<()> 
+                -> ControlFlow<V::Out> 
             {
                 Continue(())
             }
@@ -128,6 +134,7 @@ macro_rules! gen_const_int {
             type Prev = ConstInt<{$i-1}>;
             type Next = ConstInt<{$i+1}>;
             type Array<T> = [T; $i];
+            type PrimitiveArray<T: Primitive> = [T; $i];
             
             //type IsZero = FalseType;
         }
@@ -139,7 +146,8 @@ macro_rules! gen_const_int {
             
             type Prev = ConstInt<{$i-1}>;
             type Next = ConstIntInvalid;
-            type Array<T> = [T; $i];            
+            type Array<T> = [T; $i];   
+            type PrimitiveArray<T: Primitive> = [T; $i];
             
             //type IsZero = FalseType;
         }
@@ -169,6 +177,7 @@ impl ConstInteger for ConstIntInvalid{
     type Prev = ConstIntInvalid;
     type Next = ConstIntInvalid;
     type Array<T> = [T; 0];
+    type PrimitiveArray<T: Primitive> = [T; 0];
     
     //type IsZero = FalseType;
     
@@ -201,6 +210,7 @@ mod test{
         const_for(ConstInt::<0>, ConstInt::<3>, V);
         struct V;
         impl ConstIntVisitor for V{
+            type Out = ();
             fn visit<I: ConstInteger>(&mut self, i: I) -> ControlFlow<()> {
                 println!("{:?}", i);
                 Continue(())
@@ -213,6 +223,7 @@ mod test{
         const_for_rev(ConstInt::<0>, ConstInt::<3>, V);
         struct V;
         impl ConstIntVisitor for V{
+            type Out = ();
             fn visit<I: ConstInteger>(&mut self, i: I) -> ControlFlow<()> {
                 println!("{:?}", i);
                 Continue(())
