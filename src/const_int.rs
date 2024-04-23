@@ -3,7 +3,7 @@ use std::fmt::{Debug, Display};
 use std::ops::ControlFlow;
 use std::ops::ControlFlow::{Break, Continue};
 use crate::bool_type::{BoolType, TrueType, FalseType};
-use crate::primitive_array::Array;
+use crate::primitive_array::{Array, ConstArray};
 use crate::{Primitive, PrimitiveArray};
 
 pub trait ConstIntVisitor {
@@ -25,11 +25,49 @@ pub fn const_for_rev<V: ConstIntVisitor>(from: impl ConstInteger, to: impl Const
     to.iterate_as_range_rev(from, v)
 }
 
+trait ConstIntegerPrivate{
+    /// const for from..N
+    fn iterate_as_range<V: ConstIntVisitor>(self, from: impl ConstInteger, visitor: &mut V)
+       -> ControlFlow<V::Out>
+    where
+        Self: ConstInteger
+    {
+        let ctrl = self.prev().iterate_as_range(from, visitor);
+        if ctrl.is_continue() {
+            if self.value() == from.value() {
+                Continue(())
+            } else {            
+                visitor.visit(self.prev())
+            }
+        } else {
+            ctrl
+        }
+    }
+    
+    /// const for (from..N).rev()
+    fn iterate_as_range_rev<V: ConstIntVisitor>(self, from: impl ConstInteger, mut visitor: V)
+        -> ControlFlow<V::Out>
+    where
+        Self: ConstInteger
+    {
+        let ctrl = visitor.visit(self.prev());
+        if ctrl.is_continue(){
+            if self.value() == from.value() {
+                Continue(())
+            } else {
+                self.prev().iterate_as_range_rev(from, visitor)
+            }
+        } else {
+            ctrl
+        }
+    }
+}
+
 /// Ala C++ integral_constant.
 /// 
 /// We need this machinery to fight against Rust's half-baked const evaluation. 
 /// With this, we can do const {Self::N+1} in stable rust. 
-pub trait ConstInteger: Default + Copy + Eq + Debug {
+pub trait ConstInteger: ConstIntegerPrivate + Default + Copy + Eq + Debug {
     const VALUE: usize;
     const DEFAULT: Self;
     
@@ -47,43 +85,12 @@ pub trait ConstInteger: Default + Copy + Eq + Debug {
         Self::Next::default()
     }
     
-    /// const for from..N
-    fn iterate_as_range<V: ConstIntVisitor>(self, from: impl ConstInteger, visitor: &mut V)
-       -> ControlFlow<V::Out>
-    {
-        let ctrl = self.prev().iterate_as_range(from, visitor);
-        if ctrl.is_continue() {
-            if self.value() == from.value() {
-                Continue(())
-            } else {            
-                visitor.visit(self.prev())
-            }
-        } else {
-            ctrl
-        }
-    }
-    
-    /// const for (from..N).rev()
-    fn iterate_as_range_rev<V: ConstIntVisitor>(self, from: impl ConstInteger, mut visitor: V)
-        -> ControlFlow<V::Out>
-    {
-        let ctrl = visitor.visit(self.prev());
-        if ctrl.is_continue(){
-            if self.value() == from.value() {
-                Continue(())
-            } else {
-                self.prev().iterate_as_range_rev(from, visitor)
-            }
-        } else {
-            ctrl
-        }
-    }
-    
     /// [T; Self::N]
-    type Array<T>: Array<Item = T>;
+    type SelfSizeArray<T>: ConstArray<Item=T, Cap=Self>;
     
-    // Somehow, Rust can't figure out that Array<usize> is PrimitiveArray<usize>.
-    type PrimitiveArray<T: Primitive>: PrimitiveArray<Item = T>;
+    /*// Somehow, Rust can't figure out that Array<usize> is PrimitiveArray<usize>.
+    #[deprecated]
+    type PrimitiveArray<T: Primitive>: ConstArray<Item=T, Cap=Self> + PrimitiveArray/* + Default*/;*/
     
     /*type IsZero: BoolType;
     fn is_zero(self) -> Self::IsZero{
@@ -102,15 +109,7 @@ impl<const N: usize> Debug for ConstInt<N> {
 
 macro_rules! gen_const_int {
     (first $i:literal) => {
-        impl ConstInteger for ConstInt<$i>{ 
-            const VALUE  : usize = $i;
-            const DEFAULT: Self = ConstInt::<$i>;
-            
-            type Prev = ConstIntInvalid;
-            type Next = ConstInt<{$i+1}>;
-            type Array<T> = [T; $i];
-            type PrimitiveArray<T: Primitive> = [T; $i];
-            
+        impl ConstIntegerPrivate for ConstInt<$i>{
             fn iterate_as_range<V: ConstIntVisitor>(self, from: impl ConstInteger, visitor: &mut V) 
                 -> ControlFlow<V::Out> 
             {
@@ -122,32 +121,43 @@ macro_rules! gen_const_int {
             {
                 Continue(())
             }
+        }
+        impl ConstInteger for ConstInt<$i>{ 
+            const VALUE  : usize = $i;
+            const DEFAULT: Self = ConstInt::<$i>;
             
+            type Prev = ConstIntInvalid;
+            type Next = ConstInt<{$i+1}>;
+            type SelfSizeArray<T> = [T; $i];
+            //type PrimitiveArray<T: Primitive> = [T; $i];
+
             //type IsZero = TrueType;
         }
     };
     ($i:literal) => {
+        impl ConstIntegerPrivate for ConstInt<$i>{}
         impl ConstInteger for ConstInt<$i>{ 
             const VALUE  : usize = $i;
             const DEFAULT: Self = ConstInt::<$i>;
             
             type Prev = ConstInt<{$i-1}>;
             type Next = ConstInt<{$i+1}>;
-            type Array<T> = [T; $i];
-            type PrimitiveArray<T: Primitive> = [T; $i];
+            type SelfSizeArray<T> = [T; $i];
+            //type PrimitiveArray<T: Primitive> = [T; $i];
             
             //type IsZero = FalseType;
         }
     };
     (last $i:literal) => {
+        impl ConstIntegerPrivate for ConstInt<$i>{}
         impl ConstInteger for ConstInt<$i>{ 
             const VALUE  : usize = $i;
             const DEFAULT: Self = ConstInt::<$i>;
             
             type Prev = ConstInt<{$i-1}>;
             type Next = ConstIntInvalid;
-            type Array<T> = [T; $i];   
-            type PrimitiveArray<T: Primitive> = [T; $i];
+            type SelfSizeArray<T> = [T; $i];
+            //type PrimitiveArray<T: Primitive> = [T; $i];
             
             //type IsZero = FalseType;
         }
@@ -166,30 +176,20 @@ macro_rules! gen_const_seq {
 
 gen_const_seq!(0,1,2,3,4,5,6,7,8;9);
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub struct ConstIntInvalid;
-impl ConstInteger for ConstIntInvalid{
-    #[doc(hidden)]
-    const VALUE  : usize = panic!();
-    #[doc(hidden)]
-    const DEFAULT: Self  = panic!();
+const MAX: usize = usize::MAX;
+impl ConstIntegerPrivate for ConstInt<MAX> {}
+impl ConstInteger for ConstInt<MAX>{ 
+    const VALUE  : usize = MAX;
+    const DEFAULT: Self  = ConstInt::<MAX>;
     
-    type Prev = ConstIntInvalid;
-    type Next = ConstIntInvalid;
-    type Array<T> = [T; 0];
-    type PrimitiveArray<T: Primitive> = [T; 0];
+    type Prev = ConstInt<MAX>;
+    type Next = ConstInt<MAX>;
+    type SelfSizeArray<T> = [T; MAX];
+    //type PrimitiveArray<T: Primitive> = [T; MAX];
     
     //type IsZero = FalseType;
-    
-    fn value(self) -> usize {
-        panic!()
-    }
 }
-impl Default for ConstIntInvalid{
-    fn default() -> Self {
-        panic!()
-    }
-}
+type ConstIntInvalid = ConstInt<MAX>;
 
 #[cfg(test)]
 mod test{

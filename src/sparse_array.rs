@@ -11,22 +11,23 @@ use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::bool_type::{BoolType};
 use crate::const_int::{const_for, ConstInt, ConstInteger, ConstIntVisitor};
 use crate::primitive::Primitive;
-use crate::primitive_array::Array;
+use crate::primitive_array::{Array, ConstArray, ConstArrayType};
 use crate::{IntoOwned, PrimitiveArray};
 
 // TODO: make public
 // Compile-time loop inside. Ends up with N (AND + SHR)s.
 #[inline]
-pub(crate) fn level_indices<LevelMask, LevelIndices>(index: usize)
-     -> LevelIndices
+pub(crate) fn level_indices<LevelMask, LevelsCount>(index: usize)
+     -> ConstArrayType<usize, LevelsCount>
 where
     LevelMask: BitBlock,
-    LevelIndices: PrimitiveArray<Item = usize> + Default
+    LevelsCount: ConstInteger,
 {
-    let mut level_indices = LevelIndices::default();
+    // TODO: need uninit?
+    let mut level_indices = ConstArrayType::<usize, LevelsCount>::from_fn(|_|0);
     
     let mut level_remainder = index;
-    let level_count = LevelIndices::CAP;
+    let level_count = LevelsCount::VALUE;
     for level in 0..level_count - 1{
         //let rev_level = level_count - level;
         let level_capacity_exp = LevelMask::SIZE_POT_EXPONENT * (level_count - level - 1);
@@ -49,26 +50,26 @@ where
 #[test]
 fn test_level_indices_new(){
     {
-        let indices = level_indices::<u64, [usize; 2]>(65);
+        let indices = level_indices::<u64, ConstInt<2>>(65);
         assert_eq!(indices, [1, 1]);
     }
     {
         let lvl0 = 262_144; // Total max capacity
         let lvl1 = 4096;
         let lvl2 = 64;
-        let indices = level_indices::<u64, [usize; 3]>(lvl1*2 + lvl2*3 + 4);
+        let indices = level_indices::<u64, ConstInt<3>>(lvl1*2 + lvl2*3 + 4);
         assert_eq!(indices, [2, 3, 4]);
     }
     {
-        let indices = level_indices::<u64, [usize; 3]>(32);
+        let indices = level_indices::<u64, ConstInt<3>>(32);
         assert_eq!(indices, [0, 0, 32]);
     }
     {
-        let indices = level_indices::<u64, [usize; 2]>(32);
+        let indices = level_indices::<u64, ConstInt<2>>(32);
         assert_eq!(indices, [0, 32]);
     }    
     {
-        let indices = level_indices::<u64, [usize; 1]>(32);
+        let indices = level_indices::<u64, ConstInt<1>>(32);
         assert_eq!(indices, [32]);
     }
 }
@@ -115,7 +116,6 @@ pub trait FoldMutVisitor<Mask> {
 // TODO: HiLevels?
 pub trait ArrayLevels: Default {
     type LevelCount: ConstInteger;
-    type LevelIndices : PrimitiveArray<Item = usize> + Default;
     
     //fn new() -> Self;
     
@@ -197,11 +197,6 @@ where
     L0::Block: HiBlock,
 {
     type LevelCount = ConstInt<1>;
-    type LevelIndices = [usize; 1];
-
-    /*fn new() -> Self {
-        (L0::default(),)
-    }*/
 
     type Mask = <L0::Block as HiBlock>::Mask;
     
@@ -240,11 +235,6 @@ where
     L1::Block: HiBlock<Mask = <L0::Block as HiBlock>::Mask>,
 {
     type LevelCount = ConstInt<2>;
-    type LevelIndices = [usize; 2];
-
-    /*fn new() -> Self {
-        (L0::default(), L1::default())
-    }*/
     
     type Mask = <L0::Block as HiBlock>::Mask;
 
@@ -289,11 +279,6 @@ where
     L2::Block: HiBlock<Mask = <L0::Block as HiBlock>::Mask>,
 {
     type LevelCount = ConstInt<3>;
-    type LevelIndices = [usize; 3];
-
-    /*fn new() -> Self {
-        (L0::default(), L1::default(), L2::default())
-    }*/
     
     type Mask = <L0::Block as HiBlock>::Mask;
 
@@ -439,16 +424,20 @@ where
     pub fn get_or_insert(&mut self, index: usize) -> &mut DataLevel::Block {
         //assert!(Self::is_in_range(index), "index out of range!");
 
-        let i = level_indices::<Levels::Mask, Levels::LevelIndices>(index);
+        let i = level_indices::<Levels::Mask, Levels::LevelCount>(index);
         
         let this = NonNull::new(self).unwrap();
-        //self.levels.foreach(V{this, level_indices: i, level_index: 0});
         let data_block_index = self.levels.fold_mut(0, V{this, level_indices: i});
-        struct V<Levels: ArrayLevels, DataLevel> {
+        struct V<Levels: ArrayLevels, DataLevel, LevelIndices> {
             this: NonNull<SparseBlockArray<Levels, DataLevel>>, 
-            level_indices: Levels::LevelIndices
+            level_indices: LevelIndices
         }
-        impl<Levels: ArrayLevels, DataLevel: ILevel, M> FoldMutVisitor<M> for V<Levels, DataLevel>{
+        impl<Levels, DataLevel, LevelIndices, M> FoldMutVisitor<M> for V<Levels, DataLevel, LevelIndices>
+        where
+            Levels: ArrayLevels, 
+            DataLevel: ILevel,
+            LevelIndices: Array<Item=usize>
+        {
             type Acc = usize;
             fn visit<I: ConstInteger, L: ILevel>(&mut self, i: I, level: &mut L, level_index: usize) -> usize
             where
@@ -552,16 +541,15 @@ where
     /*fn level_mask<const N: usize>(&self, level_indices: [usize; N]) -> Self::LevelMask<'_> {
         todo!()
     }*/
-
-    type DataBlockIndices = Levels::LevelIndices;
+    
     type DataBlockType = DataLevel::Block;
     type DataBlock<'a> where Self: 'a = &'a Self::DataBlockType;
     
     #[inline]
-    unsafe fn data_block(&self, level_indices: Self::DataBlockIndices) -> Self::DataBlock<'_> {
+    unsafe fn data_block<I: ConstArray<Item=usize, Cap=Self::LevelCount>>(&self, level_indices: I) -> Self::DataBlock<'_> {
         let data_block_index = self.levels.fold2(0, V(level_indices));
         struct V<LevelIndices>(LevelIndices);
-        impl<LevelIndices: PrimitiveArray<Item=usize>, M> FoldVisitor<M> for V<LevelIndices>{
+        impl<LevelIndices: ConstArray<Item=usize>, M> FoldVisitor<M> for V<LevelIndices>{
             type Acc = usize;
             fn visit<I: ConstInteger, L>(&mut self, i: I, level: &L, level_block_index: usize) 
                 -> Self::Acc 
@@ -589,9 +577,10 @@ where
     /// [*const u8; Levels::LevelCount-1]
     /// 
     /// Level0 skipped - we can get it from self/this.
-    level_block_ptrs: 
-        <<Levels::LevelCount as ConstInteger>::Prev as ConstInteger>
-        ::Array<*const u8>,
+    level_block_ptrs: ConstArrayType<
+        *const u8, 
+        <Levels::LevelCount as ConstInteger>::Prev
+    >,
     phantom_data: PhantomData<SparseBlockArray<Levels, DataLevel>>
 }
 

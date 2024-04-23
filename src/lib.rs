@@ -41,7 +41,7 @@ use crate::primitive_array::Array;
 // Compile-time loop inside. Ends up with N ADDs.
 #[inline]
 pub(crate) fn data_block_index<T: SparseHierarchy>(
-    level_indices: &impl PrimitiveArray<Item=usize>,
+    level_indices: &impl Array<Item=usize>,
     data_index: usize
 ) -> usize {
     let level_count = T::LevelCount::VALUE;

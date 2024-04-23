@@ -4,20 +4,23 @@ use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::{BitBlock, data_block_index, IntoOwned};
 use crate::bit_queue::BitQueue;
 use crate::const_int::{const_for_rev, ConstInt, ConstInteger, ConstIntVisitor};
-use crate::primitive_array::Array;
+use crate::primitive_array::{Array, ConstArray, ConstArrayType};
 
 // TODO: could be u32's
 /// [usize; T::LevelCount::N - 1]
-type LevelIndices<T: SparseHierarchy> = 
-    <<T::LevelCount as ConstInteger>::Prev as ConstInteger>
-    ::PrimitiveArray<usize>;
+type LevelIndices<T: SparseHierarchy> =
+    ConstArrayType<
+        usize,
+        <T::LevelCount as ConstInteger>::Prev   
+    >;
 
 /// Each hierarchy level has its own iterator.
 /// 
 /// [T::LevelMaskType::BitsIter; T::LevelCount]
-type LevelIterators<T: SparseHierarchy> = 
-    <T::LevelCount as ConstInteger>::Array<
-        <T::LevelMaskType as BitBlock>::BitsIter       
+type LevelIterators<T: SparseHierarchy> =
+    ConstArrayType<
+        <T::LevelMaskType as BitBlock>::BitsIter,
+        T::LevelCount
     >;
 
 pub struct CachingBlockIter<'a, T>

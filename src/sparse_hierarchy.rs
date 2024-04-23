@@ -5,6 +5,7 @@ use crate::sparse_array::level_indices;
 //use crate::array::level_indices_new;
 use crate::bit_block::is_empty_bitblock;
 use crate::const_int::ConstInteger;
+use crate::primitive_array::{ConstArray};
 
 /// 
 /// TODO: Change description
@@ -27,37 +28,39 @@ pub trait SparseHierarchy {
     type LevelMask<'a>: Borrow<Self::LevelMaskType> + IntoOwned<Self::LevelMaskType>
         where Self: 'a;
     
-    /*/// `I::CAP` - level number. Starting from 0.
-    fn level_mask<I: PrimitiveArray<Item=usize>>(&self, level_indices: I) -> Self::LevelMask<'_>;*/
+    /// `I::CAP` - level number. Starting from 0.
+    fn level_mask<I: ConstArray<Item=usize>>(&self, level_indices: I) -> Self::LevelMask<'_>{
+        todo!()
+    }
     
     // TODO: Try to remove IntoOwned here. This requires Data to impl Clone. 
-    // We need to have Default here, because can't have it in PrimitiveArray,
-    // because only max [T;32] implements Default. 
-    /// Len/CAP = LEVELS_COUNT
-    type DataBlockIndices : PrimitiveArray<Item = usize> + Default;
     type DataBlockType;
     type DataBlock<'a>: Borrow<Self::DataBlockType> + IntoOwned<Self::DataBlockType> 
         where Self: 'a;
     /// # Safety
     ///
     /// indices are not checked.
-    unsafe fn data_block(&self, level_indices: Self::DataBlockIndices)
+    unsafe fn data_block<I: ConstArray<Item=usize, Cap=Self::LevelCount>>(&self, level_indices: I)
         -> Self::DataBlock<'_>;
-    
-    /*unsafe fn contains_unchecked(&self, index: usize) -> bool {
-        let indices = level_indices_new::<Self::LevelMaskType, Self::DataBlockIndices>(index);
-        // indices.split_last()
-        
-        self.level_mask(indices);
-        todo!()
-    }*/
+
+    // TODO: unchecked
+    /// # Safety
+    ///
+    /// `index` must be in [max_range].
+    #[inline]
+    unsafe fn contains_unchecked(&self, index: usize) -> bool {
+        let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
+        let (level_indices, mask_index) = indices.split_last();
+        let mask = self.level_mask(level_indices);
+        mask.borrow().get_bit(mask_index)
+    }
     
     /// # Safety
     ///
-    /// `index` must be in range.
+    /// `index` must be in [max_range].
     #[inline]
     unsafe fn get_unchecked(&self, index: usize) -> Self::DataBlock<'_>{
-        let indices = level_indices::<Self::LevelMaskType, Self::DataBlockIndices>(index);
+        let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
         self.data_block(indices)
     }
     
