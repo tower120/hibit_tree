@@ -3,7 +3,7 @@
 mod primitive;
 mod primitive_array;
 mod sparse_array;
-pub mod level;
+mod sparse_array_levels;
 mod bit_utils;
 mod bool_type;
 mod bit_block;
@@ -16,14 +16,17 @@ pub mod bit_queue;
 //pub mod simple_iter;
 pub mod caching_iter;
 //mod ref_or_val;
+pub mod level;
 pub mod level_block;
 pub mod const_int;
+
 
 //pub use ref_or_val::*;
 pub use bit_block::{BitBlock, IEmptyBitBlock, EmptyBitBlock};
 pub use primitive::Primitive;
 pub use primitive_array::{Array, PrimitiveArray};
-pub use sparse_array::{SparseArray, SparseArrayLevels};
+pub use sparse_array::{SparseArray};
+pub use sparse_array_levels::SparseArrayLevels;
 //pub use apply::{Apply, Op};
 //pub use fold::Fold;
 //pub use empty::Empty;

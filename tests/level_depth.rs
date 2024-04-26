@@ -2,7 +2,7 @@ use std::ops::Range;
 use itertools::{assert_equal, Itertools};
 use hi_sparse_array::level_block::{Block, LevelBlock};
 use hi_sparse_array::level::{ILevel, Level, SingleBlockLevel};
-use hi_sparse_array::{SparseArrayLevels, SparseArray};
+use hi_sparse_array::{SparseArray, SparseArrayLevels};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::sparse_hierarchy::SparseHierarchy;
 
