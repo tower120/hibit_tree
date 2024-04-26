@@ -114,7 +114,6 @@ pub trait SparseArrayLevels: Default {
     fn visit<I: ConstInteger, V: Visitor<Self::Mask>>(&self, i: I, visitor: V) -> V::Out;
     fn visit_mut<I: ConstInteger, V: MutVisitor<Self::Mask>>(&mut self, i: I, visitor: V) -> V::Out;
     
-    // TODO: consider "visit" accept usize, and implement fold here.
     fn fold<Acc>(&self, acc: Acc, visitor: impl FoldVisitor<Self::Mask, Acc=Acc>) -> Acc;
     fn fold_mut<Acc>(&mut self, acc: Acc, visitor: impl FoldMutVisitor<Self::Mask, Acc=Acc>) -> Acc;
 }
@@ -174,6 +173,10 @@ sparse_array_levels_impl!(1: [0,]; L0,);
 sparse_array_levels_impl!(2: [0,1,]; L0,L1,);
 sparse_array_levels_impl!(3: [0,1,2,]; L0,L1,L2,);
 sparse_array_levels_impl!(4: [0,1,2,3,]; L0,L1,L2,L3,);
+sparse_array_levels_impl!(5: [0,1,2,3,4,]; L0,L1,L2,L3,L4,);
+sparse_array_levels_impl!(6: [0,1,2,3,4,5,]; L0,L1,L2,L3,L4,L5,);
+sparse_array_levels_impl!(7: [0,1,2,3,4,5,6,]; L0,L1,L2,L3,L4,L5,L6,);
+sparse_array_levels_impl!(8: [0,1,2,3,4,5,6,7,]; L0,L1,L2,L3,L4,L5,L6,L7,);
 
 pub struct SparseArray<Levels, DataLevel> {
     levels: Levels,
