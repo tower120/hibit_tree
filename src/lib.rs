@@ -22,8 +22,8 @@ pub mod const_int;
 //pub use ref_or_val::*;
 pub use bit_block::{BitBlock, IEmptyBitBlock, EmptyBitBlock};
 pub use primitive::Primitive;
-pub use primitive_array::PrimitiveArray;
-pub use sparse_array::{SparseBlockArray, ArrayLevels};
+pub use primitive_array::{Array, PrimitiveArray};
+pub use sparse_array::{SparseArray, SparseArrayLevels};
 //pub use apply::{Apply, Op};
 //pub use fold::Fold;
 //pub use empty::Empty;
@@ -35,7 +35,7 @@ use std::ops::ControlFlow;
 use bool_type::BoolType;
 use sparse_hierarchy::SparseHierarchy;
 use crate::const_int::{const_for, ConstInt, ConstInteger, ConstIntVisitor};
-use crate::primitive_array::Array;
+//use crate::primitive_array::Array;
 //use crate::sparse_hierarchy::{level_bypass, LevelBypass};
 
 // Compile-time loop inside. Ends up with N ADDs.

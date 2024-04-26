@@ -1,5 +1,5 @@
 use hi_sparse_array::level_block::{Block, ClusterBlock, LevelBlock};
-use hi_sparse_array::SparseBlockArray;
+use hi_sparse_array::SparseArray;
 use itertools::assert_equal;
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::level::{BypassLevel, Level};
@@ -28,7 +28,7 @@ impl LevelBlock for DataBlock{
 fn insert_test(){
     type Lvl0Block = Block<u64, [u8;64]>;
     type ClusterLvl1Block = ClusterBlock<u64, [u16;4], [u16;16]>;
-    type Array = SparseBlockArray<Lvl0Block, Level<ClusterLvl1Block>, BypassLevel, Level<DataBlock>>;
+    type Array = SparseArray<Lvl0Block, Level<ClusterLvl1Block>, BypassLevel, Level<DataBlock>>;
     
     let mut array: Array = Default::default(); 
     

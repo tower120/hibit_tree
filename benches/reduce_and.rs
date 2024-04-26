@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, BitOr, Mul};
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
-use hi_sparse_array::{apply, Apply, BitBlock, EmptyBitBlock, fold, IntoOwned, Op, reduce, Reduce, SparseBlockArray};
+use hi_sparse_array::{apply, Apply, BitBlock, EmptyBitBlock, fold, IntoOwned, Op, reduce, Reduce, SparseArray};
 use hi_sparse_array::level_block::{LevelBlock, Block};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::level::{BypassLevel, Level};
@@ -46,7 +46,7 @@ impl LevelBlock for DataBlock{
     }
 }
 
-type BlockArray = SparseBlockArray<Lvl0Block, Level<Lvl1Block>, BypassLevel/*Level<Lvl1Block>*/, Level<DataBlock>>;
+type BlockArray = SparseArray<Lvl0Block, Level<Lvl1Block>, BypassLevel/*Level<Lvl1Block>*/, Level<DataBlock>>;
 
 
 pub struct AndOp<L0, L1, L2, LD>(PhantomData<(L0, L1, L2, LD)>);

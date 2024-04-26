@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
 use wide::f32x4;
-use hi_sparse_array::{Apply, apply, BitBlock, Op, IntoOwned, SparseBlockArray};
+use hi_sparse_array::{Apply, apply, BitBlock, Op, IntoOwned, SparseArray};
 use hi_sparse_array::bit_queue::EmptyBitQueue;
 use hi_sparse_array::level_block::{LevelBlock, Block};
 use hi_sparse_array::caching_iter::CachingBlockIter;
@@ -76,7 +76,7 @@ impl BitAnd for EmptyMask{
 
 type Lvl0Block = Block<u64, [u8; 64]>;
 type Lvl1Block = Block<u64, [u16; 64]>;
-type SparseArray = SparseBlockArray<
+type SparseArray = SparseArray<
     Lvl0Block,
     //Level<Lvl1Block>,
     BypassLevel<EmptyMask>,

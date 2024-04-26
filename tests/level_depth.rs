@@ -2,7 +2,7 @@ use std::ops::Range;
 use itertools::{assert_equal, Itertools};
 use hi_sparse_array::level_block::{Block, LevelBlock};
 use hi_sparse_array::level::{ILevel, Level, SingleBlockLevel};
-use hi_sparse_array::{ArrayLevels, SparseBlockArray};
+use hi_sparse_array::{SparseArrayLevels, SparseArray};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::sparse_hierarchy::SparseHierarchy;
 
@@ -29,10 +29,10 @@ impl LevelBlock for DataBlock{
 
 #[test]
 fn level_depth_test(){
-    fn do_test<Levels, DataLevel>(mut array: SparseBlockArray<Levels, DataLevel>, range: Range<usize>)
+    fn do_test<Levels, DataLevel>(mut array: SparseArray<Levels, DataLevel>, range: Range<usize>)
     where
         DataLevel: ILevel<Block = DataBlock>, 
-        Levels: ArrayLevels    
+        Levels: SparseArrayLevels    
     {
         for i in range.clone(){
             *array.get_or_insert(i as usize) = DataBlock(i as u64);
@@ -55,15 +55,15 @@ fn level_depth_test(){
     type Lvl2Block = Block<u64, [u32;64]>;
     
     {
-        type Array = SparseBlockArray<(SingleBlockLevel<Lvl0Block>, ), Level<DataBlock>>;
+        type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, ), Level<DataBlock>>;
         do_test(Array::default(), 0..64);
     }
     {
-        type Array = SparseBlockArray<(SingleBlockLevel<Lvl0Block>, Level<Lvl1Block>), Level<DataBlock>>;
+        type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, Level<Lvl1Block>), Level<DataBlock>>;
         do_test(Array::default(), 0..64*64);
     }
     {
-        type Array = SparseBlockArray<(SingleBlockLevel<Lvl0Block>, Level<Lvl1Block>, Level<Lvl2Block>), Level<DataBlock>>;
+        type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, Level<Lvl1Block>, Level<Lvl2Block>), Level<DataBlock>>;
         do_test(Array::default(), 0..64*64*64);
     }
 }

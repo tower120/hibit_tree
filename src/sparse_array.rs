@@ -112,7 +112,7 @@ pub trait FoldMutVisitor<Mask> {
 
 
 // TODO: HiLevels?
-pub trait ArrayLevels: Default {
+pub trait SparseArrayLevels: Default {
     type LevelCount: ConstInteger;
     
     //fn new() -> Self;
@@ -146,8 +146,8 @@ pub trait ArrayLevels: Default {
         }
         impl<'a, This, FV, Acc> ConstIntVisitor for IndexVisitor<'a, This, FV, Acc>
         where
-            This: ArrayLevels,
-            FV: FoldVisitor<<This as ArrayLevels>::Mask, Acc=Acc>
+            This: SparseArrayLevels,
+            FV: FoldVisitor<<This as SparseArrayLevels>::Mask, Acc=Acc>
         {
             type Out = Acc;
             fn visit<I: ConstInteger>(&mut self, i: I) -> ControlFlow<Acc> {
@@ -155,7 +155,7 @@ pub trait ArrayLevels: Default {
                 let level_visitor = LevelVisitor {
                     acc,
                     visitor: &mut self.fold_visitor,
-                    phantom_data: PhantomData::<<This as ArrayLevels>::Mask>,
+                    phantom_data: PhantomData::<<This as SparseArrayLevels>::Mask>,
                 };
                 let acc = self.this.visit(i, level_visitor);
                 if I::VALUE == This::LevelCount::VALUE-1{
@@ -189,7 +189,7 @@ pub trait ArrayLevels: Default {
 
 // TODO: macro impl?
 
-impl<L0> ArrayLevels for (L0,)
+impl<L0> SparseArrayLevels for (L0,)
 where
     L0: ILevel,
     L0::Block: HiBlock,
@@ -225,7 +225,7 @@ where
     }
 }
 
-impl<L0, L1> ArrayLevels for (L0, L1)
+impl<L0, L1> SparseArrayLevels for (L0, L1)
 where
     L0: ILevel,
     L0::Block: HiBlock,
@@ -267,7 +267,7 @@ where
     }
 }
 
-impl<L0, L1, L2> ArrayLevels for (L0, L1, L2)
+impl<L0, L1, L2> SparseArrayLevels for (L0, L1, L2)
 where
     L0: ILevel,
     L0::Block: HiBlock,
@@ -314,15 +314,14 @@ where
     }
 }
 
-// TODO: rename to SparseArray
-pub struct SparseBlockArray<Levels, DataLevel> {
+pub struct SparseArray<Levels, DataLevel> {
     levels: Levels,
     data  : DataLevel,
 }
 impl<Levels, DataLevel> Default for
-    SparseBlockArray<Levels, DataLevel>
+    SparseArray<Levels, DataLevel>
 where
-    Levels: ArrayLevels,
+    Levels: SparseArrayLevels,
     DataLevel: ILevel
 {
     #[inline]
@@ -334,9 +333,9 @@ where
     }
 }
 
-impl<Levels, DataLevel> SparseBlockArray<Levels, DataLevel>
+impl<Levels, DataLevel> SparseArray<Levels, DataLevel>
 where
-    Levels: ArrayLevels,
+    Levels: SparseArrayLevels,
     DataLevel: ILevel
 {
     #[inline]
@@ -426,13 +425,13 @@ where
         
         let this = NonNull::new(self).unwrap();
         let data_block_index = self.levels.fold_mut(0, V{this, level_indices: i});
-        struct V<Levels: ArrayLevels, DataLevel, LevelIndices> {
-            this: NonNull<SparseBlockArray<Levels, DataLevel>>, 
+        struct V<Levels: SparseArrayLevels, DataLevel, LevelIndices> {
+            this: NonNull<SparseArray<Levels, DataLevel>>, 
             level_indices: LevelIndices
         }
         impl<Levels, DataLevel, LevelIndices, M> FoldMutVisitor<M> for V<Levels, DataLevel, LevelIndices>
         where
-            Levels: ArrayLevels, 
+            Levels: SparseArrayLevels, 
             DataLevel: ILevel,
             LevelIndices: Array<Item=usize>
         {
@@ -524,9 +523,9 @@ where
 
 
 
-impl<Levels, DataLevel> SparseHierarchy for SparseBlockArray<Levels, DataLevel>
+impl<Levels, DataLevel> SparseHierarchy for SparseArray<Levels, DataLevel>
 where
-    Levels: ArrayLevels,
+    Levels: SparseArrayLevels,
     DataLevel: ILevel,
     DataLevel::Block: Clone
 {
@@ -570,7 +569,7 @@ where
 
 pub struct SparseBlockArrayState<Levels, DataLevel>
 where
-    Levels: ArrayLevels
+    Levels: SparseArrayLevels
 {
     /// [*const u8; Levels::LevelCount-1]
     /// 
@@ -579,15 +578,15 @@ where
         *const u8, 
         <Levels::LevelCount as ConstInteger>::Dec
     >,
-    phantom_data: PhantomData<SparseBlockArray<Levels, DataLevel>>
+    phantom_data: PhantomData<SparseArray<Levels, DataLevel>>
 }
 
 impl<Levels, DataLevel> SparseHierarchyState for SparseBlockArrayState<Levels, DataLevel>
 where
-    Levels: ArrayLevels,
+    Levels: SparseArrayLevels,
     DataLevel: ILevel<Block: Clone>,
 {
-    type This = SparseBlockArray<Levels, DataLevel>;
+    type This = SparseArray<Levels, DataLevel>;
 
     fn new(this: &Self::This) -> Self {
         Self{

@@ -54,6 +54,7 @@ impl<T, const N: usize> UninitArray for [MaybeUninit<T>; N]{
     }
 }
 
+// TODO: Do we actually need this?
 pub trait PrimitiveArray: Array<Item: Primitive, UninitArray: Copy> + Copy {}
 impl<T: Array<Item: Primitive, UninitArray: Copy> + Copy> PrimitiveArray for T {}
 

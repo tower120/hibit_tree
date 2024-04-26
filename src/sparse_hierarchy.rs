@@ -25,7 +25,11 @@ pub trait SparseHierarchy {
         where Self: 'a;
     
     /// `I::CAP` - level number. Starting from 0.
-    fn level_mask<I: ConstArray<Item=usize>>(&self, level_indices: I) -> Self::LevelMask<'_>{
+    /// 
+    /// # Safety
+    ///
+    /// indices are not checked.
+    unsafe fn level_mask<I: ConstArray<Item=usize>>(&self, level_indices: I) -> Self::LevelMask<'_>{
         todo!()
     }
     
@@ -40,6 +44,8 @@ pub trait SparseHierarchy {
         -> Self::DataBlock<'_>;
 
     // TODO: unchecked
+    /// Allowed to return false positives with non-[EXACT_HIERARCHY].
+    /// 
     /// # Safety
     ///
     /// `index` must be in [max_range].
@@ -72,6 +78,7 @@ pub trait SparseHierarchy {
     
     type State: SparseHierarchyState<This = Self>;
     
+    /// Act as `const` - noop.
     #[inline]
     /*const*/ fn max_range() -> usize {
         Self::LevelMaskType::size().pow(Self::LevelCount::VALUE as _) 

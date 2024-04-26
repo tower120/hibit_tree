@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
-use hi_sparse_array::SparseBlockArray;
+use hi_sparse_array::SparseArray;
 use hi_sparse_array::level_block::{LevelBlock, Block, SmallBlock, ClusterBlock};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::level::{BypassLevel, Level, SingleBlockLevel};
@@ -31,9 +31,9 @@ impl LevelBlock for DataBlock{
     }
 }
 
-type BlockArray = SparseBlockArray<(SingleBlockLevel<Lvl0Block>, Level<Lvl1Block>), Level<DataBlock>>;
-type SmallBlockArray = SparseBlockArray<(SingleBlockLevel<Lvl0Block>, Level<CompactLvl1Block>), Level<DataBlock>>;
-type ClusterBlockArray = SparseBlockArray<(SingleBlockLevel<Lvl0Block>, Level<ClusterLvl1Block>), Level<DataBlock>>;
+type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, Level<Lvl1Block>), Level<DataBlock>>;
+type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, Level<CompactLvl1Block>), Level<DataBlock>>;
+type ClusterBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, Level<ClusterLvl1Block>), Level<DataBlock>>;
 
 
 fn cluster_array_iter(array: &ClusterBlockArray) -> u64 {
