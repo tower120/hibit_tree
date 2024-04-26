@@ -3,7 +3,7 @@ use criterion::{black_box, Criterion, criterion_group, criterion_main};
 use hi_sparse_array::SparseArray;
 use hi_sparse_array::level_block::{LevelBlock, Block, SmallBlock, ClusterBlock};
 use hi_sparse_array::caching_iter::CachingBlockIter;
-use hi_sparse_array::level::{BypassLevel, Level, SingleBlockLevel};
+use hi_sparse_array::level::{Level, SingleBlockLevel};
 
 type Lvl0Block = Block<u64, [u8;64]>;
 type Lvl1Block = Block<u64, [u16;64]>;

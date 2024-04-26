@@ -1,8 +1,4 @@
 use std::marker::PhantomData;
-use std::mem;
-use std::mem::ManuallyDrop;
-use std::ops::ControlFlow;
-use std::ops::ControlFlow::{Break, Continue};
 use std::ptr::{NonNull, null};
 use crate::bit_block::BitBlock;
 use crate::level_block::HiBlock;
@@ -111,208 +107,73 @@ pub trait FoldMutVisitor<Mask> {
 }
 
 
-// TODO: HiLevels?
 pub trait SparseArrayLevels: Default {
     type LevelCount: ConstInteger;
-    
-    //fn new() -> Self;
-    
     type Mask: BitBlock;
     
     fn visit<I: ConstInteger, V: Visitor<Self::Mask>>(&self, i: I, visitor: V) -> V::Out;
     fn visit_mut<I: ConstInteger, V: MutVisitor<Self::Mask>>(&mut self, i: I, visitor: V) -> V::Out;
     
-    // TODO: this should act as fold() code- and performance-wise.
-    //       Benchmark and replace.
-    fn fold2<V: FoldVisitor<Self::Mask>>(&self, acc: V::Acc, mut visitor: V) -> V::Acc
-    where 
-        Self: Sized
-    {
-        let index_visitor = IndexVisitor { 
-            this: self, 
-            acc: ManuallyDrop::new(acc), 
-            fold_visitor: visitor, 
-        };
-        let ctrl = const_for(ConstInt::<0>, Self::LevelCount::DEFAULT, index_visitor);
-        return match ctrl {
-            Continue(_) => unreachable!(),
-            Break(acc) => acc
-        };
-        
-        struct IndexVisitor<'a, This/*: ArrayLevels*/, FV, Acc>{
-            this: &'a This,
-            acc: ManuallyDrop<Acc>,
-            fold_visitor: FV,
-        }
-        impl<'a, This, FV, Acc> ConstIntVisitor for IndexVisitor<'a, This, FV, Acc>
-        where
-            This: SparseArrayLevels,
-            FV: FoldVisitor<<This as SparseArrayLevels>::Mask, Acc=Acc>
-        {
-            type Out = Acc;
-            fn visit<I: ConstInteger>(&mut self, i: I) -> ControlFlow<Acc> {
-                let acc = unsafe{ ManuallyDrop::take(&mut self.acc) };
-                let level_visitor = LevelVisitor {
-                    acc,
-                    visitor: &mut self.fold_visitor,
-                    phantom_data: PhantomData::<<This as SparseArrayLevels>::Mask>,
-                };
-                let acc = self.this.visit(i, level_visitor);
-                if I::VALUE == This::LevelCount::VALUE-1{
-                    Break(acc)   
-                } else {
-                    self.acc = ManuallyDrop::new(acc);
-                    Continue(())
-                }
-            }
-        }
-
-        struct LevelVisitor<'a, V, A, M>{
-            acc: A,
-            visitor: &'a mut V,
-            phantom_data: PhantomData<M>
-        }
-        impl<'a, V: FoldVisitor<M, Acc=A>, A, M> Visitor<M> for LevelVisitor<'a, V, A, M>{
-            type Out = A;
-            fn visit<I: ConstInteger, L>(self, i: I, level: &L) -> A
-            where 
-                L: ILevel, L::Block: HiBlock<Mask=M> 
-            {
-                 self.visitor.visit(i, level, self.acc)
-            }
-        }
-    }
-    
+    // TODO: consider "visit" accept usize, and implement fold here.
     fn fold<Acc>(&self, acc: Acc, visitor: impl FoldVisitor<Self::Mask, Acc=Acc>) -> Acc;
     fn fold_mut<Acc>(&mut self, acc: Acc, visitor: impl FoldMutVisitor<Self::Mask, Acc=Acc>) -> Acc;
 }
 
-// TODO: macro impl?
-
-impl<L0> SparseArrayLevels for (L0,)
-where
-    L0: ILevel,
-    L0::Block: HiBlock,
-{
-    type LevelCount = ConstInt<1>;
-
-    type Mask = <L0::Block as HiBlock>::Mask;
+macro_rules! sparse_array_levels_impl {
+    ($n:literal: [$($i:tt,)+]; $first_t:tt, $($t:tt,)* ) => {
+        impl<$first_t, $($t,)*> SparseArrayLevels for ($first_t, $($t,)*)
+        where
+            $first_t: ILevel,
+            $first_t::Block: HiBlock,
+            $(
+                $t: ILevel,
+                $t::Block: HiBlock<Mask = <$first_t::Block as HiBlock>::Mask>,
+            )*
+        {
+            type LevelCount = ConstInt<$n>;       
+            type Mask = <$first_t::Block as HiBlock>::Mask;
     
-    fn visit<I: ConstInteger, V: Visitor<Self::Mask>>(&self, i: I, mut visitor: V) -> V::Out {
-        match i.value() {
-            0 => visitor.visit(i, &self.0),
-            _ => unreachable!()
+            #[inline]
+            fn visit<I: ConstInteger, V: Visitor<Self::Mask>>(&self, i: I, mut visitor: V) -> V::Out {
+                match i.value() {
+                    $(
+                        $i => visitor.visit(i, &self.$i),
+                    )+
+                    _ => unreachable!()
+                }
+            }
+            
+            #[inline]
+            fn visit_mut<I: ConstInteger, V: MutVisitor<Self::Mask>>(&mut self, i: I, mut visitor: V) -> V::Out {
+                match i.value() {
+                    $(
+                        $i => visitor.visit(i, &mut self.$i),
+                    )+
+                    _ => unreachable!()
+                }
+            }   
+            
+            fn fold<Acc>(&self, mut acc: Acc, mut visitor: impl FoldVisitor<Self::Mask, Acc = Acc>) -> Acc {
+                $(
+                    acc = visitor.visit(ConstInt::<$i>::DEFAULT, &self.$i, acc);
+                )+
+                acc
+            }
+
+            fn fold_mut<Acc>(&mut self, mut acc: Acc, mut visitor: impl FoldMutVisitor<Self::Mask, Acc = Acc>) -> Acc {
+                $(
+                    acc = visitor.visit(ConstInt::<$i>::DEFAULT, &mut self.$i, acc);
+                )+
+                acc
+            }
+            
         }
-    }
-    
-    fn visit_mut<I: ConstInteger, V: MutVisitor<Self::Mask>>(&mut self, i: I, mut visitor: V) -> V::Out {
-        match i.value() {
-            0 => visitor.visit(i, &mut self.0),
-            _ => unreachable!()
-        }
-    }
-    
-    /*fn foreach(&mut self, mut visitor: impl Visitor){
-        visitor.visit::<0, _>(&mut self.0);
-    }*/
-    
-    fn fold<Acc>(&self, acc: Acc, mut visitor: impl FoldVisitor<Self::Mask, Acc = Acc>) -> Acc {
-        visitor.visit(ConstInt::<0>::DEFAULT, &self.0, acc)
-    }
-
-    fn fold_mut<Acc>(&mut self, acc: Acc, mut visitor: impl FoldMutVisitor<Self::Mask, Acc = Acc>) -> Acc {
-        visitor.visit(ConstInt::<0>::DEFAULT, &mut self.0, acc)
-    }
+    };
 }
-
-impl<L0, L1> SparseArrayLevels for (L0, L1)
-where
-    L0: ILevel,
-    L0::Block: HiBlock,
-    L1: ILevel,
-    L1::Block: HiBlock<Mask = <L0::Block as HiBlock>::Mask>,
-{
-    type LevelCount = ConstInt<2>;
-    
-    type Mask = <L0::Block as HiBlock>::Mask;
-
-    fn visit<I: ConstInteger, V: Visitor<Self::Mask>>(&self, i: I, mut visitor: V) -> V::Out {
-        match i.value(){
-            0 => visitor.visit(i, &self.0),
-            1 => visitor.visit(i, &self.1),
-            _ => unreachable!()
-        }
-    }
-    
-    fn visit_mut<I: ConstInteger, V: MutVisitor<Self::Mask>>(&mut self, i: I, mut visitor: V) -> V::Out {
-        match i.value(){
-            0 => visitor.visit(i, &mut self.0),
-            1 => visitor.visit(i, &mut self.1),
-            _ => unreachable!()
-        }
-    }
-    
-    /*fn foreach(&mut self, mut visitor: impl Visitor){
-        visitor.visit::<0, _>(&mut self.0);
-    }*/
-    fn fold<Acc>(&self, mut acc: Acc, mut visitor: impl FoldVisitor<Self::Mask, Acc = Acc>) -> Acc {
-        acc = visitor.visit(ConstInt::<0>::DEFAULT, &self.0, acc);
-        visitor.visit(ConstInt::<1>::DEFAULT, &self.1, acc)
-    }
-    
-
-    fn fold_mut<Acc>(&mut self, mut acc: Acc, mut visitor: impl FoldMutVisitor<Self::Mask, Acc = Acc>) -> Acc {
-        acc = visitor.visit(ConstInt::<0>::DEFAULT, &mut self.0, acc);
-        visitor.visit(ConstInt::<1>::DEFAULT, &mut self.1, acc)
-    }
-}
-
-impl<L0, L1, L2> SparseArrayLevels for (L0, L1, L2)
-where
-    L0: ILevel,
-    L0::Block: HiBlock,
-    L1: ILevel,
-    L1::Block: HiBlock<Mask = <L0::Block as HiBlock>::Mask>,
-    L2: ILevel,
-    L2::Block: HiBlock<Mask = <L0::Block as HiBlock>::Mask>,
-{
-    type LevelCount = ConstInt<3>;
-    
-    type Mask = <L0::Block as HiBlock>::Mask;
-
-    fn visit<I: ConstInteger, V: Visitor<Self::Mask>>(&self, i: I, mut visitor: V) -> V::Out {
-        match i.value(){
-            0 => visitor.visit(i, &self.0),
-            1 => visitor.visit(i, &self.1),
-            2 => visitor.visit(i, &self.2),
-            _ => unreachable!()
-        }
-    }
-    
-    fn visit_mut<I: ConstInteger, V: MutVisitor<Self::Mask>>(&mut self, i: I, mut visitor: V) -> V::Out {
-        match i.value(){
-            0 => visitor.visit(i, &mut self.0),
-            1 => visitor.visit(i, &mut self.1),
-            2 => visitor.visit(i, &mut self.2),
-            _ => unreachable!()
-        }
-    }
-    
-    /*fn foreach(&mut self, mut visitor: impl Visitor){
-        visitor.visit::<0, _>(&mut self.0);
-    }*/
-    fn fold<Acc>(&self, mut acc: Acc, mut visitor: impl FoldVisitor<Self::Mask, Acc = Acc>) -> Acc {
-        acc = visitor.visit(ConstInt::<0>::DEFAULT, &self.0, acc);
-        acc = visitor.visit(ConstInt::<1>::DEFAULT, &self.1, acc);
-        visitor.visit(ConstInt::<2>::DEFAULT, &self.2, acc)
-    }
-    
-    fn fold_mut<Acc>(&mut self, mut acc: Acc, mut visitor: impl FoldMutVisitor<Self::Mask, Acc = Acc>) -> Acc {
-        acc = visitor.visit(ConstInt::<0>::DEFAULT, &mut self.0, acc);
-        acc = visitor.visit(ConstInt::<1>::DEFAULT, &mut self.1, acc);
-        visitor.visit(ConstInt::<2>::DEFAULT, &mut self.2, acc)
-    }
-}
+sparse_array_levels_impl!(1: [0,]; L0,);
+sparse_array_levels_impl!(2: [0,1,]; L0,L1,);
+sparse_array_levels_impl!(3: [0,1,2,]; L0,L1,L2,);
+sparse_array_levels_impl!(4: [0,1,2,3,]; L0,L1,L2,L3,);
 
 pub struct SparseArray<Levels, DataLevel> {
     levels: Levels,
@@ -544,7 +405,7 @@ where
     
     #[inline]
     unsafe fn data_block<I: ConstArray<Item=usize, Cap=Self::LevelCount>>(&self, level_indices: I) -> Self::DataBlock<'_> {
-        let data_block_index = self.levels.fold2(0, V(level_indices));
+        let data_block_index = self.levels.fold(0, V(level_indices));
         struct V<LevelIndices>(LevelIndices);
         impl<LevelIndices: ConstArray<Item=usize>, M> FoldVisitor<M> for V<LevelIndices>{
             type Acc = usize;
