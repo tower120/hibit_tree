@@ -2,7 +2,6 @@ use std::mem::{MaybeUninit, size_of};
 use std::ptr::NonNull;
 use crate::bit_block::BitBlock;
 use crate::level_block::{HiBlock, LevelBlock};
-use crate::level_block::meta_ptr::Ptr;
 use crate::primitive::Primitive;
 use crate::primitive_array::PrimitiveArray;
 

@@ -11,64 +11,18 @@ use std::ptr::NonNull;
 use crate::{BitBlock, Primitive, PrimitiveArray};
 
 pub trait LevelBlock: Sized {
-    fn empty() -> Self; 
-    
+    fn empty() -> Self;
     // Do we need this?
     fn is_empty(&self) -> bool;
     
-/*    // Does this needed?
-    type Data;
-    fn data(&self) -> &Self::Data; 
-    unsafe fn data_mut(&mut self) -> &mut Self::Data;*/
-    
+    // We need this for intrusive LinkedList of empty blocks.
+    // TODO: We could have some EmptyZeroableData<T: Zeroable> with default implementations
+    //       of ... everything here.
+    // TODO: It is possible to have ILevel that store empty block indexes in
+    //       separate Vec and don't need these two functions.
     fn as_u64_mut(&mut self) -> &mut u64;
-    
     /// Restore empty state, after as_u64_mut() mutation.
     fn restore_empty_u64(&mut self);
-}
-
-mod meta_ptr{
-    use super::*;
-    
-    pub struct Ptr<T>(pub(crate) Option<NonNull<T>>);
-    impl<T> From<&T> for Ptr<T>{
-        #[inline]
-        fn from(value: &T) -> Self {
-            Self(Some(NonNull::from(value)))
-        }
-    }
-    impl<T> Default for Ptr<T>{
-        #[inline]
-        fn default() -> Self {
-            Self(None)
-        }
-    }
-    impl<T> AsRef<T> for Ptr<T>{
-        #[inline]
-        fn as_ref(&self) -> &T {
-            unsafe{
-                self.0.unwrap_unchecked().as_ref()
-            }
-        }
-    }
-    
-    pub struct EmptyPtr<T>(PhantomData<T>);
-    impl<T> Default for EmptyPtr<T>{
-        #[inline]
-        fn default() -> Self {
-            Self(PhantomData)
-        }
-    }
-    impl<T> From<&T> for EmptyPtr<T>{
-        fn from(_: &T) -> Self {
-            unreachable!()
-        }
-    }
-    impl<T> AsRef<T> for EmptyPtr<T>{
-        fn as_ref(&self) -> &T {
-            unreachable!()
-        }
-    }
 }
 
 /// Hierarchy level level_block

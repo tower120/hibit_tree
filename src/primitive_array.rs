@@ -62,7 +62,7 @@ pub trait UninitPrimitiveArray: UninitArray<UninitItem: Primitive> + Copy{}
 impl <T: UninitPrimitiveArray + Copy> UninitPrimitiveArray for T{} 
 
 
-/// [ConstInteger] friendly [Array] 
+/// [ConstInteger]-sized [Array]. 
 pub trait ConstArray: Array {
     type Cap: ConstInteger;
     

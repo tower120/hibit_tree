@@ -5,7 +5,6 @@ use std::slice::{from_raw_parts, from_raw_parts_mut};
 use arrayvec::ArrayVec;
 use crate::level_block::{LevelBlock, HiBlock};
 use crate::{BitBlock, Primitive, PrimitiveArray};
-use crate::level_block::meta_ptr::Ptr;
 use crate::primitive_array::Array;
 
 type SubBlockMask = u16;

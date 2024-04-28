@@ -4,7 +4,6 @@ use std::ops::ControlFlow::Continue;
 use std::ptr;
 use crate::BitBlock;
 use crate::level_block::{LevelBlock, HiBlock};
-use crate::level_block::meta_ptr::Ptr;
 use crate::primitive::Primitive;
 use crate::primitive_array::{PrimitiveArray, UninitArray, UninitPrimitiveArray};
 
