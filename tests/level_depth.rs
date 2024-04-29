@@ -43,6 +43,10 @@ fn level_depth_test(){
             assert_eq!(data, &DataBlock(i as u64));
         }
         
+        for i in range.clone(){
+            assert!(array.contains(i));
+        }
+        
         /*for (index, data) in CachingBlockIter::new(&array){
             println!("{index}: {:}", data.0);
         }*/

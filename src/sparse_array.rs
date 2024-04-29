@@ -1,4 +1,6 @@
 use std::marker::PhantomData;
+use std::ops::ControlFlow;
+use std::ops::ControlFlow::Continue;
 use std::ptr::{NonNull, null};
 use crate::bit_block::BitBlock;
 use crate::level_block::HiBlock;
@@ -107,6 +109,7 @@ where
         //level_indices::<Level1, Level2>(index)
     }
     
+    #[inline]
     unsafe fn get_block_ptr(&self, level_n: impl ConstInteger, level_index: usize) -> *const u8{
         struct V(usize);
         impl<M> Visitor<M> for V{
@@ -123,6 +126,7 @@ where
         self.levels.visit(level_n, V(level_index))
     }
     
+    #[inline]
     unsafe fn get_block_mask(
         &self, 
         level_n: impl ConstInteger, 
@@ -144,6 +148,7 @@ where
         self.levels.visit(level_n, V(level_block_ptr)).as_ref()        
     }    
 
+    #[inline]
     unsafe fn get_block_index(
         &self, 
         level_n: impl ConstInteger, 
@@ -164,6 +169,28 @@ where
             }
         }
         self.levels.visit(level_n, V(level_block_ptr, index))
+    }
+    
+    #[inline]
+    unsafe fn fetch_block_index<I: ConstArray<Item=usize>>(&self, level_indices: I)
+        -> usize 
+    {
+        struct V<LevelIndices>(LevelIndices);
+        impl<LevelIndices: ConstArray<Item=usize>, M> FoldVisitor<M> for V<LevelIndices>{
+            type Acc = usize;
+            fn visit<I: ConstInteger, L>(&mut self, i: I, level: &L, level_block_index: Self::Acc) 
+                -> Self::Acc 
+            where 
+                L: ILevel, L::Block: HiBlock
+            {
+                unsafe{
+                    let block = level.blocks().get_unchecked(level_block_index);
+                    let in_block_index = self.0.as_ref().get_unchecked(I::VALUE).as_usize();
+                    block.get_or_zero(in_block_index).as_usize()
+                }
+            }
+        }        
+        self.levels.fold_n(I::Cap::default(), 0, V(level_indices))
     }
     
     // get_mut
@@ -298,33 +325,26 @@ where
     type LevelMaskType = Levels::Mask;
     type LevelMask<'a> where Self: 'a = &'a Self::LevelMaskType;
 
-    /*fn level_mask<const N: usize>(&self, level_indices: [usize; N]) -> Self::LevelMask<'_> {
-        todo!()
-    }*/
+    unsafe fn level_mask<I: ConstArray<Item=usize>>(&self, level_indices: I) -> Self::LevelMask<'_> {
+        let block_index = self.fetch_block_index(level_indices);
+        let block_ptr   = self.get_block_ptr(I::Cap::default(), block_index);
+        self.get_block_mask(I::Cap::default(), block_ptr)
+    }
     
     type DataBlockType = DataLevel::Block;
     type DataBlock<'a> where Self: 'a = &'a Self::DataBlockType;
     
     #[inline]
     unsafe fn data_block<I: ConstArray<Item=usize, Cap=Self::LevelCount>>(&self, level_indices: I) -> Self::DataBlock<'_> {
-        let data_block_index = self.levels.fold(0, V(level_indices));
-        struct V<LevelIndices>(LevelIndices);
-        impl<LevelIndices: ConstArray<Item=usize>, M> FoldVisitor<M> for V<LevelIndices>{
-            type Acc = usize;
-            fn visit<I: ConstInteger, L>(&mut self, i: I, level: &L, level_block_index: usize) 
-                -> Self::Acc 
-            where 
-                L: ILevel, 
-                L::Block: HiBlock 
-            {
-                unsafe{
-                    let block = level.blocks().get_unchecked(level_block_index);
-                    let in_block_index = self.0.as_ref().get_unchecked(I::VALUE).as_usize();
-                    block.get_or_zero(in_block_index).as_usize()
-                }
-            }
-        }
+        let data_block_index = self.fetch_block_index(level_indices);
         self.data.blocks().get_unchecked(data_block_index)
+    }
+
+    #[inline]
+    fn empty_data_block(&self) -> Self::DataBlock<'_> {
+        unsafe{
+            self.data.blocks().get_unchecked(0)
+        }
     }
 
     type State = SparseBlockArrayState<Levels, DataLevel>;

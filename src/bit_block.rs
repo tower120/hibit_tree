@@ -44,7 +44,16 @@ pub trait BitBlock: Eq + Sized + Clone + 'static{
     /// `bit_index` is guaranteed to be valid
     #[inline]
     fn get_bit(&self, bit_index: usize) -> bool{
-        todo!()
+        let array = self.as_array().as_ref();
+        if Self::Array::CAP == 1{
+            unsafe{
+                bit_utils::get_bit_unchecked(*array.get_unchecked(0), bit_index)
+            }
+        } else {
+            unsafe{
+                bit_utils::get_array_bit_unchecked(array, bit_index)
+            }
+        }
     }
     
     /// Returns [Break] if traverse was interrupted (`f` returns [Break]).

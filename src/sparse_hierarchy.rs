@@ -9,9 +9,12 @@ use crate::primitive_array::{ConstArray};
 
 /// 
 /// TODO: Change description
-/// 
-/// Basic interface for accessing level_block masks. Can work with `SimpleIter`.
 ///
+/// # Infinity
+/// 
+/// SparseHierarchy will act as infinite-size data source, if you try to
+/// access elements outside of [max_range] in a safe manner ([get]/[contains]).   
+/// 
 // We need xxxxType for each concrete level_block/mask type to avoid the need for use `for<'a>`,
 // which is still not working (at Rust level) in cases, where we need it most. 
 pub trait SparseHierarchy {
@@ -29,22 +32,32 @@ pub trait SparseHierarchy {
     /// # Safety
     ///
     /// indices are not checked.
-    unsafe fn level_mask<I: ConstArray<Item=usize>>(&self, level_indices: I) -> Self::LevelMask<'_>{
-        todo!()
-    }
+    unsafe fn level_mask<I: ConstArray<Item=usize>>(&self, level_indices: I) -> Self::LevelMask<'_>;
     
     // TODO: Try to remove IntoOwned here. This requires Data to impl Clone. 
-    type DataBlockType;
+    type DataBlockType /*: LevelBlock*/;
     type DataBlock<'a>: Borrow<Self::DataBlockType> + IntoOwned<Self::DataBlockType> 
         where Self: 'a;
+    // TODO: rename?
     /// # Safety
     ///
     /// indices are not checked.
     unsafe fn data_block<I: ConstArray<Item=usize, Cap=Self::LevelCount>>(&self, level_indices: I)
         -> Self::DataBlock<'_>;
-
-    // TODO: unchecked
-    /// Allowed to return false positives with non-[EXACT_HIERARCHY].
+    
+    // We need this, because DataBlock may return reference.
+    // And we can't have a non-const constructible static in rust,
+    // for taking reference from arbitrary DataBlockType::empty() 
+    // without overhead.
+    //
+    // Used by get().
+    fn empty_data_block(&self) -> Self::DataBlock<'_>;
+    
+    // TODO: not tested
+    /// Returns true if element at `index` is non-empty.
+    /// 
+    /// Faster than [get] + [is_empty], since output is based on hierarchy data only.
+    /// May return false positives with non-[EXACT_HIERARCHY].
     /// 
     /// # Safety
     ///
@@ -56,6 +69,18 @@ pub trait SparseHierarchy {
         let mask = self.level_mask(level_indices);
         mask.borrow().get_bit(mask_index)
     }
+
+    /// Returns false if `index` outside of range.
+    /// 
+    /// This makes SparseHierarchy basically infinite.
+    #[inline]
+    fn contains(&self, index: usize) -> bool {
+        if index > Self::max_range(){
+            false
+        } else {
+            unsafe{ self.contains_unchecked(index) }
+        }        
+    }
     
     /// # Safety
     ///
@@ -66,22 +91,26 @@ pub trait SparseHierarchy {
         self.data_block(indices)
     }
     
-    /// Returns None if `index` outside range.
+    /// Returns [empty_data_block()] if `index` outside of range.
+    /// 
+    /// This makes SparseHierarchy basically infinite.
     #[inline]
-    fn get(&self, index: usize) -> Option<Self::DataBlock<'_>>{
+    fn get(&self, index: usize) -> Self::DataBlock<'_>{
         if index > Self::max_range(){
-            None
+            self.empty_data_block()
         } else {
-            Some(unsafe{ self.get_unchecked(index) })
+            unsafe{ self.get_unchecked(index) }
         }
     }    
     
     type State: SparseHierarchyState<This = Self>;
     
+    /// Max index this SparseHierarchy can contain.
+    /// 
     /// Act as `const` - noop.
     #[inline]
     /*const*/ fn max_range() -> usize {
-        Self::LevelMaskType::size().pow(Self::LevelCount::VALUE as _) 
+        Self::LevelMaskType::size().pow(Self::LevelCount::VALUE as _) - 1 
     }
 }
 

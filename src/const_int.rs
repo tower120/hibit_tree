@@ -94,8 +94,17 @@ pub trait ConstInteger: ConstIntegerPrivate + Default + Copy + Eq + Debug {
     }*/ 
 }
 
-#[derive(Default, Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub struct ConstInt<const N: usize>;
+
+impl<const N: usize> Default for ConstInt<N>{
+    fn default() -> Self {
+        if N == MAX{
+            panic!()
+        }
+        Self
+    }
+}
 
 impl<const N: usize> Debug for ConstInt<N> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

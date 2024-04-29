@@ -43,8 +43,14 @@ pub trait SparseArrayLevels: Default {
     fn visit<I: ConstInteger, V: Visitor<Self::Mask>>(&self, i: I, visitor: V) -> V::Out;
     fn visit_mut<I: ConstInteger, V: MutVisitor<Self::Mask>>(&mut self, i: I, visitor: V) -> V::Out;
     
-    fn fold<Acc>(&self, acc: Acc, visitor: impl FoldVisitor<Self::Mask, Acc=Acc>) -> Acc;
+    #[inline]
+    fn fold<Acc>(&self, acc: Acc, visitor: impl FoldVisitor<Self::Mask, Acc=Acc>) -> Acc{
+        self.fold_n(Self::LevelCount::DEFAULT, acc, visitor)
+    }
     fn fold_mut<Acc>(&mut self, acc: Acc, visitor: impl FoldMutVisitor<Self::Mask, Acc=Acc>) -> Acc;
+    
+    /// fold first `n` tuple elements.
+    fn fold_n<Acc>(&self, n: impl ConstInteger, acc: Acc, visitor: impl FoldVisitor<Self::Mask, Acc=Acc>) -> Acc;
 }
 
 macro_rules! sparse_array_levels_impl {
@@ -79,18 +85,23 @@ macro_rules! sparse_array_levels_impl {
                     )+
                     _ => unreachable!()
                 }
-            }   
-            
-            fn fold<Acc>(&self, mut acc: Acc, mut visitor: impl FoldVisitor<Self::Mask, Acc = Acc>) -> Acc {
+            }
+
+            #[inline]
+            fn fold_mut<Acc>(&mut self, mut acc: Acc, mut visitor: impl FoldMutVisitor<Self::Mask, Acc = Acc>) -> Acc {
                 $(
-                    acc = visitor.visit(ConstInt::<$i>::DEFAULT, &self.$i, acc);
+                    acc = visitor.visit(ConstInt::<$i>, &mut self.$i, acc);
                 )+
                 acc
             }
-
-            fn fold_mut<Acc>(&mut self, mut acc: Acc, mut visitor: impl FoldMutVisitor<Self::Mask, Acc = Acc>) -> Acc {
+            
+            #[inline]
+            fn fold_n<Acc>(&self, n: impl ConstInteger, mut acc: Acc, mut visitor: impl FoldVisitor<Self::Mask, Acc=Acc>) -> Acc{
                 $(
-                    acc = visitor.visit(ConstInt::<$i>::DEFAULT, &mut self.$i, acc);
+                    if $i == n.value() {
+                        return acc;
+                    }
+                    acc = visitor.visit(ConstInt::<$i>, &self.$i, acc);
                 )+
                 acc
             }
