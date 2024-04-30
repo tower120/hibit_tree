@@ -97,9 +97,12 @@ where
 
 pub type ConstArrayType<T, C: ConstInteger> = C::SelfSizeArray<T>;
 
+// TODO: rename to ConstCopyArrayType
+pub type ConstPrimitiveArrayType<T: Primitive, C: ConstInteger> = C::SelfSizePrimitiveArray<T>;
+
 /*/// [ConstInteger] friendly [PrimitiveArray]
 pub trait ConstPrimitiveArray
-    : ConstArray<DecrArray: PrimitiveArray>
+    : ConstArray<DecArray: PrimitiveArray>
     + PrimitiveArray
 {}
-impl<T: ConstArray<DecrArray: PrimitiveArray> + PrimitiveArray> ConstPrimitiveArray for T {}*/
+impl<T: ConstArray<DecArray: PrimitiveArray> + PrimitiveArray> ConstPrimitiveArray for T {}*/

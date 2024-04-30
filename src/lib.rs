@@ -7,7 +7,7 @@ mod sparse_array_levels;
 mod bit_utils;
 mod bool_type;
 mod bit_block;
-//mod apply;
+mod apply;
 //mod fold;
 //mod empty;
 
@@ -27,7 +27,7 @@ pub use primitive::Primitive;
 pub use primitive_array::{Array, PrimitiveArray};
 pub use sparse_array::{SparseArray};
 pub use sparse_array_levels::SparseArrayLevels;
-//pub use apply::{Apply, Op};
+pub use apply::{Apply, Op};
 //pub use fold::Fold;
 //pub use empty::Empty;
 
@@ -77,7 +77,7 @@ impl<T: Clone> IntoOwned<T> for &T{
     }
 }
 
-/*#[inline]
+#[inline]
 pub fn apply<Op, B1, B2, T1, T2>(op: Op, s1: B1, s2: B2) -> Apply<Op, B1, B2, T1, T2>
 where
     Op: apply::Op,
@@ -87,7 +87,7 @@ where
     Apply{op, s1, s2, phantom: PhantomData}
 }
 
-#[inline]
+/*#[inline]
 pub fn fold<'a, Op, Init, ArrayIter, Array>(op: Op, init: &'a Init, array_iter: ArrayIter) -> Fold<'a, Op, Init, ArrayIter, Array>
 where
     Op: apply::Op,

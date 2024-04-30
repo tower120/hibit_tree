@@ -2,11 +2,11 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
 use wide::f32x4;
-use hi_sparse_array::{Apply, apply, BitBlock, Op, IntoOwned, SparseArray};
+use hi_sparse_array::{Apply, apply, BitBlock, Op, IntoOwned};
 use hi_sparse_array::bit_queue::EmptyBitQueue;
 use hi_sparse_array::level_block::{LevelBlock, Block};
 use hi_sparse_array::caching_iter::CachingBlockIter;
-use hi_sparse_array::level::{BypassLevel, Level};
+use hi_sparse_array::level::{Level, SingleBlockLevel};
 //use hi_sparse_array::simple_iter::SimpleBlockIter;
 
 #[derive(Clone)]
@@ -76,11 +76,9 @@ impl BitAnd for EmptyMask{
 
 type Lvl0Block = Block<u64, [u8; 64]>;
 type Lvl1Block = Block<u64, [u16; 64]>;
-type SparseArray = SparseArray<
-    Lvl0Block,
+type SparseArray = hi_sparse_array::SparseArray<
+    (SingleBlockLevel<Lvl0Block>,),
     //Level<Lvl1Block>,
-    BypassLevel<EmptyMask>,
-    BypassLevel<EmptyMask>,
     Level<DataBlock>
 >;
 
@@ -103,40 +101,30 @@ impl SparseVector{
     }
 }
 
-pub struct MulOp<L0, L1, L2, LD>(PhantomData<(L0, L1, L2, LD)>);
-impl<L0, L1, L2, LD> Default for MulOp<L0, L1, L2, LD>{
+pub struct MulOp<M, D>(PhantomData<(M, D)>);
+impl<M, D> Default for MulOp<M, D>{
     fn default() -> Self {
         Self(PhantomData)
     }
 } 
 
-impl<L0, L1, L2, LD> Op for MulOp<L0, L1, L2, LD>
+impl<M, D> Op for MulOp<M, D>
 where
-    L0: BitBlock + BitAnd<Output = L0>, 
-    L1: BitBlock + BitAnd<Output = L1>, 
-    L2: BitBlock + BitAnd<Output = L2>, 
-    LD: Mul<Output = LD>
+    M: BitBlock + BitAnd<Output = M>, 
+    D: Mul<Output = D> + LevelBlock
 {
     const EXACT_HIERARCHY: bool = false;
     const SKIP_EMPTY_HIERARCHIES: bool = false;
     
-    type Level0Mask = L0;
-    fn lvl0_op(&self, left: impl IntoOwned<L0>, right: impl IntoOwned<L0>) -> Self::Level0Mask {
+    type LevelMask = M;
+    fn lvl_op(&self, left: impl IntoOwned<M>, right: impl IntoOwned<M>) -> Self::LevelMask {
         left.into_owned() & right.into_owned()
     }
 
-    type Level1Mask = L1;
-    fn lvl1_op(&self, left: impl IntoOwned<L1>, right: impl IntoOwned<L1>) -> Self::Level1Mask {
-        left.into_owned() & right.into_owned()
-    }
-    
-    type Level2Mask = L2;
-    fn lvl2_op(&self, left: impl IntoOwned<L2>, right: impl IntoOwned<L2>) -> Self::Level2Mask {
-        left.into_owned() & right.into_owned()
-    }
-
-    type DataBlock = LD;
-    fn data_op(&self, left: impl Borrow<LD> + IntoOwned<LD>, right: impl Borrow<LD> + IntoOwned<LD>) -> Self::DataBlock {
+    type DataBlockL = D;
+    type DataBlockR = D;
+    type DataBlockO = D;
+    fn data_op(&self, left: impl Borrow<D> + IntoOwned<D>, right: impl Borrow<D> + IntoOwned<D>) -> Self::DataBlockO {
         left.into_owned() * right.into_owned()
     }
 }
@@ -145,7 +133,7 @@ where
 /// Per-element multiplication
 pub fn mul<'a>(v1: &'a SparseVector, v2: &'a SparseVector) 
     -> Apply<
-        MulOp<u64, EmptyMask, EmptyMask, DataBlock>, 
+        MulOp<u64, DataBlock>, 
         &'a SparseArray, 
         &'a SparseArray,
         SparseArray,

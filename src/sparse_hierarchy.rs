@@ -3,7 +3,8 @@ use std::marker::PhantomData;
 use crate::{Array, BitBlock, IntoOwned, PrimitiveArray};
 use crate::sparse_array::level_indices;
 use crate::const_int::ConstInteger;
-use crate::primitive_array::{ConstArray, ConstArrayType};
+use crate::level_block::LevelBlock;
+use crate::primitive_array::{ConstArray, ConstArrayType, ConstPrimitiveArrayType};
 
 /// 
 /// TODO: Change description
@@ -34,12 +35,13 @@ pub trait SparseHierarchy {
     /// # Safety
     ///
     /// `level_indices` are not checked.
-    unsafe fn level_mask<I: ConstArray<Item=usize>>(&self, level_indices: I) 
-        -> Self::LevelMask<'_>;
+    unsafe fn level_mask<I>(&self, level_indices: I) -> Self::LevelMask<'_>
+    where
+        I: ConstArray<Item=usize> + Copy;
     
     // TODO: Try to remove IntoOwned here. This requires Data to impl Clone. 
-    type DataBlockType /*: LevelBlock*/;
-    type DataBlock<'a>: Borrow<Self::DataBlockType> + IntoOwned<Self::DataBlockType> 
+    type DataBlockType: LevelBlock;
+    type DataBlock<'a>: Borrow<Self::DataBlockType> + IntoOwned<Self::DataBlockType>
         where Self: 'a;
     // TODO: rename?
     /// # Safety
@@ -47,7 +49,7 @@ pub trait SparseHierarchy {
     /// indices are not checked.
     unsafe fn data_block<I>(&self, level_indices: I) -> Self::DataBlock<'_>
     where
-        I: ConstArray<Item=usize, Cap=Self::LevelCount>;
+        I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy;
     
     // We need this, because DataBlock may return reference.
     // And we can't have a non-const constructible static in rust,
@@ -106,6 +108,8 @@ pub trait SparseHierarchy {
         }
     }    
     
+    /// Use [DefaultState] as default, if you don't want to implement 
+    /// stateful SparseHierarchy.
     type State: SparseHierarchyState<This = Self>;
     
     /// Max index this SparseHierarchy can contain.
@@ -214,7 +218,7 @@ impl<This: SparseHierarchy> SparseHierarchyState for DefaultState<This>{
             self.level_indices.as_mut()[level_n.dec().value()] = level_index;
         }
         
-        let indices: ConstArrayType<usize, N> 
+        let indices: ConstPrimitiveArrayType<usize, N> 
             = Array::from_fn(|/*const*/ i| {
                 if /*const*/ N::VALUE-1 == i {
                     level_index
@@ -231,7 +235,7 @@ impl<This: SparseHierarchy> SparseHierarchyState for DefaultState<This>{
     unsafe fn data_block<'a>(&self, this: &'a Self::This, level_index: usize) 
         -> <Self::This as SparseHierarchy>::DataBlock<'a> 
     {
-        let indices: ConstArrayType<usize, This::LevelCount> 
+        let indices: ConstPrimitiveArrayType<usize, This::LevelCount> 
             = Array::from_fn(|/*const*/ i| {
                 if /*const*/ This::LevelCount::VALUE-1 == i {
                     level_index

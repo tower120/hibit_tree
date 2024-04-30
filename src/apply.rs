@@ -1,28 +1,11 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
-use std::mem;
-use std::mem::MaybeUninit;
-use std::ptr::addr_of_mut;
 use crate::bit_block::BitBlock;
 use crate::{SparseHierarchy, IntoOwned};
+use crate::const_int::ConstInteger;
+use crate::level_block::LevelBlock;
+use crate::primitive_array::ConstArray;
 use crate::sparse_hierarchy::{DefaultState, SparseHierarchyState};
-
-// TODO: unused now
-/// &mut MaybeUninit<(T0, T1)> = (&mut MaybeUninit<T0>, &mut MaybeUninit<T1>)
-#[inline] 
-fn uninit_as_mut_pair<T0, T1>(pair: &mut MaybeUninit<(T0, T1)>)
-    -> (&mut MaybeUninit<T0>, &mut MaybeUninit<T1>)
-{
-    unsafe{
-        let ptr  = pair.as_mut_ptr();
-        let ptr0 = addr_of_mut!((*ptr).0);
-        let ptr1 = addr_of_mut!((*ptr).1);
-        (
-            &mut* mem::transmute::<_, *mut MaybeUninit<T0>>(ptr0),
-            &mut* mem::transmute::<_, *mut MaybeUninit<T1>>(ptr1)
-        )
-    }
-}
 
 // TODO: move out from apply.
 // We need more advanced GAT in Rust to make `DataBlock<'a>` work here 
@@ -59,29 +42,20 @@ pub trait Op {
     /// 
     const SKIP_EMPTY_HIERARCHIES: bool;
     
-    type Level0Mask: BitBlock;
-    fn lvl0_op(&self,
-        left : impl Borrow<Self::Level0Mask> + IntoOwned<Self::Level0Mask>,
-        right: impl Borrow<Self::Level0Mask> + IntoOwned<Self::Level0Mask>
-    ) -> Self::Level0Mask;
+    type LevelMask: BitBlock;
+    fn lvl_op(&self,
+        left : impl Borrow<Self::LevelMask> + IntoOwned<Self::LevelMask>,
+        right: impl Borrow<Self::LevelMask> + IntoOwned<Self::LevelMask>
+    ) -> Self::LevelMask;
     
-    type Level1Mask: BitBlock;
-    fn lvl1_op(&self,
-        left : impl Borrow<Self::Level1Mask> + IntoOwned<Self::Level1Mask>,
-        right: impl Borrow<Self::Level1Mask> + IntoOwned<Self::Level1Mask>
-    ) -> Self::Level1Mask;
-    
-    type Level2Mask: BitBlock;
-    fn lvl2_op(&self,
-        left : impl Borrow<Self::Level2Mask> + IntoOwned<Self::Level2Mask>,
-        right: impl Borrow<Self::Level2Mask> + IntoOwned<Self::Level2Mask>
-    ) -> Self::Level2Mask;
-    
-    type DataBlock;
+    // TODO: rename
+    type DataBlockL;
+    type DataBlockR;
+    type DataBlockO: LevelBlock;
     fn data_op(&self,
-        left : impl Borrow<Self::DataBlock> + IntoOwned<Self::DataBlock>,
-        right: impl Borrow<Self::DataBlock> + IntoOwned<Self::DataBlock>
-    ) -> Self::DataBlock;
+        left : impl Borrow<Self::DataBlockL> + IntoOwned<Self::DataBlockL>,
+        right: impl Borrow<Self::DataBlockR> + IntoOwned<Self::DataBlockR>
+    ) -> Self::DataBlockO;
 }
 
 pub struct Apply<Op, B1, B2, T1, T2>{
@@ -99,67 +73,57 @@ where
     T1: SparseHierarchy,
 
     T2: SparseHierarchy<
-        Level0MaskType = T1::Level0MaskType,
-        Level1MaskType = T1::Level1MaskType,
-        Level2MaskType = T1::Level2MaskType,
-        DataBlockType  = T1::DataBlockType,
+        LevelCount    = T1::LevelCount,
+        LevelMaskType = T1::LevelMaskType,
     >,
 
     Op: self::Op<
-        Level0Mask = T1::Level0MaskType,
-        Level1Mask = T1::Level1MaskType,
-        Level2Mask = T1::Level2MaskType,
-        DataBlock  = T1::DataBlockType,
+        LevelMask  = T1::LevelMaskType,
+        DataBlockL = T1::DataBlockType,
+        DataBlockR = T2::DataBlockType,
     >
 {
+    type LevelCount = T1::LevelCount;
     const EXACT_HIERARCHY: bool = Op::EXACT_HIERARCHY;
-    
-    type Level0MaskType = T1::Level0MaskType;
-    type Level0Mask<'a> = Self::Level0MaskType where Self:'a;
-    #[inline]
-    fn level0_mask(&self) -> Self::Level0Mask<'_> {
-        let s1 = self.s1.borrow(); 
-        let s2 = self.s2.borrow();
-        self.op.lvl0_op(s1.level0_mask(), s2.level0_mask())
-    }
 
-    type Level1MaskType = T1::Level1MaskType;
-    type Level1Mask<'a> = Self::Level1MaskType where Self:'a;
+    type LevelMaskType = T1::LevelMaskType;
+    type LevelMask<'a> = Self::LevelMaskType where Self:'a;
     #[inline]
-    unsafe fn level1_mask(&self, level0_index: usize) -> Self::Level1Mask<'_> {
+    unsafe fn level_mask<I>(&self, level_indices: I)
+        -> Self::LevelMask<'_>
+    where 
+        I: ConstArray<Item=usize> + Copy
+    {
         let s1 = self.s1.borrow(); 
         let s2 = self.s2.borrow();
-        self.op.lvl1_op(
-            s1.level1_mask(level0_index),
-            s2.level1_mask(level0_index)
-        )
-    }
-    
-    type Level2MaskType = T1::Level2MaskType;
-    type Level2Mask<'a> = Self::Level2MaskType where Self:'a;
-    #[inline]
-    unsafe fn level2_mask(&self, level0_index: usize, level1_index: usize) -> Self::Level2Mask<'_> {
-        let s1 = self.s1.borrow(); 
-        let s2 = self.s2.borrow();
-        self.op.lvl2_op(
-            s1.level2_mask(level0_index, level1_index),
-            s2.level2_mask(level0_index, level1_index)
+        self.op.lvl_op(
+            s1.level_mask(level_indices),
+            s2.level_mask(level_indices)
         )
     }
 
-    type DataBlockType = Op::DataBlock;
-    type DataBlock<'a> = Op::DataBlock where Self:'a;
+    type DataBlockType = Op::DataBlockO;
+    type DataBlock<'a> = Op::DataBlockO where Self:'a;
     #[inline]
-    unsafe fn data_block(&self, level0_index: usize, level1_index: usize, level2_index: usize) -> Self::DataBlock<'_> {
+    unsafe fn data_block<I>(&self, level_indices: I) -> Self::DataBlock<'_>
+    where
+        I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
+    {
         let s1 = self.s1.borrow(); 
         let s2 = self.s2.borrow();
         self.op.data_op(
-            s1.data_block(level0_index, level1_index, level2_index),
-            s2.data_block(level0_index, level1_index, level2_index)
+            s1.data_block(level_indices),
+            s2.data_block(level_indices)
         )
     }
-    
+
+    #[inline]
+    fn empty_data_block(&self) -> Self::DataBlock<'_> {
+        <Op::DataBlockO as LevelBlock>::empty()
+    }
+
     type State = ApplyState<Op, B1, B2, T1, T2>;
+    //type State = DefaultState<Self>;
 }
 
 pub struct ApplyState<Op, B1, B2, T1, T2>
@@ -180,17 +144,14 @@ where
     T1: SparseHierarchy,
 
     T2: SparseHierarchy<
-        Level0MaskType = T1::Level0MaskType,
-        Level1MaskType = T1::Level1MaskType,
-        Level2MaskType = T1::Level2MaskType,
-        DataBlockType  = T1::DataBlockType,
+        LevelCount    = T1::LevelCount,
+        LevelMaskType = T1::LevelMaskType,
     >,
 
     Op: self::Op<
-        Level0Mask = T1::Level0MaskType,
-        Level1Mask = T1::Level1MaskType,
-        Level2Mask = T1::Level2MaskType,
-        DataBlock  = T1::DataBlockType,
+        LevelMask  = T1::LevelMaskType,
+        DataBlockL = T1::DataBlockType,
+        DataBlockR = T2::DataBlockType,
     >
 {
     type This = Apply<Op, B1, B2, T1, T2>;
@@ -205,37 +166,21 @@ where
     }
     
     #[inline]
-    unsafe fn select_level1<'a>(&mut self, this: &'a Self::This, level0_index: usize) 
-        -> (<Self::This as SparseHierarchy>::Level1Mask<'a>, bool) 
+    unsafe fn select_level_bock<'a, N: ConstInteger>(&mut self, this: &'a Self::This, level_n: N, level_index: usize) 
+        -> (<Self::This as SparseHierarchy>::LevelMask<'a>, bool) 
     {
-        let (mask1, _) = self.s1.select_level1(
-            this.s1.borrow(), level0_index
+        let (mask1, _) = self.s1.select_level_bock(
+            this.s1.borrow(), level_n, level_index
         );
-        let (mask2, _) = self.s2.select_level1(
-            this.s2.borrow(), level0_index
+        let (mask2, _) = self.s2.select_level_bock(
+            this.s2.borrow(), level_n, level_index
         );
         
-        let mask = this.op.lvl1_op(mask1, mask2);
+        let mask = this.op.lvl_op(mask1, mask2);
         let is_empty = mask.is_zero();
         (mask, !is_empty)
     }
-    
-    #[inline]
-    unsafe fn select_level2<'a>(&mut self, this: &'a Self::This, level1_index: usize) 
-        -> (<Self::This as SparseHierarchy>::Level2Mask<'a>, bool) 
-    {
-        let (mask1, _) = self.s1.select_level2(
-            this.s1.borrow(), level1_index
-        );
-        let (mask2, _) = self.s2.select_level2(
-            this.s2.borrow(), level1_index
-        );
-        
-        let mask = this.op.lvl2_op(mask1, mask2);
-        let is_empty = mask.is_zero();
-        (mask, !is_empty)
-    }
-    
+
     #[inline]
     unsafe fn data_block<'a>(&self, this: &'a Self::This, level_index: usize) 
         -> <Self::This as SparseHierarchy>::DataBlock<'a> 

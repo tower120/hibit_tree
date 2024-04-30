@@ -95,6 +95,11 @@ pub trait ConstInteger: ConstIntegerPrivate + Default + Copy + Eq + Debug {
     /// [T; Self::N]
     type SelfSizeArray<T>: ConstArray<Item=T, Cap=Self>;
     
+    /// Same as [SelfSizeArray], but with additional type bounds.
+    /// 
+    /// N.B. We can't **just** forward Copy for SelfSizeArray if T: Copy in Rust.
+    type SelfSizePrimitiveArray<T: Primitive>: ConstArray<Item=T, Cap=Self, DecArray:Copy> + Copy;
+    
     /*type IsZero: BoolType;
     fn is_zero(self) -> Self::IsZero{
         Self::IsZero::default()
@@ -142,6 +147,7 @@ macro_rules! gen_const_int {
             type SatDec = ConstInt<{$i}>;
             type Inc = ConstInt<{$i+1}>;
             type SelfSizeArray<T> = [T; $i];
+            type SelfSizePrimitiveArray<T: Primitive> = [T; $i];
 
             //type IsZero = TrueType;
         }
@@ -156,6 +162,8 @@ macro_rules! gen_const_int {
             type SatDec = ConstInt<{$i-1}>;
             type Inc = ConstInt<{$i+1}>;
             type SelfSizeArray<T> = [T; $i];
+            type SelfSizePrimitiveArray<T: Primitive> = [T; $i];
+            
             
             //type IsZero = FalseType;
         }
@@ -170,6 +178,7 @@ macro_rules! gen_const_int {
             type SatDec = ConstInt<{$i-1}>;
             type Inc = ConstIntInvalid;
             type SelfSizeArray<T> = [T; $i];
+            type SelfSizePrimitiveArray<T: Primitive> = [T; $i];
             
             //type IsZero = FalseType;
         }
@@ -198,6 +207,7 @@ impl ConstInteger for ConstInt<MAX>{
     type SatDec = ConstInt<MAX>;
     type Inc = ConstInt<MAX>;
     type SelfSizeArray<T> = [T; MAX];
+    type SelfSizePrimitiveArray<T: Primitive> = [T; MAX];
     
     //type IsZero = FalseType;
 }
