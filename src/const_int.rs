@@ -75,6 +75,13 @@ pub trait ConstInteger: ConstIntegerPrivate + Default + Copy + Eq + Debug {
         Self::VALUE
     }
     
+    /// Saturating decrement
+    type SatDec: ConstInteger;
+    /// Saturating decrement
+    fn sat_dec(self) -> Self::Dec {
+        Self::Dec::default()
+    }
+    
     type Dec: ConstInteger;
     fn dec(self) -> Self::Dec {
         Self::Dec::default()
@@ -131,7 +138,8 @@ macro_rules! gen_const_int {
             const VALUE  : usize = $i;
             const DEFAULT: Self = ConstInt::<$i>;
             
-            type Dec = ConstIntInvalid;
+            type Dec    = ConstIntInvalid;
+            type SatDec = ConstInt<{$i}>;
             type Inc = ConstInt<{$i+1}>;
             type SelfSizeArray<T> = [T; $i];
 
@@ -144,7 +152,8 @@ macro_rules! gen_const_int {
             const VALUE  : usize = $i;
             const DEFAULT: Self = ConstInt::<$i>;
             
-            type Dec = ConstInt<{$i-1}>;
+            type Dec    = ConstInt<{$i-1}>;
+            type SatDec = ConstInt<{$i-1}>;
             type Inc = ConstInt<{$i+1}>;
             type SelfSizeArray<T> = [T; $i];
             
@@ -157,7 +166,8 @@ macro_rules! gen_const_int {
             const VALUE  : usize = $i;
             const DEFAULT: Self = ConstInt::<$i>;
             
-            type Dec = ConstInt<{$i-1}>;
+            type Dec    = ConstInt<{$i-1}>;
+            type SatDec = ConstInt<{$i-1}>;
             type Inc = ConstIntInvalid;
             type SelfSizeArray<T> = [T; $i];
             
@@ -184,7 +194,8 @@ impl ConstInteger for ConstInt<MAX>{
     const VALUE  : usize = MAX;
     const DEFAULT: Self  = ConstInt::<MAX>;
     
-    type Dec = ConstInt<MAX>;
+    type Dec    = ConstInt<MAX>;
+    type SatDec = ConstInt<MAX>;
     type Inc = ConstInt<MAX>;
     type SelfSizeArray<T> = [T; MAX];
     

@@ -5,7 +5,7 @@ use std::ptr::{NonNull, null};
 use crate::bit_block::BitBlock;
 use crate::level_block::HiBlock;
 use crate::level::{ILevel, Level};
-use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
+use crate::sparse_hierarchy::{DefaultState, SparseHierarchy, SparseHierarchyState};
 use crate::const_int::{const_for, ConstInt, ConstInteger, ConstIntVisitor};
 use crate::primitive::Primitive;
 use crate::primitive_array::{Array, ConstArray, ConstArrayType};
@@ -325,6 +325,7 @@ where
     type LevelMaskType = Levels::Mask;
     type LevelMask<'a> where Self: 'a = &'a Self::LevelMaskType;
 
+    #[inline]
     unsafe fn level_mask<I: ConstArray<Item=usize>>(&self, level_indices: I) -> Self::LevelMask<'_> {
         let block_index = self.fetch_block_index(level_indices);
         let block_ptr   = self.get_block_ptr(I::Cap::default(), block_index);
@@ -348,6 +349,7 @@ where
     }
 
     type State = SparseBlockArrayState<Levels, DataLevel>;
+    //type State = DefaultState<Self>;
 }
 
 pub struct SparseBlockArrayState<Levels, DataLevel>
@@ -371,20 +373,19 @@ where
 {
     type This = SparseArray<Levels, DataLevel>;
 
-    fn new(this: &Self::This) -> Self {
+    fn new(_: &Self::This) -> Self {
         Self{
-            // TODO: point to 0,0,0... block?
             level_block_ptrs: Array::from_fn(|_|null()),
             phantom_data: Default::default(),
         }
     }
 
-    unsafe fn select_level_bock<'a, L: ConstInteger>(
-        &mut self, level_n: L, this: &'a Self::This, level_index: usize
+    unsafe fn select_level_bock<'a, N: ConstInteger>(
+        &mut self, this: &'a Self::This, level_n: N, level_index: usize
     )
         -> (<Self::This as SparseHierarchy>::LevelMask<'a>, bool) 
     {
-        if L::VALUE == 0{
+        if N::VALUE == 0{
             assert_eq!(level_index, 0);
             let block_ptr = this.get_block_ptr(level_n, 0);
             let mask = this.get_block_mask(level_n, block_ptr);
@@ -397,7 +398,7 @@ where
         // 1. get level_block_index from prev level. 
         let level_block_index ={
             let prev_level_block_ptr = 
-                if L::VALUE == 1{
+                if N::VALUE == 1{
                     // get directly from root
                     this.get_block_ptr(ConstInt::<0>, 0)
                 } else {

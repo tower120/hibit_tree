@@ -50,7 +50,7 @@ where
         
         // TODO: This probably could be better
         let (root_mask, _) = unsafe{
-            state.select_level_bock(ConstInt::<0>, container, 0)
+            state.select_level_bock(container, ConstInt::<0>, 0)
         };
         let level0_iter = root_mask.into_owned().into_bits_iter();
         
@@ -107,8 +107,8 @@ where
                             let level_depth = i.inc();                            
                             let (level_mask, _) = unsafe{
                                 self.0.state.select_level_bock(
+                                    &self.0.container,
                                     level_depth,
-                                    &self.0.container, 
                                     index
                                 )
                             };

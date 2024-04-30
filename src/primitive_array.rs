@@ -67,8 +67,8 @@ pub trait ConstArray: Array {
     type Cap: ConstInteger;
     
     /// Self array decremented in size.
-    type DecrArray: ConstArray<Item=Self::Item, Cap=<Self::Cap as ConstInteger>::Dec>;  
-    fn split_last(self) -> (Self::DecrArray, Self::Item);
+    type DecArray: ConstArray<Item=Self::Item, Cap=<Self::Cap as ConstInteger>::Dec>;  
+    fn split_last(self) -> (Self::DecArray, Self::Item);
 }
 
 impl<T, const N: usize> ConstArray for [T; N]
@@ -76,9 +76,12 @@ where
     ConstInt<N>: ConstInteger
 {
     type Cap = ConstInt<N>;
-    type DecrArray = ConstArrayType<Self::Item, <Self::Cap as ConstInteger>::Dec>;
+    
+    /// Array with N-1 size/cap.
+    type DecArray = ConstArrayType<Self::Item, <Self::Cap as ConstInteger>::Dec>;
 
-    fn split_last(self) -> (Self::DecrArray, Self::Item) {
+    #[inline]
+    fn split_last(self) -> (Self::DecArray, Self::Item) {
         let this = ManuallyDrop::new(self);
         let left = unsafe{
             Array::from_fn(|i| { 

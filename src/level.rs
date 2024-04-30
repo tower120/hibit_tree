@@ -1,8 +1,6 @@
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::slice;
-use crate::bit_block::{EmptyBitBlock, IEmptyBitBlock};
-use crate::bool_type::{BoolType, FalseType, TrueType};
 use crate::level_block::{HiBlock, LevelBlock};
 use crate::primitive::Primitive;
 

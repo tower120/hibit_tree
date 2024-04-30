@@ -22,7 +22,7 @@ pub mod const_int;
 
 
 //pub use ref_or_val::*;
-pub use bit_block::{BitBlock, IEmptyBitBlock, EmptyBitBlock};
+pub use bit_block::BitBlock;
 pub use primitive::Primitive;
 pub use primitive_array::{Array, PrimitiveArray};
 pub use sparse_array::{SparseArray};
