@@ -7,6 +7,7 @@ use hi_sparse_array::bit_queue::EmptyBitQueue;
 use hi_sparse_array::level_block::{LevelBlock, Block};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::level::{Level, SingleBlockLevel};
+use hi_sparse_array::sparse_hierarchy::SparseHierarchy;
 //use hi_sparse_array::simple_iter::SimpleBlockIter;
 
 #[derive(Clone)]
@@ -38,39 +39,6 @@ impl LevelBlock for DataBlock{
     fn restore_empty_u64(&mut self) {
         // Is this correct for float??
         *self.as_u64_mut() = 0;
-    }
-}
-
-#[derive(Eq, PartialEq, Copy, Clone)]
-struct EmptyMask;
-impl BitBlock for EmptyMask{
-    const SIZE_POT_EXPONENT: usize = 0;
-
-    fn zero() -> Self {
-        Self
-    }
-
-    type BitsIter = EmptyBitQueue;
-
-    fn into_bits_iter(self) -> Self::BitsIter {
-        EmptyBitQueue
-    }
-
-    type Array = [u64; 0];
-
-    fn as_array(&self) -> &Self::Array {
-        todo!()
-    }
-
-    fn as_array_mut(&mut self) -> &mut Self::Array {
-        todo!()
-    }
-} 
-impl BitAnd for EmptyMask{
-    type Output = Self;
-
-    fn bitand(self, rhs: Self) -> Self::Output {
-        todo!()
     }
 }
 
