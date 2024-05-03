@@ -35,6 +35,7 @@ impl<T, const N: usize> Array for [T; N]{
          
     type UninitArray = [MaybeUninit<Self::Item>; N];
     
+    #[inline]
     fn from_fn<F>(f: F) -> Self 
     where 
         F: FnMut(usize) -> T 

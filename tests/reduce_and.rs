@@ -1,10 +1,10 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
-use hi_sparse_array::{BitBlock, EmptyBitBlock, fold, IntoOwned, Op, /*reduce, Reduce, */SparseArray};
+use hi_sparse_array::{BitBlock, fold, IntoOwned, Op, /*reduce, Reduce, */SparseArray};
 use hi_sparse_array::level_block::{LevelBlock, Block, SmallBlock, ClusterBlock};
 use hi_sparse_array::caching_iter::CachingBlockIter;
-use hi_sparse_array::level::{BypassLevel, Level};
+use hi_sparse_array::level::{Level, SingleBlockLevel};
 
 type Lvl0Block = Block<u64, [u8;64]>;
 type Lvl1Block = Block<u64, [u16;64]>;
@@ -37,43 +37,33 @@ impl LevelBlock for DataBlock{
     }
 }
 
-type BlockArray = SparseArray<Lvl0Block, Level<Lvl1Block>, /*BypassLevel*/Level<Lvl1Block>, Level<DataBlock>>;
+type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, Level<Lvl1Block>), Level<DataBlock>>;
 
 
-pub struct AndOp<L0, L1, L2, LD>(PhantomData<(L0, L1, L2, LD)>);
-impl<L0, L1, L2, LD> Default for AndOp<L0, L1, L2, LD>{
+pub struct AndOp<M, LD>(PhantomData<(M, LD)>);
+impl<M, LD> Default for AndOp<M, LD>{
     fn default() -> Self {
         Self(PhantomData)
     }
 } 
 
-impl<L0, L1, L2, LD> Op for AndOp<L0, L1, L2, LD>
+impl<M, LD> Op for AndOp<M, LD>
 where
-    L0: BitBlock + BitAnd<Output = L0>, 
-    L1: BitBlock + BitAnd<Output = L1>, 
-    L2: BitBlock + BitAnd<Output = L2>, 
-    LD: BitAnd<Output = LD>
+    M: BitBlock + BitAnd<Output = M>, 
+    LD: BitAnd<Output = LD> + LevelBlock
 {
     const EXACT_HIERARCHY: bool = false;
     const SKIP_EMPTY_HIERARCHIES: bool = true;
     
-    type Level0Mask = L0;
-    fn lvl0_op(&self, left: impl IntoOwned<L0>, right: impl IntoOwned<L0>) -> Self::Level0Mask {
+    type LevelMask = M;
+    fn lvl_op(&self, left: impl IntoOwned<M>, right: impl IntoOwned<M>) -> Self::LevelMask {
         left.into_owned() & right.into_owned()
     }
 
-    type Level1Mask = L1;
-    fn lvl1_op(&self, left: impl IntoOwned<L1>, right: impl IntoOwned<L1>) -> Self::Level1Mask {
-        left.into_owned() & right.into_owned()
-    }
-    
-    type Level2Mask = L2;
-    fn lvl2_op(&self, left: impl IntoOwned<L2>, right: impl IntoOwned<L2>) -> Self::Level2Mask {
-        left.into_owned() & right.into_owned()
-    }
-
-    type DataBlock = LD;
-    fn data_op(&self, left: impl Borrow<LD> + IntoOwned<LD>, right: impl Borrow<LD> + IntoOwned<LD>) -> Self::DataBlock {
+    type DataBlockL = LD;
+    type DataBlockR = LD;
+    type DataBlockO = LD;
+    fn data_op(&self, left: impl Borrow<LD> + IntoOwned<LD>, right: impl Borrow<LD> + IntoOwned<LD>) -> Self::DataBlockO {
         left.into_owned() & right.into_owned()
     }
 }

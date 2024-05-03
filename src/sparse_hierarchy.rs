@@ -75,6 +75,7 @@ pub trait SparseHierarchy {
         mask.borrow().get_bit(mask_index)
     }
 
+    // TODO rename to may_contain
     /// Returns false if `index` outside of range.
     /// 
     /// This makes SparseHierarchy basically infinite.

@@ -78,7 +78,6 @@ impl<T: ILevel<Block: HiBlock>> HiLevel for T{}
 
 
 
-
 pub struct SparseArray<Levels, DataLevel> {
     levels: Levels,
     data  : DataLevel,
@@ -103,17 +102,12 @@ where
     Levels: SparseArrayLevels,
     DataLevel: ILevel
 {
-    #[inline]
-    fn level_indices(index: usize) -> (usize/*level0*/, usize/*level1*/, usize/*level2*/) {
-        todo!()
-        //level_indices::<Level1, Level2>(index)
-    }
-    
-    #[inline]
+    #[inline(always)]
     unsafe fn get_block_ptr(&self, level_n: impl ConstInteger, level_index: usize) -> *const u8{
         struct V(usize);
         impl<M> Visitor<M> for V{
             type Out = *const u8;
+            #[inline(always)]
             fn visit<I: ConstInteger, L>(self, _: I, level: &L) -> Self::Out 
             where 
                 L: ILevel 
@@ -126,7 +120,7 @@ where
         self.levels.visit(level_n, V(level_index))
     }
     
-    #[inline]
+    #[inline(always)]
     unsafe fn get_block_mask(
         &self, 
         level_n: impl ConstInteger, 
@@ -135,6 +129,7 @@ where
         struct V(*const u8);
         impl<M> Visitor<M> for V{
             type Out = NonNull<M>;
+            #[inline(always)]
             fn visit<I: ConstInteger, L>(self, _: I, _: &L) -> Self::Out 
             where 
                 L: ILevel<Block: HiBlock<Mask=M>> 
@@ -148,7 +143,7 @@ where
         self.levels.visit(level_n, V(level_block_ptr)).as_ref()        
     }    
 
-    #[inline]
+    #[inline(always)]
     unsafe fn get_block_index(
         &self, 
         level_n: impl ConstInteger, 
@@ -158,6 +153,7 @@ where
         struct V(*const u8, usize);
         impl<M> Visitor<M> for V{
             type Out = usize;
+            #[inline(always)]
             fn visit<I: ConstInteger, L>(self, _: I, _: &L) -> Self::Out 
             where 
                 L: ILevel<Block: HiBlock> 
@@ -178,6 +174,7 @@ where
         struct V<LevelIndices>(LevelIndices);
         impl<LevelIndices: ConstArray<Item=usize>, M> FoldVisitor<M> for V<LevelIndices>{
             type Acc = usize;
+            #[inline(always)]
             fn visit<I: ConstInteger, L>(&mut self, i: I, level: &L, level_block_index: Self::Acc) 
                 -> Self::Acc 
             where 
@@ -226,6 +223,7 @@ where
             LevelIndices: Array<Item=usize>
         {
             type Acc = usize;
+            #[inline]
             fn visit<I: ConstInteger, L: ILevel>(&mut self, i: I, level: &mut L, level_index: usize) -> usize
             where
                 L::Block: HiBlock
@@ -240,6 +238,7 @@ where
                             struct Insert;
                             impl<M> MutVisitor<M> for Insert {
                                 type Out = usize;
+                                #[inline(always)]
                                 fn visit<I:ConstInteger, L: ILevel>(self, i: I, level: &mut L) -> usize {
                                     level.insert_empty_block()
                                 }
@@ -373,6 +372,7 @@ where
 {
     type This = SparseArray<Levels, DataLevel>;
 
+    #[inline]
     fn new(_: &Self::This) -> Self {
         Self{
             level_block_ptrs: Array::from_fn(|_|null()),
@@ -380,6 +380,7 @@ where
         }
     }
 
+    #[inline(always)]
     unsafe fn select_level_bock<'a, N: ConstInteger>(
         &mut self, this: &'a Self::This, level_n: N, level_index: usize
     )
@@ -417,6 +418,7 @@ where
         (mask, !level_block_index.is_zero())
     }
 
+    #[inline(always)]
     unsafe fn data_block<'a>(&self, this: &'a Self::This, level_index: usize)
         -> <Self::This as SparseHierarchy>::DataBlock<'a> 
     {

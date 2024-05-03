@@ -8,7 +8,7 @@ mod bit_utils;
 mod bool_type;
 mod bit_block;
 mod apply;
-//mod fold;
+mod fold;
 //mod empty;
 
 pub mod sparse_hierarchy;
@@ -28,7 +28,7 @@ pub use primitive_array::{Array, PrimitiveArray};
 pub use sparse_array::{SparseArray};
 pub use sparse_array_levels::SparseArrayLevels;
 pub use apply::{Apply, Op};
-//pub use fold::Fold;
+pub use fold::Fold;
 //pub use empty::Empty;
 
 
@@ -87,8 +87,9 @@ where
     Apply{op, s1, s2, phantom: PhantomData}
 }
 
-/*#[inline]
-pub fn fold<'a, Op, Init, ArrayIter, Array>(op: Op, init: &'a Init, array_iter: ArrayIter) -> Fold<'a, Op, Init, ArrayIter, Array>
+#[inline]
+pub fn fold<'a, Op, Init, ArrayIter, Array>(op: Op, init: &'a Init, array_iter: ArrayIter) 
+    -> Fold<'a, Op, Init, ArrayIter, Array>
 where
     Op: apply::Op,
     ArrayIter: Iterator<Item = &'a Array> + Clone,
@@ -98,7 +99,7 @@ where
     Fold{op, init, array_iter, phantom: PhantomData}
 }
 
-pub type Reduce<'a, Op, ArrayIter, Array> = Fold<'a, Op, Array, ArrayIter, Array>;
+/*pub type Reduce<'a, Op, ArrayIter, Array> = Fold<'a, Op, Array, ArrayIter, Array>;
 #[inline]
 pub fn reduce<'a, Op, ArrayIter, Array>(op: Op, mut array_iter: ArrayIter) -> Option<Reduce<'a, Op, ArrayIter, Array>>
 where

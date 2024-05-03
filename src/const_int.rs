@@ -12,6 +12,7 @@ pub trait ConstIntVisitor {
 }
 
 /// for from..to
+#[inline]
 pub fn const_for<V: ConstIntVisitor>(from: impl ConstInteger, to: impl ConstInteger, mut v: V)
      -> ControlFlow<V::Out>
 {
@@ -19,6 +20,7 @@ pub fn const_for<V: ConstIntVisitor>(from: impl ConstInteger, to: impl ConstInte
 }
 
 /// for (from..to).rev()
+#[inline]
 pub fn const_for_rev<V: ConstIntVisitor>(from: impl ConstInteger, to: impl ConstInteger, v: V)
      -> ControlFlow<V::Out>
 {
@@ -27,6 +29,7 @@ pub fn const_for_rev<V: ConstIntVisitor>(from: impl ConstInteger, to: impl Const
 
 trait ConstIntegerPrivate{
     /// const for from..N
+    #[inline(always)]
     fn iterate_as_range<V: ConstIntVisitor>(self, from: impl ConstInteger, visitor: &mut V)
        -> ControlFlow<V::Out>
     where
@@ -45,6 +48,7 @@ trait ConstIntegerPrivate{
     }
     
     /// const for (from..N).rev()
+    #[inline(always)]
     fn iterate_as_range_rev<V: ConstIntVisitor>(self, from: impl ConstInteger, mut visitor: V)
         -> ControlFlow<V::Out>
     where
@@ -71,6 +75,7 @@ pub trait ConstInteger: ConstIntegerPrivate + Default + Copy + Eq + Debug {
     const VALUE: usize;
     const DEFAULT: Self;
     
+    #[inline]
     fn value(self) -> usize {
         Self::VALUE
     }
@@ -78,16 +83,19 @@ pub trait ConstInteger: ConstIntegerPrivate + Default + Copy + Eq + Debug {
     /// Saturating decrement
     type SatDec: ConstInteger;
     /// Saturating decrement
+    #[inline]
     fn sat_dec(self) -> Self::Dec {
         Self::Dec::default()
     }
     
     type Dec: ConstInteger;
+    #[inline]
     fn dec(self) -> Self::Dec {
         Self::Dec::default()
     }
     
     type Inc: ConstInteger;
+    #[inline]
     fn inc(self) -> Self::Inc {
         Self::Inc::default()
     }
@@ -110,6 +118,7 @@ pub trait ConstInteger: ConstIntegerPrivate + Default + Copy + Eq + Debug {
 pub struct ConstInt<const N: usize>;
 
 impl<const N: usize> Default for ConstInt<N>{
+    #[inline]
     fn default() -> Self {
         if N == MAX{
             panic!()
@@ -127,12 +136,14 @@ impl<const N: usize> Debug for ConstInt<N> {
 macro_rules! gen_const_int {
     (first $i:literal) => {
         impl ConstIntegerPrivate for ConstInt<$i>{
+            #[inline]
             fn iterate_as_range<V: ConstIntVisitor>(self, from: impl ConstInteger, visitor: &mut V) 
                 -> ControlFlow<V::Out> 
             {
                 Continue(())
             }
             
+            #[inline]
             fn iterate_as_range_rev<V: ConstIntVisitor>(self, from: impl ConstInteger, visitor: V) 
                 -> ControlFlow<V::Out> 
             {

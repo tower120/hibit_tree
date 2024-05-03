@@ -1,11 +1,12 @@
+use std::any::Any;
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, BitOr, Mul};
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
-use hi_sparse_array::{apply, Apply, BitBlock, EmptyBitBlock, fold, IntoOwned, Op, reduce, Reduce, SparseArray};
+use hi_sparse_array::{apply, Apply, BitBlock, fold, IntoOwned, Op, SparseArray};
 use hi_sparse_array::level_block::{LevelBlock, Block};
 use hi_sparse_array::caching_iter::CachingBlockIter;
-use hi_sparse_array::level::{BypassLevel, Level};
+use hi_sparse_array::level::{Level, SingleBlockLevel};
 
 type Lvl0Block = Block<u64, [u8;64]>;
 type Lvl1Block = Block<u64, [u16;64]>;
@@ -20,6 +21,16 @@ impl BitAnd for DataBlock{
         Self(self.0 & rhs.0)
     }
 }
+
+impl BitAnd for &DataBlock{
+    type Output = DataBlock;
+
+    #[inline]
+    fn bitand(self, rhs: Self) -> Self::Output {
+        DataBlock(self.0 & rhs.0)
+    }
+}
+
 impl BitOr for DataBlock{
     type Output = Self;
 
@@ -46,52 +57,42 @@ impl LevelBlock for DataBlock{
     }
 }
 
-type BlockArray = SparseArray<Lvl0Block, Level<Lvl1Block>, BypassLevel/*Level<Lvl1Block>*/, Level<DataBlock>>;
+type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, Level<Lvl1Block>), Level<DataBlock>>;
 
 
-pub struct AndOp<L0, L1, L2, LD>(PhantomData<(L0, L1, L2, LD)>);
-impl<L0, L1, L2, LD> Default for AndOp<L0, L1, L2, LD>{
+pub struct AndOp<M, LD>(PhantomData<(M, LD)>);
+impl<M, LD> Default for AndOp<M, LD>{
     fn default() -> Self {
         Self(PhantomData)
     }
 } 
 
-impl<L0, L1, L2, LD> Op for AndOp<L0, L1, L2, LD>
+impl<M, LD> Op for AndOp<M, LD>
 where
-    L0: BitBlock + BitAnd<Output = L0>, 
-    L1: BitBlock + BitAnd<Output = L1>, 
-    L2: BitBlock + BitAnd<Output = L2>, 
-    LD: BitAnd<Output = LD>
+    M: BitBlock + BitAnd<Output = M>, 
+    LD: BitAnd<Output = LD> + LevelBlock,
+    for<'a> &'a LD: BitAnd<&'a LD, Output = LD>
 {
     const EXACT_HIERARCHY: bool = false;
     const SKIP_EMPTY_HIERARCHIES: bool = false;
      
-    type Level0Mask = L0;
+    type LevelMask = M;
     #[inline]
-    fn lvl0_op(&self, left: impl IntoOwned<L0>, right: impl IntoOwned<L0>) -> Self::Level0Mask {
+    fn lvl_op(&self, left: impl IntoOwned<M>, right: impl IntoOwned<M>) -> Self::LevelMask {
         left.into_owned() & right.into_owned()
     }
 
-    type Level1Mask = L1;
+    type DataBlockL = LD;
+    type DataBlockR = LD;
+    type DataBlockO = LD;
     #[inline]
-    fn lvl1_op(&self, left: impl IntoOwned<L1>, right: impl IntoOwned<L1>) -> Self::Level1Mask {
-        left.into_owned() & right.into_owned()
-    }
-    
-    type Level2Mask = L2;
-    #[inline]
-    fn lvl2_op(&self, left: impl IntoOwned<L2>, right: impl IntoOwned<L2>) -> Self::Level2Mask {
-        left.into_owned() & right.into_owned()
-    }
-
-    type DataBlock = LD;
-    #[inline]
-    fn data_op(&self, left: impl Borrow<LD> + IntoOwned<LD>, right: impl Borrow<LD> + IntoOwned<LD>) -> Self::DataBlock {
-        left.into_owned() & right.into_owned()
+    fn data_op(&self, left: impl Borrow<LD> + IntoOwned<LD>, right: impl Borrow<LD> + IntoOwned<LD>) -> Self::DataBlockO {
+        //left.into_owned() & right.into_owned()
+        left.borrow() & right.borrow()
     }
 }
 
-pub struct OrOp<L0, L1, L2, LD>(PhantomData<(L0, L1, L2, LD)>);
+/*pub struct OrOp<L0, L1, L2, LD>(PhantomData<(L0, L1, L2, LD)>);
 impl<L0, L1, L2, LD> Default for OrOp<L0, L1, L2, LD> {
     fn default() -> Self {
         Self(PhantomData)
@@ -132,11 +133,11 @@ where
         left.into_owned() | right.into_owned()
     }
 }
-
-fn fold_iter(list: &[BlockArray]) -> u64 {
-    let op: AndOp<u64, u64, EmptyBitBlock, DataBlock> = AndOp(PhantomData);
+*/
+fn fold_iter(list: &[BlockArray]) -> impl Any {
+    let op: AndOp<u64, DataBlock> = AndOp(PhantomData);
     
-    let init = unsafe{ list.get_unchecked(0) };
+    let init  = unsafe{ list.get_unchecked(0) };
     let other = unsafe{ list.get_unchecked(1..) };
     
     
@@ -164,7 +165,7 @@ fn fold_iter(list: &[BlockArray]) -> u64 {
 
 
 fn apply_iter(array1: &BlockArray, array2: &BlockArray) -> u64 {
-    let and_op: AndOp<u64, u64, EmptyBitBlock, DataBlock> = AndOp(PhantomData);
+    let and_op: AndOp<u64, DataBlock> = AndOp(PhantomData);
     let reduce: Apply<_, _, _, BlockArray, BlockArray> = apply(and_op, array1, array2);
     
     let mut s = 0;
@@ -187,7 +188,7 @@ pub fn bench_iter(c: &mut Criterion) {
         *block_array3.get_or_insert(i*20) = DataBlock(i as u64);
         *block_array4.get_or_insert(i*20) = DataBlock(i as u64);
     }
-    let arrays = [block_array1, block_array2, block_array3];
+    let arrays = [block_array1, block_array2/*, block_array3*/];
 
     c.bench_function("fold", |b| b.iter(|| fold_iter(black_box(&arrays))));
     c.bench_function("apply", |b| b.iter(|| apply_iter(black_box(&arrays[0]), black_box(&arrays[1]))));

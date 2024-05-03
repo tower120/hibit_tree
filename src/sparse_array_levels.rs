@@ -67,7 +67,7 @@ macro_rules! sparse_array_levels_impl {
             type LevelCount = ConstInt<$n>;       
             type Mask = <$first_t::Block as HiBlock>::Mask;
     
-            #[inline]
+            #[inline(always)]
             fn visit<I: ConstInteger, V: Visitor<Self::Mask>>(&self, i: I, mut visitor: V) -> V::Out {
                 match i.value() {
                     $(
@@ -77,7 +77,7 @@ macro_rules! sparse_array_levels_impl {
                 }
             }
             
-            #[inline]
+            #[inline(always)]
             fn visit_mut<I: ConstInteger, V: MutVisitor<Self::Mask>>(&mut self, i: I, mut visitor: V) -> V::Out {
                 match i.value() {
                     $(

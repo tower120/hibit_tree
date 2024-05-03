@@ -88,6 +88,7 @@ where
                 struct V<'b,'a,T: SparseHierarchy>(&'b mut CachingBlockIter<'a, T>); 
                 impl<'b,'a,T: SparseHierarchy> ConstIntVisitor for V<'b,'a,T> {
                     type Out = ();
+                    #[inline(always)]
                     fn visit<I: ConstInteger>(&mut self, i: I) -> ControlFlow<()> {
                         let level_iter = unsafe{
                             self.0

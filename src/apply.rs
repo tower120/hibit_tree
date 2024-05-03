@@ -123,7 +123,6 @@ where
     }
 
     type State = ApplyState<Op, B1, B2, T1, T2>;
-    //type State = DefaultState<Self>;
 }
 
 pub struct ApplyState<Op, B1, B2, T1, T2>
