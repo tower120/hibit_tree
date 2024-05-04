@@ -81,7 +81,7 @@ impl<T: Clone> IntoOwned<T> for &T{
 
 #[inline]
 pub fn apply<Op, B1, B2>(op: Op, s1: B1, s2: B2) -> Apply<Op, B1, B2>
-// TODO: more detail bounds?/ no bounds?
+// TODO: more detailed bounds?/ no bounds?
 /*where
     Op: apply::Op,
     B1: Borrowable<Borrowed: SparseHierarchy>,
@@ -96,13 +96,13 @@ pub fn apply<Op, B1, B2>(op: Op, s1: B1, s2: B2) -> Apply<Op, B1, B2>
 }
 
 #[inline]
-pub fn fold<'a, Op, Init, /*ArrayIter, */Array>(op: Op, init: &'a Init, array_iter: impl IntoIterator<Item = &'a Array>) 
-    -> Fold<'a, Op, Init,/* ArrayIter,*/ Array>
-where
+pub fn fold<Op, Init, Array>(op: Op, init: Init, array_iter: impl IntoIterator<Item = Array>) 
+    -> Fold<Op, Init, Array>
+/*where
     Op: apply::Op,
     //ArrayIter: Iterator<Item = &'a Array> + Clone,
     Array: SparseHierarchy,
-    Init: SparseHierarchy,
+    Init: SparseHierarchy,*/
 {
     let arrays = array_iter.into_iter().collect(); 
     Fold{

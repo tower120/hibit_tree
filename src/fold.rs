@@ -1,42 +1,41 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use arrayvec::ArrayVec;
-use crate::{BitBlock, IntoOwned, primitive_array};
+use crate::{BitBlock, Borrowable, IntoOwned, primitive_array};
 use crate::const_int::ConstInteger;
 use crate::level_block::LevelBlock;
 use crate::primitive_array::{ConstArray, ConstArrayType};
 use crate::sparse_hierarchy::{DefaultState, SparseHierarchy, SparseHierarchyState};
 
 // TODO: We can go without ArrayIter being Clone!
-pub struct Fold<'a, Op, Init, /*ArrayIter, */Array>{
+pub struct Fold<Op, Init, Array>{
     pub(crate) op: Op,
-    pub(crate) init: &'a Init,
-    pub(crate) arrays: ArrayVec<&'a Array, N>,
-    //pub(crate) array_iter: ArrayIter,
-    //pub(crate) phantom: PhantomData<&'a Array>,
+    pub(crate) init: Init,
+    pub(crate) arrays: ArrayVec<Array, N>,
 }
 
-impl<'a, Op, Init, /*ArrayIter, */Array> SparseHierarchy for Fold<'a, Op, Init, /*ArrayIter, */Array>
+impl<Op, Init, Array> SparseHierarchy for Fold<Op, Init, Array>
 where
-    Init: SparseHierarchy<
-        LevelCount    = Array::LevelCount,
-        LevelMaskType = Array::LevelMaskType,
+    Init: Borrowable< 
+        Borrowed: SparseHierarchy<
+            LevelCount    = <Array::Borrowed as SparseHierarchy>::LevelCount,
+            LevelMaskType = <Array::Borrowed as SparseHierarchy>::LevelMaskType,
+        >
     >,
 
-    //ArrayIter: Iterator<Item = &'a Array> + Clone,
-    Array: SparseHierarchy,
+    Array: Borrowable<Borrowed:SparseHierarchy>,
 
     Op: crate::apply::Op<
-        LevelMask = Array::LevelMaskType,
-        DataBlockL = Init::DataBlockType,
-        DataBlockR = Array::DataBlockType,
-        DataBlockO = Init::DataBlockType,
+        LevelMask = <Array::Borrowed as SparseHierarchy>::LevelMaskType,
+        DataBlockL = <Init::Borrowed as SparseHierarchy>::DataBlockType,
+        DataBlockR = <Array::Borrowed as SparseHierarchy>::DataBlockType,
+        DataBlockO = <Init::Borrowed as SparseHierarchy>::DataBlockType,
     >,
 {
     const EXACT_HIERARCHY: bool = Op::EXACT_HIERARCHY;
-    type LevelCount = Array::LevelCount;
+    type LevelCount = <Array::Borrowed as SparseHierarchy>::LevelCount;
 
-    type LevelMaskType = Array::LevelMaskType;
+    type LevelMaskType = <Array::Borrowed as SparseHierarchy>::LevelMaskType;
     type LevelMask<'b> = Self::LevelMaskType where Self: 'b;
 
     #[inline]
@@ -47,9 +46,9 @@ where
         //self.array_iter.clone()
         self.arrays.iter()
             .fold(
-            self.init.level_mask(level_indices).into_owned(), 
+            self.init.borrow().level_mask(level_indices).into_owned(), 
             |acc, array|{
-                self.op.lvl_op(acc, array.level_mask(level_indices))
+                self.op.lvl_op(acc, array.borrow().level_mask(level_indices))
             }
         )
     }
@@ -65,9 +64,9 @@ where
         //self.array_iter
         self.arrays.iter()
             .clone().fold(
-            self.init.data_block(level_indices).into_owned(), 
+            self.init.borrow().data_block(level_indices).into_owned(), 
             |acc, array|{
-                self.op.data_op(acc, array.data_block(level_indices))
+                self.op.data_op(acc, array.borrow().data_block(level_indices))
             }
         )
     }
@@ -77,12 +76,12 @@ where
         <Op::DataBlockO as LevelBlock>::empty()
     }
 
-    type State = FoldState<'a, Op, Init, /*ArrayIter, */Array>;
-    //type State = DefaultState<Self>;
+    //type State = FoldState<'a, Op, Init, /*ArrayIter, */Array>;
+    type State = DefaultState<Self>;
 }
 
 const N: usize = 32;
-
+/*
 pub struct FoldState<'a, Op, Init, /*ArrayIter,*/ Array>
 where
     Init: SparseHierarchy,
@@ -214,4 +213,4 @@ where
         
         acc
     }    
-}
+}*/
