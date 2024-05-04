@@ -3,6 +3,7 @@ use std::ops::ControlFlow;
 use std::ops::ControlFlow::Continue;
 use std::ptr::{NonNull, null};
 use crate::bit_block::BitBlock;
+use crate::Borrowable;
 use crate::level_block::HiBlock;
 use crate::level::{ILevel, Level};
 use crate::sparse_hierarchy::{DefaultState, SparseHierarchy, SparseHierarchyState};
@@ -440,4 +441,11 @@ where
         let data_block_index = this.get_block_index(last_level_index, level_block_ptr, level_index);
         this.data.blocks().get_unchecked(data_block_index)
     }
+}
+
+impl<Levels, DataLevel> Borrowable for SparseArray<Levels, DataLevel>{
+    type Borrowed = SparseArray<Levels, DataLevel>; 
+}
+impl<Levels, DataLevel> Borrowable for &SparseArray<Levels, DataLevel>{
+    type Borrowed = SparseArray<Levels, DataLevel>; 
 }

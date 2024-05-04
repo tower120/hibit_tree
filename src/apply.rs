@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use crate::bit_block::BitBlock;
-use crate::{SparseHierarchy, IntoOwned};
+use crate::{SparseHierarchy, IntoOwned, Borrowable};
 use crate::const_int::ConstInteger;
 use crate::level_block::LevelBlock;
 use crate::primitive_array::ConstArray;
@@ -58,35 +58,32 @@ pub trait Op {
     ) -> Self::DataBlockO;
 }
 
-pub struct Apply<Op, B1, B2, T1, T2>{
+pub struct Apply<Op, B1, B2>{
     pub(crate) op: Op,
     pub(crate) s1: B1,
     pub(crate) s2: B2,
-    pub(crate) phantom: PhantomData<(T1, T2)>,
 }
 
-impl<Op, B1, B2, T1, T2> SparseHierarchy for Apply<Op, B1, B2, T1, T2>
+impl<Op, B1, B2> SparseHierarchy for Apply<Op, B1, B2>
 where
-    B1: Borrow<T1>,
-    B2: Borrow<T2>,
-
-    T1: SparseHierarchy,
-
-    T2: SparseHierarchy<
-        LevelCount    = T1::LevelCount,
-        LevelMaskType = T1::LevelMaskType,
+    B1: Borrowable<Borrowed: SparseHierarchy>,
+    B2: Borrowable<
+        Borrowed: SparseHierarchy<
+            LevelCount    = <B1::Borrowed as SparseHierarchy>::LevelCount,
+            LevelMaskType = <B1::Borrowed as SparseHierarchy>::LevelMaskType,
+        >
     >,
 
     Op: self::Op<
-        LevelMask  = T1::LevelMaskType,
-        DataBlockL = T1::DataBlockType,
-        DataBlockR = T2::DataBlockType,
+        LevelMask  = <B1::Borrowed as SparseHierarchy>::LevelMaskType,
+        DataBlockL = <B1::Borrowed as SparseHierarchy>::DataBlockType,
+        DataBlockR = <B2::Borrowed as SparseHierarchy>::DataBlockType,
     >
 {
-    type LevelCount = T1::LevelCount;
     const EXACT_HIERARCHY: bool = Op::EXACT_HIERARCHY;
+    type LevelCount = <B1::Borrowed as SparseHierarchy>::LevelCount;
 
-    type LevelMaskType = T1::LevelMaskType;
+    type LevelMaskType = <B1::Borrowed as SparseHierarchy>::LevelMaskType;
     type LevelMask<'a> = Self::LevelMaskType where Self:'a;
     #[inline]
     unsafe fn level_mask<I>(&self, level_indices: I)
@@ -122,38 +119,36 @@ where
         <Op::DataBlockO as LevelBlock>::empty()
     }
 
-    type State = ApplyState<Op, B1, B2, T1, T2>;
+    type State = ApplyState<Op, B1, B2>;
 }
 
-pub struct ApplyState<Op, B1, B2, T1, T2>
+pub struct ApplyState<Op, B1, B2>
 where
-    T1: SparseHierarchy,
-    T2: SparseHierarchy,
+    B1: Borrowable<Borrowed: SparseHierarchy>,
+    B2: Borrowable<Borrowed: SparseHierarchy>,
 {
-    s1: T1::State, 
-    s2: T2::State,
-    phantom_data: PhantomData<Apply<Op, B1, B2, T1, T2>>
+    s1: <B1::Borrowed as SparseHierarchy>::State, 
+    s2: <B2::Borrowed as SparseHierarchy>::State,
+    phantom_data: PhantomData<Apply<Op, B1, B2>>
 }
 
-impl<Op, B1, B2, T1, T2> SparseHierarchyState for ApplyState<Op, B1, B2, T1, T2>
+impl<Op, B1, B2> SparseHierarchyState for ApplyState<Op, B1, B2>
 where
-    B1: Borrow<T1>,
-    B2: Borrow<T2>,
-
-    T1: SparseHierarchy,
-
-    T2: SparseHierarchy<
-        LevelCount    = T1::LevelCount,
-        LevelMaskType = T1::LevelMaskType,
+    B1: Borrowable<Borrowed: SparseHierarchy>,
+    B2: Borrowable<
+        Borrowed: SparseHierarchy<
+            LevelCount    = <B1::Borrowed as SparseHierarchy>::LevelCount,
+            LevelMaskType = <B1::Borrowed as SparseHierarchy>::LevelMaskType,
+        >
     >,
 
     Op: self::Op<
-        LevelMask  = T1::LevelMaskType,
-        DataBlockL = T1::DataBlockType,
-        DataBlockR = T2::DataBlockType,
+        LevelMask  = <B1::Borrowed as SparseHierarchy>::LevelMaskType,
+        DataBlockL = <B1::Borrowed as SparseHierarchy>::DataBlockType,
+        DataBlockR = <B2::Borrowed as SparseHierarchy>::DataBlockType,
     >
 {
-    type This = Apply<Op, B1, B2, T1, T2>;
+    type This = Apply<Op, B1, B2>;
 
     #[inline]
     fn new(this: &Self::This) -> Self {
@@ -192,4 +187,11 @@ where
         );
         this.op.data_op(m0, m1)        
     }
+}
+
+impl<Op, B1, B2> Borrowable for Apply<Op, B1, B2>{ 
+    type Borrowed = Apply<Op, B1, B2>; 
+}
+impl<Op, B1, B2> Borrowable for &Apply<Op, B1, B2>{ 
+    type Borrowed = Apply<Op, B1, B2>; 
 }

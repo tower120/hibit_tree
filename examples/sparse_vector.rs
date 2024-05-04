@@ -3,12 +3,10 @@ use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
 use wide::f32x4;
 use hi_sparse_array::{Apply, apply, BitBlock, Op, IntoOwned};
-use hi_sparse_array::bit_queue::EmptyBitQueue;
 use hi_sparse_array::level_block::{LevelBlock, Block};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::level::{Level, SingleBlockLevel};
 use hi_sparse_array::sparse_hierarchy::SparseHierarchy;
-//use hi_sparse_array::simple_iter::SimpleBlockIter;
 
 #[derive(Clone)]
 struct DataBlock(f32x4);
@@ -45,8 +43,10 @@ impl LevelBlock for DataBlock{
 type Lvl0Block = Block<u64, [u8; 64]>;
 type Lvl1Block = Block<u64, [u16; 64]>;
 type SparseArray = hi_sparse_array::SparseArray<
-    (SingleBlockLevel<Lvl0Block>,),
-    //Level<Lvl1Block>,
+    (
+        SingleBlockLevel<Lvl0Block>,
+        //Level<Lvl1Block>,
+    ),
     Level<DataBlock>
 >;
 
@@ -100,13 +100,12 @@ where
 // TODO: should be lazy in all ways.
 /// Per-element multiplication
 pub fn mul<'a>(v1: &'a SparseVector, v2: &'a SparseVector) 
-    -> Apply<
+    -> /*Apply<
         MulOp<u64, DataBlock>, 
         &'a SparseArray, 
         &'a SparseArray,
-        SparseArray,
-        SparseArray
-    >
+    >*/
+    impl SparseHierarchy<DataBlockType=DataBlock> + 'a
 {
     apply(
         MulOp::default(),
@@ -117,12 +116,10 @@ pub fn mul<'a>(v1: &'a SparseVector, v2: &'a SparseVector)
 
 pub fn dot(v1: &SparseVector, v2: &SparseVector) -> f32 {
     let m = mul(v1, v2);
-    let iter =
-        CachingBlockIter::new(&m);
-        //SimpleBlockIter::new(&m);
+    let iter = CachingBlockIter::new(&m);
     let mut sum = f32x4::ZERO;
     iter.for_each(|(index, block)|{
-        sum += block.0;
+        sum += block.borrow().0;
     });
     sum.reduce_add()
 }

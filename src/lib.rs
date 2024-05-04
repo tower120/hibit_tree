@@ -19,9 +19,11 @@ pub mod caching_iter;
 pub mod level;
 pub mod level_block;
 pub mod const_int;
+mod borrowable;
 
 
 //pub use ref_or_val::*;
+pub use borrowable::*;
 pub use bit_block::BitBlock;
 pub use primitive::Primitive;
 pub use primitive_array::{Array, PrimitiveArray};
@@ -78,13 +80,19 @@ impl<T: Clone> IntoOwned<T> for &T{
 }
 
 #[inline]
-pub fn apply<Op, B1, B2, T1, T2>(op: Op, s1: B1, s2: B2) -> Apply<Op, B1, B2, T1, T2>
-where
+pub fn apply<Op, B1, B2>(op: Op, s1: B1, s2: B2) -> Apply<Op, B1, B2>
+// TODO: more detail bounds?/ no bounds?
+/*where
     Op: apply::Op,
-    B1: Borrow<T1>,
-    B2: Borrow<T2>,
+    B1: Borrowable<Borrowed: SparseHierarchy>,
+    B2: Borrowable<
+        Borrowed: SparseHierarchy<
+            LevelCount    = <B1::Borrowed as SparseHierarchy>::LevelCount,
+            LevelMaskType = <B1::Borrowed as SparseHierarchy>::LevelMaskType,
+        >
+    >,*/
 {
-    Apply{op, s1, s2, phantom: PhantomData}
+    Apply{op, s1, s2}
 }
 
 #[inline]
