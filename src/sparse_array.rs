@@ -357,6 +357,8 @@ where
 {
     /// [*const u8; Levels::LevelCount-1]
     /// 
+    /// *const u8 - points to LevelBlock in heap.
+    /// 
     /// Level0 skipped - we can get it from self/this.
     level_block_ptrs: ConstArrayType<
         *const u8, 

@@ -88,15 +88,20 @@ where
 }
 
 #[inline]
-pub fn fold<'a, Op, Init, ArrayIter, Array>(op: Op, init: &'a Init, array_iter: ArrayIter) 
-    -> Fold<'a, Op, Init, ArrayIter, Array>
+pub fn fold<'a, Op, Init, /*ArrayIter, */Array>(op: Op, init: &'a Init, array_iter: impl IntoIterator<Item = &'a Array>) 
+    -> Fold<'a, Op, Init,/* ArrayIter,*/ Array>
 where
     Op: apply::Op,
-    ArrayIter: Iterator<Item = &'a Array> + Clone,
+    //ArrayIter: Iterator<Item = &'a Array> + Clone,
     Array: SparseHierarchy,
     Init: SparseHierarchy,
 {
-    Fold{op, init, array_iter, phantom: PhantomData}
+    let arrays = array_iter.into_iter().collect(); 
+    Fold{
+        op, init,
+        arrays
+        //array_iter, phantom: PhantomData
+    }
 }
 
 /*pub type Reduce<'a, Op, ArrayIter, Array> = Fold<'a, Op, Array, ArrayIter, Array>;

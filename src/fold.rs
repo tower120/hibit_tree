@@ -8,22 +8,22 @@ use crate::primitive_array::{ConstArray, ConstArrayType};
 use crate::sparse_hierarchy::{DefaultState, SparseHierarchy, SparseHierarchyState};
 
 // TODO: We can go without ArrayIter being Clone!
-// TODO: try to remove Array generic arg, looks like we have it already in ArrayIter
-pub struct Fold<'a, Op, Init, ArrayIter, Array>{
+pub struct Fold<'a, Op, Init, /*ArrayIter, */Array>{
     pub(crate) op: Op,
     pub(crate) init: &'a Init,
-    pub(crate) array_iter: ArrayIter,
-    pub(crate) phantom: PhantomData<&'a Array>,
+    pub(crate) arrays: ArrayVec<&'a Array, N>,
+    //pub(crate) array_iter: ArrayIter,
+    //pub(crate) phantom: PhantomData<&'a Array>,
 }
 
-impl<'a, Op, Init, ArrayIter, Array> SparseHierarchy for Fold<'a, Op, Init, ArrayIter, Array>
+impl<'a, Op, Init, /*ArrayIter, */Array> SparseHierarchy for Fold<'a, Op, Init, /*ArrayIter, */Array>
 where
     Init: SparseHierarchy<
         LevelCount    = Array::LevelCount,
         LevelMaskType = Array::LevelMaskType,
     >,
 
-    ArrayIter: Iterator<Item = &'a Array> + Clone,
+    //ArrayIter: Iterator<Item = &'a Array> + Clone,
     Array: SparseHierarchy,
 
     Op: crate::apply::Op<
@@ -44,7 +44,9 @@ where
     where 
         I: ConstArray<Item=usize> + Copy
     {
-        self.array_iter.clone().fold(
+        //self.array_iter.clone()
+        self.arrays.iter()
+            .fold(
             self.init.level_mask(level_indices).into_owned(), 
             |acc, array|{
                 self.op.lvl_op(acc, array.level_mask(level_indices))
@@ -60,7 +62,9 @@ where
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
     {
-        self.array_iter.clone().fold(
+        //self.array_iter
+        self.arrays.iter()
+            .clone().fold(
             self.init.data_block(level_indices).into_owned(), 
             |acc, array|{
                 self.op.data_op(acc, array.data_block(level_indices))
@@ -73,12 +77,13 @@ where
         <Op::DataBlockO as LevelBlock>::empty()
     }
 
-    type State = FoldState<'a, Op, Init, ArrayIter, Array>;
+    type State = FoldState<'a, Op, Init, /*ArrayIter, */Array>;
+    //type State = DefaultState<Self>;
 }
 
 const N: usize = 32;
 
-pub struct FoldState<'a, Op, Init, ArrayIter, Array>
+pub struct FoldState<'a, Op, Init, /*ArrayIter,*/ Array>
 where
     Init: SparseHierarchy,
     Array: SparseHierarchy,
@@ -89,7 +94,8 @@ where
     >,
 {
     init_state: Init::State,
-    states: ArrayVec<(&'a Array, Array::State), N>,
+    // TODO: len inside of ArrayVecs unnecessary, since we have it in Fold 
+    states: ArrayVec</*(&'a Array,*/ Array::State/*)*/, N>,
     
     // TODO: ZST when not in use 
     /// In-use only when `Op::SKIP_EMPTY_HIERARCHIES` raised.
@@ -100,19 +106,19 @@ where
         <Array::LevelCount as ConstInteger>::Dec
     >,
     
-    phantom_data: PhantomData<Fold<'a, Op, Init, ArrayIter, Array>>
+    phantom_data: PhantomData<Fold<'a, Op, Init, /*ArrayIter, */Array>>
 }
 
-impl<'a, Op, Init, ArrayIter, Array> SparseHierarchyState 
+impl<'a, Op, Init, /*ArrayIter, */Array> SparseHierarchyState 
 for 
-    FoldState<'a, Op, Init, ArrayIter, Array>
+    FoldState<'a, Op, Init, /*ArrayIter,*/ Array>
 where
     Init: SparseHierarchy<
         LevelCount    = Array::LevelCount,
         LevelMaskType = Array::LevelMaskType,
     >,
 
-    ArrayIter: Iterator<Item = &'a Array> + Clone,
+    // ArrayIter: Iterator<Item = &'a Array> + Clone,
     Array: SparseHierarchy,
 
     Op: crate::apply::Op<
@@ -122,13 +128,18 @@ where
         DataBlockO = Init::DataBlockType,
     >,
 {
-    type This = Fold<'a, Op, Init, ArrayIter, Array>;
+    type This = Fold<'a, Op, Init, /*ArrayIter, */Array>;
 
     #[inline]
     fn new(this: &Self::This) -> Self {
-        let states = ArrayVec::from_iter(
+        /*let states = ArrayVec::from_iter(
             this.array_iter.clone()
                 .map(|array| (array, SparseHierarchyState::new(array)))
+        );*/
+        
+        let states = ArrayVec::from_iter(
+            this.arrays.iter()
+                .map(|&array| SparseHierarchyState::new(array))
         );
         
         Self{
@@ -149,7 +160,8 @@ where
         if Op::SKIP_EMPTY_HIERARCHIES
         && N::VALUE != 0 
         {
-            let lvl_non_empty_states = self.lvls_non_empty_states.as_mut().get_unchecked_mut(level_n.value()-1); 
+            todo!()
+            /*let lvl_non_empty_states = self.lvls_non_empty_states.as_mut().get_unchecked_mut(level_n.value()-1); 
             lvl_non_empty_states.clear();
             for i in 0..self.states.len(){
                 let (array, array_state) = self.states.get_unchecked_mut(i);
@@ -159,9 +171,13 @@ where
                 if v{
                     lvl_non_empty_states.push_unchecked(i);
                 }
-            }
+            }*/
         } else {
-            for (array, array_state) in self.states.iter_mut(){
+            //for (array, array_state) in self.states.iter_mut(){
+            for i in 0..this.arrays.len(){
+                let array = this.arrays.get_unchecked(i);
+                let array_state = self.states.get_unchecked_mut(i);
+            
                 let (mask, _) = array_state.select_level_bock(array, level_n, level_index);
                 acc_mask = this.op.lvl_op(acc_mask, mask);
             }
@@ -178,14 +194,19 @@ where
         let mut acc = self.init_state.data_block(this.init.borrow(), level_index).into_owned();
         
         if Op::SKIP_EMPTY_HIERARCHIES {
-            let lvl_non_empty_states = self.lvls_non_empty_states.as_ref().last().unwrap_unchecked();
+            todo!()
+            /*let lvl_non_empty_states = self.lvls_non_empty_states.as_ref().last().unwrap_unchecked();
             for &i in lvl_non_empty_states {
                 let (array, array_state) = self.states.get_unchecked(i);
                 let data = array_state.data_block(array, level_index);
                 acc = this.op.data_op(acc, data);
-            }
+            }*/
         } else {
-            for (array, array_state) in &self.states {
+            //for (array, array_state) in &self.states {
+            for i in 0..this.arrays.len(){
+                let array = this.arrays.get_unchecked(i);
+                let array_state = self.states.get_unchecked(i);
+            
                 let data = array_state.data_block(array, level_index);
                 acc = this.op.data_op(acc, data);
             }
