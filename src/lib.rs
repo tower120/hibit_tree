@@ -1,11 +1,11 @@
 #![feature(associated_type_bounds)]
 
+mod borrowable;
 mod primitive;
 mod primitive_array;
 mod sparse_array;
 mod sparse_array_levels;
 mod bit_utils;
-mod bool_type;
 mod bit_block;
 mod apply;
 mod fold;
@@ -18,8 +18,7 @@ pub mod caching_iter;
 //mod ref_or_val;
 pub mod level;
 pub mod level_block;
-pub mod const_int;
-mod borrowable;
+pub mod const_utils;
 
 
 //pub use ref_or_val::*;
@@ -37,9 +36,8 @@ pub use fold::Fold;
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::ControlFlow;
-use bool_type::BoolType;
 use sparse_hierarchy::SparseHierarchy;
-use crate::const_int::{const_for, ConstInt, ConstInteger, ConstIntVisitor};
+use crate::const_utils::const_int::{const_for, ConstInt, ConstInteger, ConstIntVisitor};
 //use crate::primitive_array::Array;
 //use crate::sparse_hierarchy::{level_bypass, LevelBypass};
 

@@ -1,5 +1,5 @@
 use crate::BitBlock;
-use crate::const_int::{ConstInt, ConstInteger};
+use crate::const_utils::const_int::{ConstInt, ConstInteger};
 use crate::level::ILevel;
 use crate::level_block::HiBlock;
 

@@ -6,6 +6,7 @@ use criterion::{black_box, Criterion, criterion_group, criterion_main};
 use hi_sparse_array::{apply, Apply, BitBlock, fold, IntoOwned, Op, SparseArray};
 use hi_sparse_array::level_block::{LevelBlock, Block};
 use hi_sparse_array::caching_iter::CachingBlockIter;
+use hi_sparse_array::const_utils::ConstFalse;
 use hi_sparse_array::level::{Level, SingleBlockLevel};
 
 type Lvl0Block = Block<u64, [u8;64]>;
@@ -74,7 +75,7 @@ where
     for<'a> &'a LD: BitAnd<&'a LD, Output = LD>
 {
     const EXACT_HIERARCHY: bool = false;
-    const SKIP_EMPTY_HIERARCHIES: bool = false;
+    type SKIP_EMPTY_HIERARCHIES = ConstFalse;
      
     type LevelMask = M;
     #[inline]

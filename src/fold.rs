@@ -2,9 +2,10 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use arrayvec::ArrayVec;
 use crate::{BitBlock, Borrowable, IntoOwned, primitive_array};
-use crate::const_int::ConstInteger;
+use crate::const_utils::const_bool::ConstBool;
+use crate::const_utils::const_int::ConstInteger;
+use crate::const_utils::const_array::{ConstArray, ConstArrayType};
 use crate::level_block::LevelBlock;
-use crate::primitive_array::{ConstArray, ConstArrayType};
 use crate::sparse_hierarchy::{DefaultState, SparseHierarchy, SparseHierarchyState};
 
 // TODO: We can go without ArrayIter being Clone!
@@ -149,7 +150,7 @@ where
         let (acc_mask, _) = self.init_state.select_level_bock(this.init.borrow(), level_n, level_index);
         let mut acc_mask = acc_mask.into_owned();
         
-        if Op::SKIP_EMPTY_HIERARCHIES
+        if Op::SKIP_EMPTY_HIERARCHIES::VALUE
         && N::VALUE != 0 
         {
             let lvl_non_empty_states = self.lvls_non_empty_states.as_mut()
@@ -185,7 +186,7 @@ where
     {
         let mut acc = self.init_state.data_block(this.init.borrow(), level_index).into_owned();
         
-        if Op::SKIP_EMPTY_HIERARCHIES {
+        if Op::SKIP_EMPTY_HIERARCHIES::VALUE {
             let lvl_non_empty_states = self.lvls_non_empty_states.as_ref()
                                        .last().unwrap_unchecked();
             for &i in lvl_non_empty_states {

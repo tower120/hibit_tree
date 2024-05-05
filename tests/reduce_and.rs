@@ -4,6 +4,7 @@ use std::ops::{BitAnd, Mul};
 use hi_sparse_array::{BitBlock, fold, IntoOwned, Op, /*reduce, Reduce, */SparseArray};
 use hi_sparse_array::level_block::{LevelBlock, Block, SmallBlock, ClusterBlock};
 use hi_sparse_array::caching_iter::CachingBlockIter;
+use hi_sparse_array::const_utils::ConstTrue;
 use hi_sparse_array::level::{Level, SingleBlockLevel};
 
 type Lvl0Block = Block<u64, [u8;64]>;
@@ -53,7 +54,7 @@ where
     LD: BitAnd<Output = LD> + LevelBlock
 {
     const EXACT_HIERARCHY: bool = false;
-    const SKIP_EMPTY_HIERARCHIES: bool = true;
+    type SKIP_EMPTY_HIERARCHIES = ConstTrue;
     
     type LevelMask = M;
     fn lvl_op(&self, left: impl IntoOwned<M>, right: impl IntoOwned<M>) -> Self::LevelMask {

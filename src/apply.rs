@@ -2,9 +2,10 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use crate::bit_block::BitBlock;
 use crate::{SparseHierarchy, IntoOwned, Borrowable};
-use crate::const_int::ConstInteger;
+use crate::const_utils::const_bool::ConstBool;
+use crate::const_utils::const_int::ConstInteger;
+use crate::const_utils::const_array::ConstArray;
 use crate::level_block::LevelBlock;
-use crate::primitive_array::ConstArray;
 use crate::sparse_hierarchy::{DefaultState, SparseHierarchyState};
 
 // TODO: move out from apply.
@@ -40,7 +41,7 @@ pub trait Op {
     /// Notice though, that such thing cannot happen with intersection. 
     /// So trying to apply such optimization there, would be a waste of resources.   
     /// 
-    const SKIP_EMPTY_HIERARCHIES: bool;
+    type SKIP_EMPTY_HIERARCHIES: ConstBool;
     
     type LevelMask: BitBlock;
     fn lvl_op(&self,

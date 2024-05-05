@@ -5,6 +5,7 @@ use wide::f32x4;
 use hi_sparse_array::{Apply, apply, BitBlock, Op, IntoOwned};
 use hi_sparse_array::level_block::{LevelBlock, Block};
 use hi_sparse_array::caching_iter::CachingBlockIter;
+use hi_sparse_array::const_utils::ConstFalse;
 use hi_sparse_array::level::{Level, SingleBlockLevel};
 use hi_sparse_array::sparse_hierarchy::SparseHierarchy;
 
@@ -82,7 +83,7 @@ where
     D: Mul<Output = D> + LevelBlock
 {
     const EXACT_HIERARCHY: bool = false;
-    const SKIP_EMPTY_HIERARCHIES: bool = false;
+    type SKIP_EMPTY_HIERARCHIES = ConstFalse;
     
     type LevelMask = M;
     fn lvl_op(&self, left: impl IntoOwned<M>, right: impl IntoOwned<M>) -> Self::LevelMask {

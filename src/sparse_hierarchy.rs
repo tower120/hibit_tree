@@ -2,9 +2,9 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use crate::{Array, BitBlock, IntoOwned, PrimitiveArray};
 use crate::sparse_array::level_indices;
-use crate::const_int::ConstInteger;
+use crate::const_utils::const_int::ConstInteger;
+use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
 use crate::level_block::LevelBlock;
-use crate::primitive_array::{ConstArray, ConstArrayType, ConstPrimitiveArrayType};
 
 /// 
 /// TODO: Change description
@@ -92,7 +92,7 @@ pub trait SparseHierarchy {
     ///
     /// `index` must be in [max_range].
     #[inline]
-    unsafe fn get_unchecked(&self, index: usize) -> Self::DataBlock<'_>{
+    unsafe fn get_unchecked(&self, index: usize) -> Self::DataBlock<'_> {
         let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
         self.data_block(indices)
     }
@@ -223,7 +223,7 @@ impl<This: SparseHierarchy> SparseHierarchyState for DefaultState<This>{
             self.level_indices.as_mut()[level_n.dec().value()] = level_index;
         }
         
-        let indices: ConstPrimitiveArrayType<usize, N> 
+        let indices: ConstCopyArrayType<usize, N> 
             = Array::from_fn(|/*const*/ i| {
                 if /*const*/ N::VALUE-1 == i {
                     level_index
@@ -240,7 +240,7 @@ impl<This: SparseHierarchy> SparseHierarchyState for DefaultState<This>{
     unsafe fn data_block<'a>(&self, this: &'a Self::This, level_index: usize) 
         -> <Self::This as SparseHierarchy>::DataBlock<'a> 
     {
-        let indices: ConstPrimitiveArrayType<usize, This::LevelCount> 
+        let indices: ConstCopyArrayType<usize, This::LevelCount> 
             = Array::from_fn(|/*const*/ i| {
                 if /*const*/ This::LevelCount::VALUE-1 == i {
                     level_index

@@ -7,22 +7,23 @@ use crate::Borrowable;
 use crate::level_block::HiBlock;
 use crate::level::{ILevel, Level};
 use crate::sparse_hierarchy::{DefaultState, SparseHierarchy, SparseHierarchyState};
-use crate::const_int::{const_for, ConstInt, ConstInteger, ConstIntVisitor};
+use crate::const_utils::const_int::{const_for, ConstInt, ConstInteger, ConstIntVisitor};
+use crate::const_utils::const_array::{ConstArray, ConstArrayType, /* ConstPrimitiveArray, */ConstCopyArrayType};
 use crate::primitive::Primitive;
-use crate::primitive_array::{Array, ConstArray, ConstArrayType,/* ConstPrimitiveArray, */ConstPrimitiveArrayType};
+use crate::primitive_array::{Array};
 use crate::sparse_array_levels::{FoldMutVisitor, FoldVisitor, MutVisitor, SparseArrayLevels, Visitor};
 
 // TODO: make public
 // Compile-time loop inside. Ends up with N (AND + SHR)s.
 #[inline]
 pub(crate) fn level_indices<LevelMask, LevelsCount>(index: usize)
-     -> ConstPrimitiveArrayType<usize, LevelsCount>
+     -> ConstCopyArrayType<usize, LevelsCount>
 where
     LevelMask: BitBlock,
     LevelsCount: ConstInteger,
 {
     // TODO: need uninit?
-    let mut level_indices = ConstPrimitiveArrayType::<usize, LevelsCount>::from_fn(|_|0);
+    let mut level_indices = ConstCopyArrayType::<usize, LevelsCount>::from_fn(|_|0);
     
     let mut level_remainder = index;
     let level_count = LevelsCount::VALUE;

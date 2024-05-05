@@ -2,7 +2,6 @@
 
 use std::{array, mem, ptr};
 use std::mem::{ManuallyDrop, MaybeUninit};
-use crate::const_int::{ConstInt, ConstInteger};
 use crate::primitive::Primitive;
 
 /// [Item; CAP]
@@ -60,50 +59,4 @@ pub trait PrimitiveArray: Array<Item: Primitive, UninitArray: Copy> + Copy {}
 impl<T: Array<Item: Primitive, UninitArray: Copy> + Copy> PrimitiveArray for T {}
 
 pub trait UninitPrimitiveArray: UninitArray<UninitItem: Primitive> + Copy{}
-impl <T: UninitPrimitiveArray + Copy> UninitPrimitiveArray for T{} 
-
-
-/// [ConstInteger]-sized [Array]. 
-pub trait ConstArray: Array {
-    type Cap: ConstInteger;
-    
-    /// Self array decremented in size.
-    type DecArray: ConstArray<Item=Self::Item, Cap=<Self::Cap as ConstInteger>::Dec>;  
-    fn split_last(self) -> (Self::DecArray, Self::Item);
-}
-
-impl<T, const N: usize> ConstArray for [T; N]
-where
-    ConstInt<N>: ConstInteger
-{
-    type Cap = ConstInt<N>;
-    
-    /// Array with N-1 size/cap.
-    type DecArray = ConstArrayType<Self::Item, <Self::Cap as ConstInteger>::Dec>;
-
-    #[inline]
-    fn split_last(self) -> (Self::DecArray, Self::Item) {
-        let this = ManuallyDrop::new(self);
-        let left = unsafe{
-            Array::from_fn(|i| { 
-                ptr::read(this.as_ref().get_unchecked(i))
-            })
-        };
-        let right = unsafe{
-            ptr::read(this.as_ref().last().unwrap())
-        };
-        (left, right)
-    }
-}
-
-pub type ConstArrayType<T, C: ConstInteger> = C::SelfSizeArray<T>;
-
-// TODO: rename to ConstCopyArrayType
-pub type ConstPrimitiveArrayType<T: Primitive, C: ConstInteger> = C::SelfSizePrimitiveArray<T>;
-
-/*/// [ConstInteger] friendly [PrimitiveArray]
-pub trait ConstPrimitiveArray
-    : ConstArray<DecArray: PrimitiveArray>
-    + PrimitiveArray
-{}
-impl<T: ConstArray<DecArray: PrimitiveArray> + PrimitiveArray> ConstPrimitiveArray for T {}*/
+impl <T: UninitPrimitiveArray + Copy> UninitPrimitiveArray for T{}

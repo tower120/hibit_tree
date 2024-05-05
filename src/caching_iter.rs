@@ -3,8 +3,9 @@ use std::ops::ControlFlow;
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::{BitBlock, data_block_index, IntoOwned};
 use crate::bit_queue::BitQueue;
-use crate::const_int::{const_for_rev, ConstInt, ConstInteger, ConstIntVisitor};
-use crate::primitive_array::{Array, ConstArray, ConstArrayType};
+use crate::const_utils::const_int::{const_for_rev, ConstInt, ConstInteger, ConstIntVisitor};
+use crate::const_utils::const_array::{ConstArray, ConstArrayType};
+use crate::primitive_array::{Array};
 
 // TODO: could be u32's
 /// [usize; T::LevelCount::N - 1]

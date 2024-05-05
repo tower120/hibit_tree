@@ -2,8 +2,9 @@ use std::fmt;
 use std::fmt::{Debug, Display};
 use std::ops::ControlFlow;
 use std::ops::ControlFlow::{Break, Continue};
-use crate::bool_type::{BoolType, TrueType, FalseType};
-use crate::primitive_array::{Array, ConstArray};
+use crate::const_utils::const_bool::{ConstBool, ConstTrue, ConstFalse};
+use crate::const_utils::const_array::{ConstArray};
+use crate::primitive_array::{Array};
 use crate::{Primitive, PrimitiveArray};
 
 pub trait ConstIntVisitor {
@@ -106,7 +107,7 @@ pub trait ConstInteger: ConstIntegerPrivate + Default + Copy + Eq + Debug {
     /// Same as [SelfSizeArray], but with additional type bounds.
     /// 
     /// N.B. We can't **just** forward Copy for SelfSizeArray if T: Copy in Rust.
-    type SelfSizePrimitiveArray<T: Primitive>: ConstArray<Item=T, Cap=Self, DecArray:Copy> + Copy;
+    type SelfSizeCopyArray<T: Copy>: ConstArray<Item=T, Cap=Self, DecArray:Copy> + Copy;
     
     /*type IsZero: BoolType;
     fn is_zero(self) -> Self::IsZero{
@@ -114,6 +115,7 @@ pub trait ConstInteger: ConstIntegerPrivate + Default + Copy + Eq + Debug {
     }*/ 
 }
 
+// TODO: ConstUsize ?
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct ConstInt<const N: usize>;
 
@@ -158,7 +160,7 @@ macro_rules! gen_const_int {
             type SatDec = ConstInt<{$i}>;
             type Inc = ConstInt<{$i+1}>;
             type SelfSizeArray<T> = [T; $i];
-            type SelfSizePrimitiveArray<T: Primitive> = [T; $i];
+            type SelfSizeCopyArray<T: Copy> = [T; $i];
 
             //type IsZero = TrueType;
         }
@@ -173,7 +175,7 @@ macro_rules! gen_const_int {
             type SatDec = ConstInt<{$i-1}>;
             type Inc = ConstInt<{$i+1}>;
             type SelfSizeArray<T> = [T; $i];
-            type SelfSizePrimitiveArray<T: Primitive> = [T; $i];
+            type SelfSizeCopyArray<T: Copy> = [T; $i];
             
             
             //type IsZero = FalseType;
@@ -189,7 +191,7 @@ macro_rules! gen_const_int {
             type SatDec = ConstInt<{$i-1}>;
             type Inc = ConstIntInvalid;
             type SelfSizeArray<T> = [T; $i];
-            type SelfSizePrimitiveArray<T: Primitive> = [T; $i];
+            type SelfSizeCopyArray<T: Copy> = [T; $i];
             
             //type IsZero = FalseType;
         }
@@ -218,7 +220,7 @@ impl ConstInteger for ConstInt<MAX>{
     type SatDec = ConstInt<MAX>;
     type Inc = ConstInt<MAX>;
     type SelfSizeArray<T> = [T; MAX];
-    type SelfSizePrimitiveArray<T: Primitive> = [T; MAX];
+    type SelfSizeCopyArray<T: Copy> = [T; MAX];
     
     //type IsZero = FalseType;
 }
