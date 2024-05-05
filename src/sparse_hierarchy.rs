@@ -124,12 +124,16 @@ pub trait SparseHierarchy {
 
 /// Stateful [SparseHierarchy] interface.
 /// 
-/// Having state allows implementations to cache level meta-info.
+/// Having state allows implementations to have cache level meta-info.
 /// If level block changed seldom and not sporadically (like during iteration) -
 /// this can get a significant performance boost, especially in generative [SparseHierarchy]'ies.
 /// 
 /// Block levels must be selected top(0) to bottom(last N) level.
 /// When you [select_level_bock], all levels below considered **not** selected.
+/// For example, for 3-level hierarchy you select level 0, 1, 2 and then you can
+/// access data level. But if after that, you change/select level 1 block - 
+/// you should select level 2 block too, before accessing data level again. 
+/// Imagine that you are traversing a tree.    
 ///
 /// # Example
 /// 
@@ -158,7 +162,7 @@ pub trait SparseHierarchyState{
     fn new(this: &Self::This) -> Self;
     
     /// Select block at `level_n` with `level_index`. Where `level_index` is index
-    /// in selected block pointing to `level_n`. 
+    /// in block pointing to `level_n` (which was previously selected). 
     /// 
     /// Returns `(level_mask, is_not_empty)`.
     /// `is_not_empty` - mask not empty flag. Allowed to be false-positive.

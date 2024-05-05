@@ -96,15 +96,15 @@ pub fn apply<Op, B1, B2>(op: Op, s1: B1, s2: B2) -> Apply<Op, B1, B2>
 }
 
 #[inline]
-pub fn fold<'a, Op, Init, ArrayIter, Array>(op: Op, init: &'a Init, array_iter: ArrayIter) 
-    -> Fold<'a, Op, Init, ArrayIter, Array>
-where
+pub fn fold<Op, Init, ArrayIter>(op: Op, init: Init, array_iter: ArrayIter) 
+    -> Fold<Op, Init, ArrayIter>
+/*where
     Op: apply::Op,
     ArrayIter: Iterator<Item = &'a Array> + Clone,
     Array: SparseHierarchy,
-    Init: SparseHierarchy,
+    Init: SparseHierarchy,*/
 {
-    Fold{op, init, array_iter, phantom: PhantomData}
+    Fold{op, init, array_iter}
 }
 
 /*pub type Reduce<'a, Op, ArrayIter, Array> = Fold<'a, Op, Array, ArrayIter, Array>;

@@ -166,7 +166,7 @@ fn fold_iter(list: &[BlockArray]) -> impl Any {
 
 fn apply_iter(array1: &BlockArray, array2: &BlockArray) -> u64 {
     let and_op: AndOp<u64, DataBlock> = AndOp(PhantomData);
-    let reduce: Apply<_, _, _, BlockArray, BlockArray> = apply(and_op, array1, array2);
+    let reduce = apply(and_op, array1, array2);
     
     let mut s = 0;
     for (_, i) in CachingBlockIter::new(&reduce){
