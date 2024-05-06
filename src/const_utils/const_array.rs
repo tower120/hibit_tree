@@ -1,7 +1,7 @@
 use std::mem::ManuallyDrop;
 use std::ptr;
 use crate::{Array, Primitive};
-use crate::const_utils::{ConstInt, ConstInteger};
+use crate::const_utils::{ConstUsize, ConstInteger};
 
 /// [ConstInteger]-sized [Array]. 
 pub trait ConstArray: Array {
@@ -14,9 +14,9 @@ pub trait ConstArray: Array {
 
 impl<T, const N: usize> ConstArray for [T; N]
 where
-    ConstInt<N>: ConstInteger
+    ConstUsize<N>: ConstInteger
 {
-    type Cap = ConstInt<N>;
+    type Cap = ConstUsize<N>;
     
     /// Array with N-1 size/cap.
     type DecArray = ConstArrayType<Self::Item, <Self::Cap as ConstInteger>::Dec>;

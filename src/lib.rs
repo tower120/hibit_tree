@@ -34,12 +34,8 @@ pub use fold::Fold;
 
 
 use std::borrow::Borrow;
-use std::marker::PhantomData;
-use std::ops::ControlFlow;
 use sparse_hierarchy::SparseHierarchy;
-use crate::const_utils::const_int::{const_for, ConstInt, ConstInteger, ConstIntVisitor};
-//use crate::primitive_array::Array;
-//use crate::sparse_hierarchy::{level_bypass, LevelBypass};
+use crate::const_utils::const_int::{ConstInteger, ConstIntVisitor};
 
 // Compile-time loop inside. Ends up with N ADDs.
 #[inline]

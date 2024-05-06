@@ -7,6 +7,8 @@ pub enum Either<T, F>{
     False(F)
 }
 
+/// Ala C++ std::conditional_t with ability to safely access
+/// underlying value.
 #[repr(transparent)]
 pub struct CondType<B: ConstBool, T, F>(
     pub B::Conditional<T, F>

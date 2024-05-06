@@ -8,7 +8,7 @@ pub use block::*;
 
 use std::marker::PhantomData;
 use std::ptr::NonNull;
-use crate::{BitBlock, Primitive, PrimitiveArray};
+use crate::{BitBlock, Primitive};
 
 // TODO: split into DataBlock + IntrusiveListDataBlock
 pub trait LevelBlock: Sized {

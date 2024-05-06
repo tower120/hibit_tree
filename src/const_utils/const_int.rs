@@ -5,7 +5,6 @@ use std::ops::ControlFlow::{Break, Continue};
 use crate::const_utils::const_bool::{ConstBool, ConstTrue, ConstFalse};
 use crate::const_utils::const_array::{ConstArray};
 use crate::primitive_array::{Array};
-use crate::{Primitive, PrimitiveArray};
 
 pub trait ConstIntVisitor {
     type Out;
@@ -115,11 +114,10 @@ pub trait ConstInteger: ConstIntegerPrivate + Default + Copy + Eq + Debug {
     }*/ 
 }
 
-// TODO: ConstUsize ?
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub struct ConstInt<const N: usize>;
+pub struct ConstUsize<const N: usize>;
 
-impl<const N: usize> Default for ConstInt<N>{
+impl<const N: usize> Default for ConstUsize<N>{
     #[inline]
     fn default() -> Self {
         if N == MAX{
@@ -129,7 +127,7 @@ impl<const N: usize> Default for ConstInt<N>{
     }
 }
 
-impl<const N: usize> Debug for ConstInt<N> {
+impl<const N: usize> Debug for ConstUsize<N> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ConstInt<{}>", N)
     }
@@ -137,7 +135,7 @@ impl<const N: usize> Debug for ConstInt<N> {
 
 macro_rules! gen_const_int {
     (first $i:literal) => {
-        impl ConstIntegerPrivate for ConstInt<$i>{
+        impl ConstIntegerPrivate for ConstUsize<$i>{
             #[inline]
             fn iterate_as_range<V: ConstIntVisitor>(self, from: impl ConstInteger, visitor: &mut V) 
                 -> ControlFlow<V::Out> 
@@ -152,13 +150,13 @@ macro_rules! gen_const_int {
                 Continue(())
             }
         }
-        impl ConstInteger for ConstInt<$i>{ 
+        impl ConstInteger for ConstUsize<$i>{ 
             const VALUE  : usize = $i;
-            const DEFAULT: Self = ConstInt::<$i>;
+            const DEFAULT: Self = ConstUsize::<$i>;
             
             type Dec    = ConstIntInvalid;
-            type SatDec = ConstInt<{$i}>;
-            type Inc = ConstInt<{$i+1}>;
+            type SatDec = ConstUsize<{$i}>;
+            type Inc = ConstUsize<{$i+1}>;
             type SelfSizeArray<T> = [T; $i];
             type SelfSizeCopyArray<T: Copy> = [T; $i];
 
@@ -166,29 +164,28 @@ macro_rules! gen_const_int {
         }
     };
     ($i:literal) => {
-        impl ConstIntegerPrivate for ConstInt<$i>{}
-        impl ConstInteger for ConstInt<$i>{ 
+        impl ConstIntegerPrivate for ConstUsize<$i>{}
+        impl ConstInteger for ConstUsize<$i>{ 
             const VALUE  : usize = $i;
-            const DEFAULT: Self = ConstInt::<$i>;
+            const DEFAULT: Self = ConstUsize::<$i>;
             
-            type Dec    = ConstInt<{$i-1}>;
-            type SatDec = ConstInt<{$i-1}>;
-            type Inc = ConstInt<{$i+1}>;
+            type Dec    = ConstUsize<{$i-1}>;
+            type SatDec = ConstUsize<{$i-1}>;
+            type Inc = ConstUsize<{$i+1}>;
             type SelfSizeArray<T> = [T; $i];
             type SelfSizeCopyArray<T: Copy> = [T; $i];
-            
             
             //type IsZero = FalseType;
         }
     };
     (last $i:literal) => {
-        impl ConstIntegerPrivate for ConstInt<$i>{}
-        impl ConstInteger for ConstInt<$i>{ 
+        impl ConstIntegerPrivate for ConstUsize<$i>{}
+        impl ConstInteger for ConstUsize<$i>{ 
             const VALUE  : usize = $i;
-            const DEFAULT: Self = ConstInt::<$i>;
+            const DEFAULT: Self = ConstUsize::<$i>;
             
-            type Dec    = ConstInt<{$i-1}>;
-            type SatDec = ConstInt<{$i-1}>;
+            type Dec    = ConstUsize<{$i-1}>;
+            type SatDec = ConstUsize<{$i-1}>;
             type Inc = ConstIntInvalid;
             type SelfSizeArray<T> = [T; $i];
             type SelfSizeCopyArray<T: Copy> = [T; $i];
@@ -211,20 +208,20 @@ macro_rules! gen_const_seq {
 gen_const_seq!(0,1,2,3,4,5,6,7,8;9);
 
 const MAX: usize = usize::MAX;
-impl ConstIntegerPrivate for ConstInt<MAX> {}
-impl ConstInteger for ConstInt<MAX>{ 
+impl ConstIntegerPrivate for ConstUsize<MAX> {}
+impl ConstInteger for ConstUsize<MAX>{ 
     const VALUE  : usize = MAX;
-    const DEFAULT: Self  = ConstInt::<MAX>;
+    const DEFAULT: Self  = ConstUsize::<MAX>;
     
-    type Dec    = ConstInt<MAX>;
-    type SatDec = ConstInt<MAX>;
-    type Inc = ConstInt<MAX>;
+    type Dec    = ConstUsize<MAX>;
+    type SatDec = ConstUsize<MAX>;
+    type Inc = ConstUsize<MAX>;
     type SelfSizeArray<T> = [T; MAX];
     type SelfSizeCopyArray<T: Copy> = [T; MAX];
     
     //type IsZero = FalseType;
 }
-type ConstIntInvalid = ConstInt<MAX>;
+type ConstIntInvalid = ConstUsize<MAX>;
 
 #[cfg(test)]
 mod test{
@@ -232,9 +229,9 @@ mod test{
     
     #[test]
     fn test(){
-        type One  = ConstInt<1>;
-        type Zero = ConstInt<0>;
-        type Two  = ConstInt<2>;
+        type Zero = ConstUsize<0>;
+        type One  = ConstUsize<1>;
+        type Two  = ConstUsize<2>;
         
         assert_eq!(One::DEFAULT.inc(), Two::DEFAULT);         
         assert_eq!(One::DEFAULT.dec(), Zero::DEFAULT);
@@ -242,7 +239,7 @@ mod test{
     
     #[test]
     fn loop_test(){
-        const_for(ConstInt::<0>, ConstInt::<3>, V);
+        const_for(ConstUsize::<0>, ConstUsize::<3>, V);
         struct V;
         impl ConstIntVisitor for V{
             type Out = ();
@@ -255,7 +252,7 @@ mod test{
     
     #[test]
     fn loop_rev_test(){
-        const_for_rev(ConstInt::<0>, ConstInt::<3>, V);
+        const_for_rev(ConstUsize::<0>, ConstUsize::<3>, V);
         struct V;
         impl ConstIntVisitor for V{
             type Out = ();

@@ -3,7 +3,7 @@ use std::ops::ControlFlow;
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::{BitBlock, data_block_index, IntoOwned};
 use crate::bit_queue::BitQueue;
-use crate::const_utils::const_int::{const_for_rev, ConstInt, ConstInteger, ConstIntVisitor};
+use crate::const_utils::const_int::{const_for_rev, ConstUsize, ConstInteger, ConstIntVisitor};
 use crate::const_utils::const_array::{ConstArray, ConstArrayType};
 use crate::primitive_array::{Array};
 
@@ -51,7 +51,7 @@ where
         
         // TODO: This probably could be better
         let (root_mask, _) = unsafe{
-            state.select_level_bock(container, ConstInt::<0>, 0)
+            state.select_level_bock(container, ConstUsize::<0>, 0)
         };
         let level0_iter = root_mask.into_owned().into_bits_iter();
         
@@ -85,7 +85,7 @@ where
             if let Some(index) = top_level_iter.next() {
                 break index;
             } else {
-                let ctrl = const_for_rev(ConstInt::<0>, T::LevelCount::DEFAULT.dec(), V(self)); 
+                let ctrl = const_for_rev(ConstUsize::<0>, T::LevelCount::DEFAULT.dec(), V(self)); 
                 struct V<'b,'a,T: SparseHierarchy>(&'b mut CachingBlockIter<'a, T>); 
                 impl<'b,'a,T: SparseHierarchy> ConstIntVisitor for V<'b,'a,T> {
                     type Out = ();

@@ -1,5 +1,5 @@
 use crate::BitBlock;
-use crate::const_utils::const_int::{ConstInt, ConstInteger};
+use crate::const_utils::const_int::{ConstUsize, ConstInteger};
 use crate::level::ILevel;
 use crate::level_block::HiBlock;
 
@@ -64,7 +64,7 @@ macro_rules! sparse_array_levels_impl {
                 $t::Block: HiBlock<Mask = <$first_t::Block as HiBlock>::Mask>,
             )*
         {
-            type LevelCount = ConstInt<$n>;       
+            type LevelCount = ConstUsize<$n>;       
             type Mask = <$first_t::Block as HiBlock>::Mask;
     
             #[inline(always)]
@@ -90,7 +90,7 @@ macro_rules! sparse_array_levels_impl {
             #[inline]
             fn fold_mut<Acc>(&mut self, mut acc: Acc, mut visitor: impl FoldMutVisitor<Self::Mask, Acc = Acc>) -> Acc {
                 $(
-                    acc = visitor.visit(ConstInt::<$i>, &mut self.$i, acc);
+                    acc = visitor.visit(ConstUsize::<$i>, &mut self.$i, acc);
                 )+
                 acc
             }
@@ -101,7 +101,7 @@ macro_rules! sparse_array_levels_impl {
                     if $i == n.value() {
                         return acc;
                     }
-                    acc = visitor.visit(ConstInt::<$i>, &self.$i, acc);
+                    acc = visitor.visit(ConstUsize::<$i>, &self.$i, acc);
                 )+
                 acc
             }

@@ -7,7 +7,7 @@ use crate::Borrowable;
 use crate::level_block::HiBlock;
 use crate::level::{ILevel, Level};
 use crate::sparse_hierarchy::{DefaultState, SparseHierarchy, SparseHierarchyState};
-use crate::const_utils::const_int::{const_for, ConstInt, ConstInteger, ConstIntVisitor};
+use crate::const_utils::const_int::{const_for, ConstUsize, ConstInteger, ConstIntVisitor};
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, /* ConstPrimitiveArray, */ConstCopyArrayType};
 use crate::primitive::Primitive;
 use crate::primitive_array::{Array};
@@ -49,26 +49,26 @@ where
 #[test]
 fn test_level_indices_new(){
     {
-        let indices = level_indices::<u64, ConstInt<2>>(65);
+        let indices = level_indices::<u64, ConstUsize<2>>(65);
         assert_eq!(indices, [1, 1]);
     }
     {
         let lvl0 = 262_144; // Total max capacity
         let lvl1 = 4096;
         let lvl2 = 64;
-        let indices = level_indices::<u64, ConstInt<3>>(lvl1*2 + lvl2*3 + 4);
+        let indices = level_indices::<u64, ConstUsize<3>>(lvl1*2 + lvl2*3 + 4);
         assert_eq!(indices, [2, 3, 4]);
     }
     {
-        let indices = level_indices::<u64, ConstInt<3>>(32);
+        let indices = level_indices::<u64, ConstUsize<3>>(32);
         assert_eq!(indices, [0, 0, 32]);
     }
     {
-        let indices = level_indices::<u64, ConstInt<2>>(32);
+        let indices = level_indices::<u64, ConstUsize<2>>(32);
         assert_eq!(indices, [0, 32]);
     }    
     {
-        let indices = level_indices::<u64, ConstInt<1>>(32);
+        let indices = level_indices::<u64, ConstUsize<1>>(32);
         assert_eq!(indices, [32]);
     }
 }
@@ -403,7 +403,7 @@ where
             let prev_level_block_ptr = 
                 if N::VALUE == 1{
                     // get directly from root
-                    this.get_block_ptr(ConstInt::<0>, 0)
+                    this.get_block_ptr(ConstUsize::<0>, 0)
                 } else {
                     self.level_block_ptrs.as_mut()[level_block_ptrs_index-1]
                 };
@@ -428,7 +428,7 @@ where
         
         let level_block_ptr = 
             if Levels::LevelCount::VALUE == 1{
-                this.get_block_ptr(ConstInt::<0>, 0)
+                this.get_block_ptr(ConstUsize::<0>, 0)
             } else {
                 // We do not store the root level's block.
                 let level_block_ptrs_index = last_level_index.dec();
