@@ -1,30 +1,30 @@
 use std::ops::{Deref, DerefMut};
 use crate::BitBlock;
-use crate::const_utils::cond_type::CondType;
+use crate::const_utils::cond_type::Either;
 use crate::const_utils::const_int::ConstInteger;
 
 pub trait ConstBool: Default + Copy{
     const VALUE: bool;
     /// T if true, F otherwise.
-    type CondType<T, F>;
-    /// Same as [CondType] but with [ConstInteger] bounds.
-    type CondInt<T: ConstInteger, F: ConstInteger>: ConstInteger;
+    type Conditional<T, F>;
+    /// Same as [Conditional] but with [ConstInteger] bounds.
+    type ConditionalInt<T: ConstInteger, F: ConstInteger>: ConstInteger;
 }
 
 #[derive(Default, Clone, Copy)]
 pub struct ConstTrue;
 impl ConstBool for ConstTrue {
     const VALUE: bool = true;
-    type CondType<T, F> = T;
-    type CondInt<T: ConstInteger, F: ConstInteger> = T;
+    type Conditional<T, F> = T;
+    type ConditionalInt<T: ConstInteger, F: ConstInteger> = T;
 }
 
 #[derive(Default, Clone, Copy)]
 pub struct ConstFalse;
 impl ConstBool for ConstFalse {
     const VALUE: bool = false;
-    type CondType<T, F> = F;
-    type CondInt<T: ConstInteger, F: ConstInteger> = F;
+    type Conditional<T, F> = F;
+    type ConditionalInt<T: ConstInteger, F: ConstInteger> = F;
 }
 
 #[cfg(test)]
@@ -32,12 +32,12 @@ mod test{
     use super::*;
     
     struct S<B: ConstBool>{
-        v: B::CondType<usize, f32>
+        v: B::Conditional<usize, f32>
     }
     
     fn test<B: ConstBool>(mut s: S<B>)
     where
-        B::CondType<usize, f32>: Clone
+        B::Conditional<usize, f32>: Clone
     {
         let c = s.v.clone();
     }

@@ -2,29 +2,28 @@ use std::mem::MaybeUninit;
 use std::ptr::NonNull;
 use crate::const_utils::{ConstBool, ConstFalse, ConstTrue};
 
-pub enum CondType<T, F>{
+pub enum Either<T, F>{
     True(T),
     False(F)
 }
 
 #[repr(transparent)]
-pub struct ConditionalType<B: ConstBool, T, F>(
-    B::CondType<T, F>
+pub struct CondType<B: ConstBool, T, F>(
+    pub B::Conditional<T, F>
 );
 
-impl<T, F> From<T> for ConditionalType<ConstTrue, T, F>{
+impl<T, F> From<T> for CondType<ConstTrue, T, F>{
     fn from(value: T) -> Self {
         Self(value)
     }
 }
 
-impl<T, F> From<F> for ConditionalType<ConstFalse, T, F>{
+impl<T, F> From<F> for CondType<ConstFalse, T, F>{
     fn from(value: F) -> Self {
         Self(value)
     }
 }
-
-impl<B: ConstBool, T, F> Default for ConditionalType<B, T, F>
+impl<B: ConstBool, T, F> Default for CondType<B, T, F>
 where 
     T: Default,
     F: Default,
@@ -34,14 +33,14 @@ where
     }
 }
 
-impl<B: ConstBool, T, F> Clone for ConditionalType<B, T, F>
+impl<B: ConstBool, T, F> Clone for CondType<B, T, F>
 where 
     T: Clone,
     F: Clone,
 {
     #[inline(always)]
     fn clone(&self) -> Self {
-        use CondType::*;
+        use Either::*;
         Self::new(
             || match self.get() {
                 True(v)  => v.clone(),
@@ -55,9 +54,9 @@ where
     }
 }
 
-impl<B: ConstBool, T, F> ConditionalType<B, T, F>{
+impl<B: ConstBool, T, F> CondType<B, T, F>{
     #[inline(always)]
-    fn new(
+    pub fn new(
         mut true_fn : impl FnMut() -> T,
         mut false_fn: impl FnMut() -> F,
     ) -> Self {
@@ -75,24 +74,24 @@ impl<B: ConstBool, T, F> ConditionalType<B, T, F>{
     }
     
     #[inline(always)]
-    fn get(&self) -> CondType<&T, &F>{
+    pub fn get(&self) -> Either<&T, &F>{
         if B::VALUE {
             let p: NonNull<T> = NonNull::from(&self.0).cast();
-            CondType::True(unsafe{p.as_ref()})
+            Either::True(unsafe{p.as_ref()})
         } else {
             let p: NonNull<F> = NonNull::from(&self.0).cast();
-            CondType::False(unsafe{p.as_ref()})
+            Either::False(unsafe{p.as_ref()})
         }
     }
     
     #[inline(always)]
-    fn get_mut(&mut self) -> CondType<&mut T, &mut F>{
+    pub fn get_mut(&mut self) -> Either<&mut T, &mut F>{
         if B::VALUE {
             let mut p: NonNull<T> = NonNull::from(&mut self.0).cast();
-            CondType::True(unsafe{p.as_mut()})
+            Either::True(unsafe{p.as_mut()})
         } else {
             let mut p: NonNull<F> = NonNull::from(&mut self.0).cast();
-            CondType::False(unsafe{p.as_mut()})
+            Either::False(unsafe{p.as_mut()})
         }
     }    
     
@@ -114,20 +113,46 @@ impl<B: ConstBool, T, F> ConditionalType<B, T, F>{
 
 #[cfg(test)]
 mod test{
-    use crate::const_utils::cond_type::ConditionalType;
+    use std::fmt::Debug;
     use crate::const_utils::cond_type::CondType;
+    use crate::const_utils::cond_type::Either;
     use crate::const_utils::const_bool::*;
 
     #[derive(Default)]
     struct S<B: ConstBool>{
-        v: ConditionalType<B, String, f32>
+        v: CondType<B, String, f32>
+    }
+    
+    trait DebugVisitor{
+        fn visit(&self, v: &impl Debug);
+    }
+    
+    fn visit_debug<B: ConstBool, T: Debug, F: Debug>(
+        s: &CondType<B, T, F>, mut f: impl DebugVisitor
+    ) {
+        match s.get(){
+            Either::True(v) => f.visit(v),
+            Either::False(v) => f.visit(v),
+        }
     }
     
     #[test]
+    fn test_impl_visit(){
+        let s: S<ConstTrue> = Default::default();
+        struct V;
+        impl DebugVisitor for V{
+            fn visit(&self, v: &impl Debug) {
+                println!("{:?}", v);
+            }
+        }
+        visit_debug(&s.v, V);
+    }
+
+    #[test]
     fn test(){
-        let s: S::<ConstTrue> = Default::default();
+        let s: S<ConstTrue> = S{v: CondType(String::from("bbb"))}/* Default::default()*/;
         
-        use CondType::*;
+        use Either::*;
         match s.v.clone().get(){
             True(s) => {
                 let mut s = s.clone();
