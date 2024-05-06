@@ -209,3 +209,10 @@ where
         acc
     }    
 }
+
+impl<Op, Init, ArrayIter> Borrowable for Fold<Op, Init, ArrayIter>{
+    type Borrowed = Fold<Op, Init, ArrayIter>;
+}
+impl<Op, Init, ArrayIter> Borrowable for &Fold<Op, Init, ArrayIter>{
+    type Borrowed = Fold<Op, Init, ArrayIter>;
+}
