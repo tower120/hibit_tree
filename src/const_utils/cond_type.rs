@@ -15,12 +15,14 @@ pub struct CondType<B: ConstBool, T, F>(
 );
 
 impl<T, F> From<T> for CondType<ConstTrue, T, F>{
+    #[inline(always)]
     fn from(value: T) -> Self {
         Self(value)
     }
 }
 
 impl<T, F> From<F> for CondType<ConstFalse, T, F>{
+    #[inline(always)]
     fn from(value: F) -> Self {
         Self(value)
     }
@@ -30,6 +32,7 @@ where
     T: Default,
     F: Default,
 {
+    #[inline(always)]
     fn default() -> Self {
         Self::new(||Default::default(), ||Default::default())
     }

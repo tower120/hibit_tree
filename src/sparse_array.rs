@@ -46,6 +46,7 @@ where
     level_indices
 }
 
+#[cfg(test)]
 #[test]
 fn test_level_indices_new(){
     {
@@ -333,17 +334,17 @@ where
         self.get_block_mask(I::Cap::default(), block_ptr)
     }
     
-    type DataBlockType = DataLevel::Block;
-    type DataBlock<'a> where Self: 'a = &'a Self::DataBlockType;
+    type DataType = DataLevel::Block;
+    type Data<'a> where Self: 'a = &'a Self::DataType;
     
     #[inline]
-    unsafe fn data_block<I: ConstArray<Item=usize, Cap=Self::LevelCount>>(&self, level_indices: I) -> Self::DataBlock<'_> {
+    unsafe fn data_block<I: ConstArray<Item=usize, Cap=Self::LevelCount>>(&self, level_indices: I) -> Self::Data<'_> {
         let data_block_index = self.fetch_block_index(level_indices);
         self.data.blocks().get_unchecked(data_block_index)
     }
 
     #[inline]
-    fn empty_data_block(&self) -> Self::DataBlock<'_> {
+    fn empty_data(&self) -> Self::Data<'_> {
         unsafe{
             self.data.blocks().get_unchecked(0)
         }
@@ -422,7 +423,7 @@ where
 
     #[inline(always)]
     unsafe fn data_block<'a>(&self, this: &'a Self::This, level_index: usize)
-        -> <Self::This as SparseHierarchy>::DataBlock<'a> 
+        -> <Self::This as SparseHierarchy>::Data<'a> 
     {
         let last_level_index = Levels::LevelCount::default().dec();
         

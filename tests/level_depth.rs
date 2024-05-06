@@ -44,7 +44,7 @@ fn level_depth_test(){
         }
         
         for i in range.clone(){
-            assert!(array.contains(i));
+            assert!(array.may_contain(i));
         }
         
         /*for (index, data) in CachingBlockIter::new(&array){

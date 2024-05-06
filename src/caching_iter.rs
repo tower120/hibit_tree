@@ -75,7 +75,7 @@ impl<'a, T> Iterator for CachingBlockIter<'a, T>
 where
     T: SparseHierarchy,
 {
-    type Item = (usize/*index*/, T::DataBlock<'a>);
+    type Item = (usize/*index*/, T::Data<'a>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

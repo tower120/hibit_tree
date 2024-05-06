@@ -77,8 +77,8 @@ where
 
     Op: self::Op<
         LevelMask  = <B1::Borrowed as SparseHierarchy>::LevelMaskType,
-        DataBlockL = <B1::Borrowed as SparseHierarchy>::DataBlockType,
-        DataBlockR = <B2::Borrowed as SparseHierarchy>::DataBlockType,
+        DataBlockL = <B1::Borrowed as SparseHierarchy>::DataType,
+        DataBlockR = <B2::Borrowed as SparseHierarchy>::DataType,
     >
 {
     const EXACT_HIERARCHY: bool = Op::EXACT_HIERARCHY;
@@ -100,10 +100,10 @@ where
         )
     }
 
-    type DataBlockType = Op::DataBlockO;
-    type DataBlock<'a> = Op::DataBlockO where Self:'a;
+    type DataType = Op::DataBlockO;
+    type Data<'a> = Op::DataBlockO where Self:'a;
     #[inline]
-    unsafe fn data_block<I>(&self, level_indices: I) -> Self::DataBlock<'_>
+    unsafe fn data_block<I>(&self, level_indices: I) -> Self::Data<'_>
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
     {
@@ -116,7 +116,7 @@ where
     }
 
     #[inline]
-    fn empty_data_block(&self) -> Self::DataBlock<'_> {
+    fn empty_data(&self) -> Self::Data<'_> {
         <Op::DataBlockO as LevelBlock>::empty()
     }
 
@@ -145,8 +145,8 @@ where
 
     Op: self::Op<
         LevelMask  = <B1::Borrowed as SparseHierarchy>::LevelMaskType,
-        DataBlockL = <B1::Borrowed as SparseHierarchy>::DataBlockType,
-        DataBlockR = <B2::Borrowed as SparseHierarchy>::DataBlockType,
+        DataBlockL = <B1::Borrowed as SparseHierarchy>::DataType,
+        DataBlockR = <B2::Borrowed as SparseHierarchy>::DataType,
     >
 {
     type This = Apply<Op, B1, B2>;
@@ -178,7 +178,7 @@ where
 
     #[inline]
     unsafe fn data_block<'a>(&self, this: &'a Self::This, level_index: usize) 
-        -> <Self::This as SparseHierarchy>::DataBlock<'a> 
+        -> <Self::This as SparseHierarchy>::Data<'a> 
     {
         let m0 = self.s1.data_block(
             this.s1.borrow(), level_index

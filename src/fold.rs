@@ -30,9 +30,9 @@ where
 
     Op: crate::apply::Op<
         LevelMask  = <Array<ArrayIter> as SparseHierarchy>::LevelMaskType,
-        DataBlockL = <Init::Borrowed as SparseHierarchy>::DataBlockType,
-        DataBlockR = <Array<ArrayIter> as SparseHierarchy>::DataBlockType,
-        DataBlockO = <Init::Borrowed as SparseHierarchy>::DataBlockType,
+        DataBlockL = <Init::Borrowed as SparseHierarchy>::DataType,
+        DataBlockR = <Array<ArrayIter> as SparseHierarchy>::DataType,
+        DataBlockO = <Init::Borrowed as SparseHierarchy>::DataType,
     >,
 {
     const EXACT_HIERARCHY: bool = Op::EXACT_HIERARCHY;
@@ -54,16 +54,16 @@ where
         )
     }
 
-    type DataBlockType = Op::DataBlockO;
-    type DataBlock<'b> where Self: 'b = Op::DataBlockO;
+    type DataType = Op::DataBlockO;
+    type Data<'b> where Self: 'b = Op::DataBlockO;
 
     #[inline]
-    unsafe fn data_block<I>(&self, level_indices: I) -> Self::DataBlock<'_>
+    unsafe fn data_block<I>(&self, level_indices: I) -> Self::Data<'_>
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
     {
         self.array_iter.clone().fold(
-            self.init.borrow().data_block(level_indices).into_owned(), 
+            self.init.borrow().data_block(level_indices).into_owned(),
             |acc, array|{
                 self.op.data_op(acc, array.borrow().data_block(level_indices))
             }
@@ -71,7 +71,7 @@ where
     }
 
     #[inline]
-    fn empty_data_block(&self) -> Self::DataBlock<'_> {
+    fn empty_data(&self) -> Self::Data<'_> {
         <Op::DataBlockO as LevelBlock>::empty()
     }
 
@@ -123,9 +123,9 @@ where
 
     Op: crate::apply::Op<
         LevelMask  = <Array<ArrayIter> as SparseHierarchy>::LevelMaskType,
-        DataBlockL = <Init::Borrowed as SparseHierarchy>::DataBlockType,
-        DataBlockR = <Array<ArrayIter> as SparseHierarchy>::DataBlockType,
-        DataBlockO = <Init::Borrowed as SparseHierarchy>::DataBlockType,
+        DataBlockL = <Init::Borrowed as SparseHierarchy>::DataType,
+        DataBlockR = <Array<ArrayIter> as SparseHierarchy>::DataType,
+        DataBlockO = <Init::Borrowed as SparseHierarchy>::DataType,
     >,
 {
     type This = Fold<Op, Init, ArrayIter>;
@@ -187,7 +187,7 @@ where
     
     #[inline]
     unsafe fn data_block<'this>(&self, this: &'this Self::This, level_index: usize) 
-        -> <Self::This as SparseHierarchy>::DataBlock<'this> 
+        -> <Self::This as SparseHierarchy>::Data<'this> 
     {
         let mut acc = self.init_state.data_block(this.init.borrow(), level_index).into_owned();
         

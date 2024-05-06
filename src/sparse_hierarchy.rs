@@ -40,59 +40,88 @@ pub trait SparseHierarchy {
         I: ConstArray<Item=usize> + Copy;
     
     // TODO: Try to remove IntoOwned here. This requires Data to impl Clone. 
-    type DataBlockType: LevelBlock;
-    type DataBlock<'a>: Borrow<Self::DataBlockType> + IntoOwned<Self::DataBlockType>
+    type DataType: LevelBlock;
+    type Data<'a>: Borrow<Self::DataType> + IntoOwned<Self::DataType>
         where Self: 'a;
-    // TODO: rename?
     /// # Safety
     ///
     /// indices are not checked.
-    unsafe fn data_block<I>(&self, level_indices: I) -> Self::DataBlock<'_>
+    unsafe fn data_block<I>(&self, level_indices: I) -> Self::Data<'_>
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy;
     
-    // We need this, because DataBlock may return reference.
+    // We need this, because Data may return reference.
     // And we can't have a non-const constructible static in rust,
     // for taking reference from arbitrary DataBlockType::empty() 
     // without overhead.
     //
     // Used by get().
-    fn empty_data_block(&self) -> Self::DataBlock<'_>;
+    fn empty_data(&self) -> Self::Data<'_>;
+    
+    /// Same as [may_contain], but without range checks.
+    /// 
+    /// # Safety
+    ///
+    /// `index` must be in [max_range].
+    #[inline]
+    unsafe fn may_contain_unchecked(&self, index: usize) -> bool {
+        let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
+        let (level_indices, mask_index) = indices.split_last();
+        let mask = self.level_mask(level_indices);
+        mask.borrow().get_bit(mask_index)
+    }
     
     /// Returns true if element at `index` is non-empty.
     /// 
     /// Faster than [get] + [is_empty], since output is based on hierarchy data only.
     /// May return false positives with non-[EXACT_HIERARCHY].
     /// 
+    /// Returns false if `index` outside of range.
+    /// 
+    /// This makes SparseHierarchy basically infinite.
+    #[inline]
+    fn may_contain(&self, index: usize) -> bool {
+        if index > Self::max_range(){
+            false
+        } else {
+            unsafe{ self.may_contain_unchecked(index) }
+        }        
+    }
+    
+    /// Same as [contains], but without range checks.
+    ///
     /// # Safety
     ///
     /// `index` must be in [max_range].
     #[inline]
     unsafe fn contains_unchecked(&self, index: usize) -> bool {
-        let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
-        let (level_indices, mask_index) = indices.split_last();
-        let mask = self.level_mask(level_indices);
-        mask.borrow().get_bit(mask_index)
+        if Self::EXACT_HIERARCHY {
+            self.may_contain_unchecked(index)
+        } else {
+            self.get_unchecked(index).borrow().is_empty()
+        }
     }
-
-    // TODO rename to may_contain
-    /// Returns false if `index` outside of range.
+    
+    /// Returns true if element at `index` is non-empty.
     /// 
-    /// This makes SparseHierarchy basically infinite.
+    /// If [EXACT_HIERARCHY] - faster than [get] + [is_empty].
+    /// Otherwise - just do the job.
+    /// 
+    /// Returns false if `index` outside of range.
     #[inline]
     fn contains(&self, index: usize) -> bool {
-        if index > Self::max_range(){
+        if index > Self::max_range() {
             false
         } else {
             unsafe{ self.contains_unchecked(index) }
-        }        
+        }
     }
     
     /// # Safety
     ///
     /// `index` must be in [max_range].
     #[inline]
-    unsafe fn get_unchecked(&self, index: usize) -> Self::DataBlock<'_> {
+    unsafe fn get_unchecked(&self, index: usize) -> Self::Data<'_> {
         let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
         self.data_block(indices)
     }
@@ -101,9 +130,9 @@ pub trait SparseHierarchy {
     /// 
     /// This makes SparseHierarchy basically infinite.
     #[inline]
-    fn get(&self, index: usize) -> Self::DataBlock<'_>{
+    fn get(&self, index: usize) -> Self::Data<'_>{
         if index > Self::max_range(){
-            self.empty_data_block()
+            self.empty_data()
         } else {
             unsafe{ self.get_unchecked(index) }
         }
@@ -188,7 +217,7 @@ pub trait SparseHierarchyState{
         &self,
         this: &'a Self::This,
         level_index: usize
-    ) -> <Self::This as SparseHierarchy>::DataBlock<'a>;    
+    ) -> <Self::This as SparseHierarchy>::Data<'a>;    
 }
 
 /// Redirect to [SparseHierarchy] stateless methods.
@@ -238,7 +267,7 @@ impl<This: SparseHierarchy> SparseHierarchyState for DefaultState<This>{
 
     #[inline]
     unsafe fn data_block<'a>(&self, this: &'a Self::This, level_index: usize) 
-        -> <Self::This as SparseHierarchy>::DataBlock<'a> 
+        -> <Self::This as SparseHierarchy>::Data<'a> 
     {
         let indices: ConstCopyArrayType<usize, This::LevelCount> 
             = Array::from_fn(|/*const*/ i| {

@@ -106,7 +106,7 @@ pub fn mul<'a>(v1: &'a SparseVector, v2: &'a SparseVector)
         &'a SparseArray, 
         &'a SparseArray,
     >*/
-    impl SparseHierarchy<DataBlockType=DataBlock> + 'a
+    impl SparseHierarchy<DataType=DataBlock> + 'a
 {
     apply(
         MulOp::default(),
