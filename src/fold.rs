@@ -5,10 +5,10 @@ use crate::{BitBlock, Borrowable, IntoOwned, primitive_array};
 use crate::const_utils::const_bool::ConstBool;
 use crate::const_utils::const_int::ConstInteger;
 use crate::const_utils::const_array::{ConstArray, ConstArrayType};
+use crate::const_utils::ConstUsize;
 use crate::level_block::LevelBlock;
 use crate::sparse_hierarchy::{DefaultState, SparseHierarchy, SparseHierarchyState};
 
-// TODO: We can go without ArrayIter being Clone!
 pub struct Fold<Op, Init, ArrayIter>{
     pub(crate) op: Op,
     pub(crate) init: Init,
@@ -84,6 +84,7 @@ pub struct FoldState<Op, Init, ArrayIter>
 where
     Init: Borrowable<Borrowed: SparseHierarchy>,
     ArrayIter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>>,
+    Op: crate::apply::Op
 {
     init_state: <Init::Borrowed as SparseHierarchy>::State,
     states: ArrayVec<
@@ -91,13 +92,17 @@ where
         N
     >,
     
-    // TODO: ZST when not in use 
     /// In-use only when `Op::SKIP_EMPTY_HIERARCHIES` raised.
     /// 
     /// [ArrayVec<usize, N>; Array::LevelCount - 1]
+    /// 
+    /// [ArrayVec<usize, N>; 0] - otherwise
     lvls_non_empty_states: ConstArrayType<
         ArrayVec<usize, N>,
-        <<Array<ArrayIter> as SparseHierarchy>::LevelCount as ConstInteger>::Dec
+        <Op::SKIP_EMPTY_HIERARCHIES as ConstBool>::ConditionalInt<
+            <<Array<ArrayIter> as SparseHierarchy>::LevelCount as ConstInteger>::Dec,
+            ConstUsize<0>
+        >
     >,
     
     phantom_data: PhantomData<Fold<Op, Init, ArrayIter>>
