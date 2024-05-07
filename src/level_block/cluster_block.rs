@@ -3,7 +3,7 @@ use std::mem::{MaybeUninit, size_of};
 use std::ptr;
 use std::slice::{from_raw_parts, from_raw_parts_mut};
 use arrayvec::ArrayVec;
-use crate::level_block::{LevelBlock, HiBlock};
+use crate::level_block::{HiBlock, IntrusiveMaybeEmptyNode, MaybeEmpty};
 use crate::{BitBlock, Primitive, PrimitiveArray};
 use crate::primitive_array::Array;
 
@@ -99,7 +99,7 @@ where
 }
 
 
-impl<Mask, SubBlockIndices, SubBlock> LevelBlock for ClusterBlock<Mask, SubBlockIndices, SubBlock>
+impl<Mask, SubBlockIndices, SubBlock> MaybeEmpty for ClusterBlock<Mask, SubBlockIndices, SubBlock>
 where
     Mask: BitBlock,
     SubBlockIndices: PrimitiveArray
@@ -121,7 +121,13 @@ where
     fn is_empty(&self) -> bool {
         todo!()
     }
+}
 
+impl<Mask, SubBlockIndices, SubBlock> IntrusiveMaybeEmptyNode for ClusterBlock<Mask, SubBlockIndices, SubBlock>
+where
+    Mask: BitBlock,
+    SubBlockIndices: PrimitiveArray
+{
     #[inline]
     fn as_u64_mut(&mut self) -> &mut u64 {
         unsafe{
@@ -130,7 +136,7 @@ where
     }
 
     #[inline]
-    fn restore_empty_u64(&mut self) {
+    fn restore_empty(&mut self) {
         *self.as_u64_mut() = 0;
     }
 }

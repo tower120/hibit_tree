@@ -1,7 +1,6 @@
 use std::mem::{MaybeUninit, size_of};
-use std::ptr::NonNull;
 use crate::bit_block::BitBlock;
-use crate::level_block::{HiBlock, LevelBlock};
+use crate::level_block::{HiBlock, IntrusiveMaybeEmptyNode, MaybeEmpty};
 use crate::primitive::Primitive;
 use crate::primitive_array::PrimitiveArray;
 
@@ -13,7 +12,7 @@ pub struct Block<Mask, BlockIndices> {
     block_indices: BlockIndices,
 }
 
-impl<Mask, BlockIndices> LevelBlock for Block<Mask, BlockIndices>
+impl<Mask, BlockIndices> MaybeEmpty for Block<Mask, BlockIndices>
 where
     Mask: BitBlock,
     BlockIndices: PrimitiveArray
@@ -30,7 +29,13 @@ where
     fn is_empty(&self) -> bool {
         todo!()
     }
+}
 
+impl<Mask, BlockIndices> IntrusiveMaybeEmptyNode for Block<Mask, BlockIndices>
+where
+    Mask: BitBlock,
+    BlockIndices: PrimitiveArray
+{
     #[inline]
     fn as_u64_mut(&mut self) -> &mut u64 {
         unsafe{
@@ -39,7 +44,7 @@ where
     }
 
     #[inline]
-    fn restore_empty_u64(&mut self) {
+    fn restore_empty(&mut self) {
         *self.as_u64_mut() = 0;
     }
 }

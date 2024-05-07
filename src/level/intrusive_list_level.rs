@@ -1,57 +1,9 @@
-use std::marker::PhantomData;
-use std::ptr::NonNull;
-use std::slice;
-use crate::level_block::{HiBlock, LevelBlock};
-use crate::primitive::Primitive;
+use crate::level::ILevel;
+use crate::level_block::IntrusiveMaybeEmptyNode;
 
-pub trait ILevel: Default {
-    type Block: LevelBlock;
-    
-    fn blocks(&self) -> &[Self::Block];
-    fn blocks_mut(&mut self) -> &mut [Self::Block];
-    
-    fn insert_empty_block(&mut self) -> usize;
-    
-    /// # Safety
-    ///
-    /// block_index and level_block emptiness are not checked.
-    unsafe fn remove_empty_block_unchecked(&mut self, block_index: usize);
-}
-
+/// Level that uses intrusive list for an empty blocks list.
 #[derive(Clone)]
-pub struct SingleBlockLevel<Block: LevelBlock>{
-    block: Block
-}
-
-impl<Block: LevelBlock> ILevel for SingleBlockLevel<Block>{
-    type Block = Block;
-
-    fn blocks(&self) -> &[Self::Block] {
-        unsafe{ slice::from_raw_parts(&self.block, 1) }
-    }
-
-    fn blocks_mut(&mut self) -> &mut [Self::Block] {
-        unsafe{ slice::from_raw_parts_mut(&mut self.block, 1) }
-    }
-
-    fn insert_empty_block(&mut self) -> usize {
-        unreachable!()
-    }
-
-    unsafe fn remove_empty_block_unchecked(&mut self, block_index: usize) {
-        unreachable!()
-    }
-}
-
-impl<Block: LevelBlock> Default for SingleBlockLevel<Block> {
-    #[inline]
-    fn default() -> Self {
-        Self{ block: Block::empty() }
-    }
-}
-
-#[derive(Clone)]
-pub struct Level<Block: LevelBlock>{
+pub struct IntrusiveListLevel<Block: IntrusiveMaybeEmptyNode>{
     blocks: Vec<Block>,
     
     /// Single linked list of empty level_block indices.
@@ -60,7 +12,7 @@ pub struct Level<Block: LevelBlock>{
     root_empty_block: u64,
 }
 
-impl<Block: LevelBlock> Default for Level<Block> {
+impl<Block: IntrusiveMaybeEmptyNode> Default for IntrusiveListLevel<Block> {
     #[inline]
     fn default() -> Self {
         Self{
@@ -71,7 +23,7 @@ impl<Block: LevelBlock> Default for Level<Block> {
     }
 }
 
-impl<Block: LevelBlock> Level<Block> {
+impl<Block: IntrusiveMaybeEmptyNode> IntrusiveListLevel<Block> {
     /// Next empty level_block link
     /// 
     /// Block's mask used as index to next empty level_block
@@ -95,7 +47,7 @@ impl<Block: LevelBlock> Level<Block> {
             self.root_empty_block = *next_empty_block_index;
             
             // restore original level_block zero state
-            empty_block.restore_empty_u64();
+            empty_block.restore_empty();
         }
         Some(index)
     }
@@ -113,7 +65,7 @@ impl<Block: LevelBlock> Level<Block> {
     }
 }
 
-impl<Block: LevelBlock> ILevel for Level<Block> {
+impl<Block: IntrusiveMaybeEmptyNode> ILevel for IntrusiveListLevel<Block> {
     type Block = Block;
 
     #[inline]

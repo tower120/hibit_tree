@@ -5,7 +5,7 @@ use crate::{SparseHierarchy, IntoOwned, Borrowable};
 use crate::const_utils::const_bool::ConstBool;
 use crate::const_utils::const_int::ConstInteger;
 use crate::const_utils::const_array::ConstArray;
-use crate::level_block::LevelBlock;
+use crate::level_block::MaybeEmpty;
 use crate::sparse_hierarchy::{DefaultState, SparseHierarchyState};
 
 // TODO: move out from apply.
@@ -52,7 +52,7 @@ pub trait Op {
     // TODO: rename
     type DataBlockL;
     type DataBlockR;
-    type DataBlockO: LevelBlock;
+    type DataBlockO: MaybeEmpty;
     fn data_op(&self,
         left : impl Borrow<Self::DataBlockL> + IntoOwned<Self::DataBlockL>,
         right: impl Borrow<Self::DataBlockR> + IntoOwned<Self::DataBlockR>
@@ -117,7 +117,7 @@ where
 
     #[inline]
     fn empty_data(&self) -> Self::Data<'_> {
-        <Op::DataBlockO as LevelBlock>::empty()
+        <Op::DataBlockO as MaybeEmpty>::empty()
     }
 
     type State = ApplyState<Op, B1, B2>;

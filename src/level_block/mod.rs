@@ -6,28 +6,25 @@ pub use small_block::*;
 pub use cluster_block::*;
 pub use block::*;
 
-use std::marker::PhantomData;
-use std::ptr::NonNull;
 use crate::{BitBlock, Primitive};
 
-// TODO: split into DataBlock + IntrusiveListDataBlock
-pub trait LevelBlock: Sized {
+// TODO: move to crate level
+pub trait MaybeEmpty {
     fn empty() -> Self;
-    // Do we need this?
     fn is_empty(&self) -> bool;
-    
-    // We need this for intrusive LinkedList of empty blocks.
-    // TODO: We could have some EmptyZeroableData<T: Zeroable> with default implementations
-    //       of ... everything here.
-    // TODO: It is possible to have ILevel that store empty block indexes in
-    //       separate Vec and don't need these two functions.
-    fn as_u64_mut(&mut self) -> &mut u64;
-    /// Restore empty state, after as_u64_mut() mutation.
-    fn restore_empty_u64(&mut self);
 }
 
+/// Implementing this will allow your struct in an empty state 
+/// to be used as a LinkedList node with [IntrusiveListLevel]. 
+pub trait IntrusiveMaybeEmptyNode: MaybeEmpty {
+    fn as_u64_mut(&mut self) -> &mut u64;
+    /// Restore [empty()] state, after [as_u64_mut()] mutation.
+    fn restore_empty(&mut self);
+}
+
+// TODO: rename to LevelBlock
 /// Hierarchy level level_block
-pub trait HiBlock: LevelBlock {
+pub trait HiBlock: /*LevelBlock*/ IntrusiveMaybeEmptyNode {
     type Mask: BitBlock;
     
     fn mask(&self) -> &Self::Mask;

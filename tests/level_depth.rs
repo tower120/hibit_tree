@@ -1,14 +1,14 @@
 use std::ops::Range;
 use itertools::{assert_equal, Itertools};
-use hi_sparse_array::level_block::{Block, LevelBlock};
-use hi_sparse_array::level::{ILevel, Level, SingleBlockLevel};
+use hi_sparse_array::level_block::{Block, MaybeEmpty};
+use hi_sparse_array::level::{ILevel, IntrusiveListLevel, Level, SingleBlockLevel};
 use hi_sparse_array::{SparseArray, SparseArrayLevels};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::sparse_hierarchy::SparseHierarchy;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct DataBlock(u64);
-impl LevelBlock for DataBlock{
+impl MaybeEmpty for DataBlock{
     fn empty() -> Self {
         Self(0)
     }
@@ -17,13 +17,13 @@ impl LevelBlock for DataBlock{
         todo!()
     }
 
-    fn as_u64_mut(&mut self) -> &mut u64 {
+    /*fn as_u64_mut(&mut self) -> &mut u64 {
         &mut self.0
     }
 
     fn restore_empty_u64(&mut self) {
         self.0 = 0;
-    }
+    }*/
 }
 
 
@@ -58,16 +58,18 @@ fn level_depth_test(){
     type Lvl1Block = Block<u64, [u16;64]>;
     type Lvl2Block = Block<u64, [u32;64]>;
     
+    type DataLevel = Level<DataBlock>;
+    
     {
-        type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, ), Level<DataBlock>>;
+        type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, ), DataLevel>;
         do_test(Array::default(), 0..64);
     }
     {
-        type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, Level<Lvl1Block>), Level<DataBlock>>;
+        type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), DataLevel>;
         do_test(Array::default(), 0..64*64);
     }
     {
-        type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, Level<Lvl1Block>, Level<Lvl2Block>), Level<DataBlock>>;
+        type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>, IntrusiveListLevel<Lvl2Block>), DataLevel>;
         do_test(Array::default(), 0..64*64*64);
     }
 }

@@ -2,10 +2,10 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
 use hi_sparse_array::{BitBlock, fold, IntoOwned, Op, /*reduce, Reduce, */SparseArray};
-use hi_sparse_array::level_block::{LevelBlock, Block, SmallBlock, ClusterBlock};
+use hi_sparse_array::level_block::{Block, MaybeEmpty};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::const_utils::ConstTrue;
-use hi_sparse_array::level::{Level, SingleBlockLevel};
+use hi_sparse_array::level::{IntrusiveListLevel, Level, SingleBlockLevel};
 
 type Lvl0Block = Block<u64, [u8;64]>;
 type Lvl1Block = Block<u64, [u16;64]>;
@@ -20,7 +20,7 @@ impl BitAnd for DataBlock{
         Self(self.0 & rhs.0)
     }
 }
-impl LevelBlock for DataBlock{
+impl MaybeEmpty for DataBlock{
     fn empty() -> Self {
         Self(0)
     }
@@ -28,17 +28,9 @@ impl LevelBlock for DataBlock{
     fn is_empty(&self) -> bool {
         todo!()
     }
-
-    fn as_u64_mut(&mut self) -> &mut u64 {
-        &mut self.0
-    }
-
-    fn restore_empty_u64(&mut self) {
-        self.0 = 0;
-    }
 }
 
-type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, Level<Lvl1Block>), Level<DataBlock>>;
+type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), /*IntrusiveList*/Level<DataBlock>>;
 
 
 pub struct AndOp<M, LD>(PhantomData<(M, LD)>);
@@ -51,7 +43,7 @@ impl<M, LD> Default for AndOp<M, LD>{
 impl<M, LD> Op for AndOp<M, LD>
 where
     M: BitBlock + BitAnd<Output = M>, 
-    LD: BitAnd<Output = LD> + LevelBlock
+    LD: BitAnd<Output = LD> + MaybeEmpty
 {
     const EXACT_HIERARCHY: bool = false;
     type SKIP_EMPTY_HIERARCHIES = ConstTrue;

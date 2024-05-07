@@ -6,7 +6,7 @@ use crate::const_utils::const_bool::ConstBool;
 use crate::const_utils::const_int::ConstInteger;
 use crate::const_utils::const_array::{ConstArray, ConstArrayType};
 use crate::const_utils::ConstUsize;
-use crate::level_block::LevelBlock;
+use crate::level_block::MaybeEmpty;
 use crate::sparse_hierarchy::{DefaultState, SparseHierarchy, SparseHierarchyState};
 
 pub struct Fold<Op, Init, ArrayIter>{
@@ -72,7 +72,7 @@ where
 
     #[inline]
     fn empty_data(&self) -> Self::Data<'_> {
-        <Op::DataBlockO as LevelBlock>::empty()
+        <Op::DataBlockO as MaybeEmpty>::empty()
     }
 
     type State = FoldState<Op, Init, ArrayIter>;

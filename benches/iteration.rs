@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
 use hi_sparse_array::SparseArray;
-use hi_sparse_array::level_block::{LevelBlock, Block, SmallBlock, ClusterBlock};
+use hi_sparse_array::level_block::{Block, SmallBlock, ClusterBlock, MaybeEmpty, IntrusiveMaybeEmptyNode};
 use hi_sparse_array::caching_iter::CachingBlockIter;
-use hi_sparse_array::level::{Level, SingleBlockLevel};
+use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
 
 type Lvl0Block = Block<u64, [u8;64]>;
 type Lvl1Block = Block<u64, [u16;64]>;
@@ -13,7 +13,7 @@ type ClusterLvl1Block = ClusterBlock<u64, [u16;4], [u16;16]>;
 
 #[derive(Clone)]
 struct DataBlock(u64);
-impl LevelBlock for DataBlock{
+impl MaybeEmpty for DataBlock{
     fn empty() -> Self {
         Self(0)
     }
@@ -21,19 +21,20 @@ impl LevelBlock for DataBlock{
     fn is_empty(&self) -> bool {
         todo!()
     }
-
+}
+impl IntrusiveMaybeEmptyNode for DataBlock{
     fn as_u64_mut(&mut self) -> &mut u64 {
         &mut self.0
     }
 
-    fn restore_empty_u64(&mut self) {
+    fn restore_empty(&mut self) {
         self.0 = 0;
     }
 }
 
-type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, Level<Lvl1Block>), Level<DataBlock>>;
-type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, Level<CompactLvl1Block>), Level<DataBlock>>;
-type ClusterBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, Level<ClusterLvl1Block>), Level<DataBlock>>;
+type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), IntrusiveListLevel<DataBlock>>;
+type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<CompactLvl1Block>), IntrusiveListLevel<DataBlock>>;
+type ClusterBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<ClusterLvl1Block>), IntrusiveListLevel<DataBlock>>;
 
 
 fn cluster_array_iter(array: &ClusterBlockArray) -> u64 {

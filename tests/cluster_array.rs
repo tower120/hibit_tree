@@ -1,12 +1,12 @@
-use hi_sparse_array::level_block::{Block, ClusterBlock, LevelBlock};
+use hi_sparse_array::level_block::{Block, ClusterBlock, MaybeEmpty};
 use hi_sparse_array::SparseArray;
 use itertools::assert_equal;
 use hi_sparse_array::caching_iter::CachingBlockIter;
-use hi_sparse_array::level::{Level, SingleBlockLevel};
+use hi_sparse_array::level::{IntrusiveListLevel, Level, SingleBlockLevel};
 
 #[derive(Clone, Debug)]
 struct DataBlock(u64);
-impl LevelBlock for DataBlock{
+impl MaybeEmpty for DataBlock{
     fn empty() -> Self {
         Self(0)
     }
@@ -14,21 +14,21 @@ impl LevelBlock for DataBlock{
     fn is_empty(&self) -> bool {
         todo!()
     }
-
+/*
     fn as_u64_mut(&mut self) -> &mut u64 {
         &mut self.0
     }
 
     fn restore_empty_u64(&mut self) {
         self.0 = 0;
-    }
+    }*/
 }
 
 #[test]
 fn insert_test(){
     type Lvl0Block = Block<u64, [u8;64]>;
     type ClusterLvl1Block = ClusterBlock<u64, [u16;4], [u16;16]>;
-    type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, Level<ClusterLvl1Block>), Level<DataBlock>>;
+    type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<ClusterLvl1Block>), /*IntrusiveList*/Level<DataBlock>>;
     
     let mut array: Array = Default::default(); 
     

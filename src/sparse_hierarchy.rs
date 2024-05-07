@@ -4,7 +4,7 @@ use crate::{Array, BitBlock, IntoOwned, PrimitiveArray};
 use crate::sparse_array::level_indices;
 use crate::const_utils::const_int::ConstInteger;
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
-use crate::level_block::LevelBlock;
+use crate::level_block::MaybeEmpty;
 
 /// 
 /// TODO: Change description
@@ -40,7 +40,7 @@ pub trait SparseHierarchy {
         I: ConstArray<Item=usize> + Copy;
     
     // TODO: Try to remove IntoOwned here. This requires Data to impl Clone. 
-    type DataType: LevelBlock;
+    type DataType: MaybeEmpty;
     type Data<'a>: Borrow<Self::DataType> + IntoOwned<Self::DataType>
         where Self: 'a;
     /// # Safety

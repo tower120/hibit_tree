@@ -3,10 +3,10 @@ use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
 use wide::f32x4;
 use hi_sparse_array::{Apply, apply, BitBlock, Op, IntoOwned};
-use hi_sparse_array::level_block::{LevelBlock, Block};
+use hi_sparse_array::level_block::{Block, IntrusiveMaybeEmptyNode, MaybeEmpty};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::const_utils::ConstFalse;
-use hi_sparse_array::level::{Level, SingleBlockLevel};
+use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
 use hi_sparse_array::sparse_hierarchy::SparseHierarchy;
 
 #[derive(Clone)]
@@ -19,7 +19,7 @@ impl Mul for DataBlock{
     }
 }
 
-impl LevelBlock for DataBlock{
+impl MaybeEmpty for DataBlock{
     fn empty() -> Self {
         Self(f32x4::ZERO)
     }
@@ -28,14 +28,16 @@ impl LevelBlock for DataBlock{
         // ??? 
         self.0 == f32x4::ZERO
     }
+}
 
+impl IntrusiveMaybeEmptyNode for DataBlock{
     fn as_u64_mut(&mut self) -> &mut u64 {
         unsafe{
             &mut*self.0.as_array_mut().as_mut_ptr().cast::<u64>()
         }
     }
 
-    fn restore_empty_u64(&mut self) {
+    fn restore_empty(&mut self) {
         // Is this correct for float??
         *self.as_u64_mut() = 0;
     }
@@ -48,7 +50,7 @@ type SparseArray = hi_sparse_array::SparseArray<
         SingleBlockLevel<Lvl0Block>,
         //Level<Lvl1Block>,
     ),
-    Level<DataBlock>
+    IntrusiveListLevel<DataBlock>
 >;
 
 #[derive(Default)]
@@ -80,7 +82,7 @@ impl<M, D> Default for MulOp<M, D>{
 impl<M, D> Op for MulOp<M, D>
 where
     M: BitBlock + BitAnd<Output = M>, 
-    D: Mul<Output = D> + LevelBlock
+    D: Mul<Output = D> + MaybeEmpty
 {
     const EXACT_HIERARCHY: bool = false;
     type SKIP_EMPTY_HIERARCHIES = ConstFalse;
