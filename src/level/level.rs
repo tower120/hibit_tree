@@ -1,5 +1,5 @@
-use crate::level::{ILevel};
-use crate::level_block::{MaybeEmpty};
+use crate::level::ILevel;
+use crate::MaybeEmpty;
 
 pub struct Level<Block: MaybeEmpty>{
     blocks: Vec<Block>,

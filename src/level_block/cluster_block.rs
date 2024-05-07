@@ -3,8 +3,8 @@ use std::mem::{MaybeUninit, size_of};
 use std::ptr;
 use std::slice::{from_raw_parts, from_raw_parts_mut};
 use arrayvec::ArrayVec;
-use crate::level_block::{HiBlock, IntrusiveMaybeEmptyNode, MaybeEmpty};
-use crate::{BitBlock, Primitive};
+use crate::level_block::HiBlock;
+use crate::{BitBlock, MaybeEmpty, MaybeEmptyIntrusive, Primitive};
 use crate::utils::array::Array;
 
 type SubBlockMask = u16;
@@ -123,7 +123,7 @@ where
     }
 }
 
-impl<Mask, SubBlockIndices, SubBlock> IntrusiveMaybeEmptyNode for ClusterBlock<Mask, SubBlockIndices, SubBlock>
+impl<Mask, SubBlockIndices, SubBlock> MaybeEmptyIntrusive for ClusterBlock<Mask, SubBlockIndices, SubBlock>
 where
     Mask: BitBlock,
     SubBlockIndices: Array

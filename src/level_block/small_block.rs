@@ -2,8 +2,8 @@ use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ops::{Deref, DerefMut};
 use std::ops::ControlFlow::Continue;
 use std::ptr;
-use crate::BitBlock;
-use crate::level_block::{HiBlock, IntrusiveMaybeEmptyNode, MaybeEmpty};
+use crate::{BitBlock, MaybeEmpty, MaybeEmptyIntrusive};
+use crate::level_block::HiBlock;
 use crate::utils::{Array, Primitive};
 
 #[repr(C)]
@@ -212,7 +212,7 @@ where
     }
 }
 
-impl<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices> IntrusiveMaybeEmptyNode for SmallBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
+impl<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices> MaybeEmptyIntrusive for SmallBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
 where
     Mask: BitBlock,
     BlockIndices: Array + Copy,

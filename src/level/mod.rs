@@ -6,7 +6,7 @@ pub use single_block_level::*;
 pub use intrusive_list_level::*;
 pub use level::*;
 
-use crate::level_block::MaybeEmpty;
+use crate::MaybeEmpty;
 
 pub trait ILevel: Default {
     type Block: MaybeEmpty;

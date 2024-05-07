@@ -1,6 +1,6 @@
 use std::slice;
 use crate::level::ILevel;
-use crate::level_block::MaybeEmpty;
+use crate::MaybeEmpty;
 
 #[derive(Clone)]
 pub struct SingleBlockLevel<Block: MaybeEmpty>{

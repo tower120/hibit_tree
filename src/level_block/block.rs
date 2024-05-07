@@ -1,6 +1,7 @@
 use std::mem::{MaybeUninit, size_of};
 use crate::bit_block::BitBlock;
-use crate::level_block::{HiBlock, IntrusiveMaybeEmptyNode, MaybeEmpty};
+use crate::level_block::HiBlock;
+use crate::{MaybeEmpty, MaybeEmptyIntrusive};
 use crate::utils::Array;
 use crate::utils::primitive::Primitive;
 
@@ -31,7 +32,7 @@ where
     }
 }
 
-impl<Mask, BlockIndices> IntrusiveMaybeEmptyNode for Block<Mask, BlockIndices>
+impl<Mask, BlockIndices> MaybeEmptyIntrusive for Block<Mask, BlockIndices>
 where
     Mask: BitBlock,
     BlockIndices: Array

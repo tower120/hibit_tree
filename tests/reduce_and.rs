@@ -1,8 +1,8 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
-use hi_sparse_array::{BitBlock, fold, Op, /*reduce, Reduce, */SparseArray};
-use hi_sparse_array::level_block::{Block, MaybeEmpty};
+use hi_sparse_array::{BitBlock, fold, MaybeEmpty, Op, SparseArray};
+use hi_sparse_array::level_block::Block;
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::const_utils::ConstTrue;
 use hi_sparse_array::level::{IntrusiveListLevel, Level, SingleBlockLevel};

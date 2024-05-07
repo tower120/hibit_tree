@@ -2,8 +2,8 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
 use wide::f32x4;
-use hi_sparse_array::{apply, BitBlock, Op};
-use hi_sparse_array::level_block::{Block, IntrusiveMaybeEmptyNode, MaybeEmpty};
+use hi_sparse_array::{apply, BitBlock, MaybeEmpty, MaybeEmptyIntrusive, Op};
+use hi_sparse_array::level_block::Block;
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::const_utils::ConstFalse;
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
@@ -31,7 +31,7 @@ impl MaybeEmpty for DataBlock{
     }
 }
 
-impl IntrusiveMaybeEmptyNode for DataBlock{
+impl MaybeEmptyIntrusive for DataBlock{
     fn as_u64_mut(&mut self) -> &mut u64 {
         unsafe{
             &mut*self.0.as_array_mut().as_mut_ptr().cast::<u64>()

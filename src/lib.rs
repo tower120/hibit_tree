@@ -32,6 +32,21 @@ use crate::const_utils::const_int::{ConstInteger, ConstIntVisitor};
 use utils::primitive::Primitive;
 use utils::array::Array;
 
+pub trait MaybeEmpty {
+    fn empty() -> Self;
+    fn is_empty(&self) -> bool;
+}
+
+/// [MaybeEmpty] that can be used as a node in intrusive list.
+/// 
+/// Implementing this will allow your [MaybeEmpty] struct in an empty state 
+/// to be used as a LinkedList node with [IntrusiveListLevel]. 
+pub trait MaybeEmptyIntrusive: MaybeEmpty {
+    fn as_u64_mut(&mut self) -> &mut u64;
+    /// Restore [empty()] state, after [as_u64_mut()] mutation.
+    fn restore_empty(&mut self);
+}
+
 // Compile-time loop inside. Ends up with N ADDs.
 #[inline]
 pub(crate) fn data_block_index<T: SparseHierarchy>(

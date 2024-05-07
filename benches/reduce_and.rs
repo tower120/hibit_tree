@@ -3,8 +3,8 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, BitOr, Mul};
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
-use hi_sparse_array::{apply, BitBlock, fold, Op, SparseArray};
-use hi_sparse_array::level_block::{Block, IntrusiveMaybeEmptyNode, MaybeEmpty};
+use hi_sparse_array::{apply, BitBlock, fold, MaybeEmpty, MaybeEmptyIntrusive, Op, SparseArray};
+use hi_sparse_array::level_block::Block;
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::const_utils::ConstFalse;
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
@@ -50,7 +50,7 @@ impl MaybeEmpty for DataBlock{
         todo!()
     }
 }
-impl IntrusiveMaybeEmptyNode for DataBlock{
+impl MaybeEmptyIntrusive for DataBlock{
     fn as_u64_mut(&mut self) -> &mut u64 {
         &mut self.0
     }

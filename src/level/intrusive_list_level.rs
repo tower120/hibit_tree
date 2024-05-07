@@ -1,9 +1,9 @@
 use crate::level::ILevel;
-use crate::level_block::IntrusiveMaybeEmptyNode;
+use crate::MaybeEmptyIntrusive;
 
 /// Level that uses intrusive list for an empty blocks list.
 #[derive(Clone)]
-pub struct IntrusiveListLevel<Block: IntrusiveMaybeEmptyNode>{
+pub struct IntrusiveListLevel<Block: MaybeEmptyIntrusive>{
     blocks: Vec<Block>,
     
     /// Single linked list of empty level_block indices.
@@ -12,7 +12,7 @@ pub struct IntrusiveListLevel<Block: IntrusiveMaybeEmptyNode>{
     root_empty_block: u64,
 }
 
-impl<Block: IntrusiveMaybeEmptyNode> Default for IntrusiveListLevel<Block> {
+impl<Block: MaybeEmptyIntrusive> Default for IntrusiveListLevel<Block> {
     #[inline]
     fn default() -> Self {
         Self{
@@ -23,7 +23,7 @@ impl<Block: IntrusiveMaybeEmptyNode> Default for IntrusiveListLevel<Block> {
     }
 }
 
-impl<Block: IntrusiveMaybeEmptyNode> IntrusiveListLevel<Block> {
+impl<Block: MaybeEmptyIntrusive> IntrusiveListLevel<Block> {
     /// Next empty level_block link
     /// 
     /// Block's mask used as index to next empty level_block
@@ -65,7 +65,7 @@ impl<Block: IntrusiveMaybeEmptyNode> IntrusiveListLevel<Block> {
     }
 }
 
-impl<Block: IntrusiveMaybeEmptyNode> ILevel for IntrusiveListLevel<Block> {
+impl<Block: MaybeEmptyIntrusive> ILevel for IntrusiveListLevel<Block> {
     type Block = Block;
 
     #[inline]

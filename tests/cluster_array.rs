@@ -1,5 +1,5 @@
-use hi_sparse_array::level_block::{Block, ClusterBlock, MaybeEmpty};
-use hi_sparse_array::SparseArray;
+use hi_sparse_array::level_block::{Block, ClusterBlock};
+use hi_sparse_array::{MaybeEmpty, SparseArray};
 use itertools::assert_equal;
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::level::{IntrusiveListLevel, Level, SingleBlockLevel};

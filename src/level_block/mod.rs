@@ -6,25 +6,11 @@ pub use small_block::*;
 pub use cluster_block::*;
 pub use block::*;
 
-use crate::{BitBlock, Primitive};
-
-// TODO: move to crate level
-pub trait MaybeEmpty {
-    fn empty() -> Self;
-    fn is_empty(&self) -> bool;
-}
-
-/// Implementing this will allow your struct in an empty state 
-/// to be used as a LinkedList node with [IntrusiveListLevel]. 
-pub trait IntrusiveMaybeEmptyNode: MaybeEmpty {
-    fn as_u64_mut(&mut self) -> &mut u64;
-    /// Restore [empty()] state, after [as_u64_mut()] mutation.
-    fn restore_empty(&mut self);
-}
+use crate::{BitBlock, MaybeEmpty, MaybeEmptyIntrusive, Primitive};
 
 // TODO: rename to LevelBlock
 /// Hierarchy level level_block
-pub trait HiBlock: /*LevelBlock*/ IntrusiveMaybeEmptyNode {
+pub trait HiBlock: MaybeEmptyIntrusive {
     type Mask: BitBlock;
     
     fn mask(&self) -> &Self::Mask;

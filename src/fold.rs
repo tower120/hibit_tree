@@ -6,7 +6,7 @@ use crate::const_utils::const_bool::ConstBool;
 use crate::const_utils::const_int::ConstInteger;
 use crate::const_utils::const_array::{ConstArray, ConstArrayType};
 use crate::const_utils::ConstUsize;
-use crate::level_block::MaybeEmpty;
+use crate::MaybeEmpty;
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::utils::{Borrowable, IntoOwned, array};
 
