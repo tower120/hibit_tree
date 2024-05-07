@@ -4,15 +4,14 @@ use std::ops::ControlFlow::Continue;
 use std::ptr;
 use crate::BitBlock;
 use crate::level_block::{HiBlock, IntrusiveMaybeEmptyNode, MaybeEmpty};
-use crate::primitive::Primitive;
-use crate::primitive_array::{PrimitiveArray, UninitArray, UninitPrimitiveArray};
+use crate::utils::{Array, Primitive};
 
 #[repr(C)]
 union BigSmallArray<BlockIndices, SmallBlockIndices, MaskU64Populations>
 where
-    BlockIndices: PrimitiveArray,
-    SmallBlockIndices: PrimitiveArray<Item=BlockIndices::Item>,
-    MaskU64Populations: PrimitiveArray<Item=u8>,
+    BlockIndices: Array,
+    SmallBlockIndices: Array<Item=BlockIndices::Item, UninitArray: Copy>,
+    MaskU64Populations: Array<Item=u8> + Copy,
 {
     big: (u8, ManuallyDrop<Box<BlockIndices>>),
     
@@ -24,9 +23,9 @@ where
 
 impl<BlockIndices, SmallBlockIndices, MaskU64Populations> From<Box<BlockIndices>> for BigSmallArray<BlockIndices, SmallBlockIndices, MaskU64Populations>
 where
-    BlockIndices: PrimitiveArray,
-    SmallBlockIndices: PrimitiveArray<Item=BlockIndices::Item>,
-    MaskU64Populations: PrimitiveArray<Item=u8>
+    BlockIndices: Array,
+    SmallBlockIndices: Array<Item=BlockIndices::Item, UninitArray: Copy>,
+    MaskU64Populations: Array<Item=u8> + Copy,
 {
     #[inline]
     fn from(array: Box<BlockIndices>) -> Self {
@@ -38,9 +37,9 @@ where
 
 impl<BlockIndices, SmallBlockIndices, MaskU64Populations> From<(MaskU64Populations, SmallBlockIndices::UninitArray)> for BigSmallArray<BlockIndices, SmallBlockIndices, MaskU64Populations>
 where
-    BlockIndices: PrimitiveArray,
-    SmallBlockIndices: PrimitiveArray<Item=BlockIndices::Item>,
-    MaskU64Populations: PrimitiveArray<Item=u8>
+    BlockIndices: Array,
+    SmallBlockIndices: Array<Item=BlockIndices::Item, UninitArray: Copy>,
+    MaskU64Populations: Array<Item=u8> + Copy,
 {
     #[inline]
     fn from(small: (MaskU64Populations, SmallBlockIndices::UninitArray)) -> Self {
@@ -51,9 +50,9 @@ where
 
 impl<BlockIndices, SmallBlockIndices, MaskU64Populations> Clone for BigSmallArray<BlockIndices, SmallBlockIndices, MaskU64Populations>
 where
-    BlockIndices: PrimitiveArray,
-    SmallBlockIndices: PrimitiveArray<Item=BlockIndices::Item>,
-    MaskU64Populations: PrimitiveArray<Item=u8>
+    BlockIndices: Array + Copy,
+    SmallBlockIndices: Array<Item=BlockIndices::Item, UninitArray: Copy>,
+    MaskU64Populations: Array<Item=u8> + Copy,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -69,9 +68,9 @@ where
 
 impl<BlockIndices, SmallBlockIndices, MaskU64Populations> BigSmallArray<BlockIndices, SmallBlockIndices, MaskU64Populations>
 where
-    BlockIndices: PrimitiveArray,
-    SmallBlockIndices: PrimitiveArray<Item=BlockIndices::Item>,
-    MaskU64Populations: PrimitiveArray<Item=u8>,
+    BlockIndices: /*Primitive*/Array,
+    SmallBlockIndices: /*Primitive*/Array<Item=BlockIndices::Item, UninitArray: Copy>,
+    MaskU64Populations: /*Primitive*/Array<Item=u8> + Copy,
 {
     #[inline]
     fn is_small(&self) -> bool {
@@ -85,9 +84,9 @@ where
 
 impl<BlockIndices, SmallBlockIndices, MaskU64Populations> Drop for BigSmallArray<BlockIndices, SmallBlockIndices, MaskU64Populations>
 where
-    BlockIndices: PrimitiveArray,
-    SmallBlockIndices: PrimitiveArray<Item=BlockIndices::Item>,
-    MaskU64Populations: PrimitiveArray<Item=u8>
+    BlockIndices: /*Primitive*/Array,
+    SmallBlockIndices: /*Primitive*/Array<Item=BlockIndices::Item, UninitArray: Copy>,
+    MaskU64Populations: /*Primitive*/Array<Item=u8> + Copy
 {
     #[inline]
     fn drop(&mut self) {
@@ -101,9 +100,9 @@ where
 #[derive(Clone)]
 pub struct SmallBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
 where
-    BlockIndices: PrimitiveArray,
-    SmallBlockIndices: PrimitiveArray<Item=BlockIndices::Item>,
-    MaskU64Populations: PrimitiveArray<Item=u8>,
+    BlockIndices: Array + Copy,
+    SmallBlockIndices: Array<Item=BlockIndices::Item, UninitArray: Copy>,
+    MaskU64Populations: Array<Item=u8> + Copy,
 {
     mask: Mask,
     big_small: BigSmallArray<BlockIndices, SmallBlockIndices, MaskU64Populations>
@@ -112,9 +111,9 @@ where
 impl<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices> SmallBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
 where
     Mask: BitBlock,
-    MaskU64Populations: PrimitiveArray<Item=u8>, 
-    BlockIndices: PrimitiveArray,
-    SmallBlockIndices: PrimitiveArray<Item=BlockIndices::Item>,
+    BlockIndices: Array + Copy,
+    SmallBlockIndices: Array<Item=BlockIndices::Item, UninitArray: Copy>,
+    MaskU64Populations: Array<Item=u8> + Copy,
 {
     /// number of 1 bits in mask before `index` bit.
     ///
@@ -189,9 +188,9 @@ where
 impl<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices> MaybeEmpty for SmallBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
 where
     Mask: BitBlock,
-    MaskU64Populations: PrimitiveArray<Item=u8>, 
-    BlockIndices: PrimitiveArray,
-    SmallBlockIndices: PrimitiveArray<Item=BlockIndices::Item>,
+    BlockIndices: Array + Copy,
+    SmallBlockIndices: Array<Item=BlockIndices::Item, UninitArray: Copy>,
+    MaskU64Populations: Array<Item=u8> + Copy,
 {
     #[inline]
     fn empty() -> Self {
@@ -216,9 +215,9 @@ where
 impl<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices> IntrusiveMaybeEmptyNode for SmallBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
 where
     Mask: BitBlock,
-    MaskU64Populations: PrimitiveArray<Item=u8>, 
-    BlockIndices: PrimitiveArray,
-    SmallBlockIndices: PrimitiveArray<Item=BlockIndices::Item>,
+    BlockIndices: Array + Copy,
+    SmallBlockIndices: Array<Item=BlockIndices::Item, UninitArray: Copy>,
+    MaskU64Populations: Array<Item=u8> + Copy,
 {
     #[inline]
     fn as_u64_mut(&mut self) -> &mut u64 {
@@ -237,9 +236,9 @@ where
 impl<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices> HiBlock for SmallBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
 where
     Mask: BitBlock,
-    MaskU64Populations: PrimitiveArray<Item=u8>, 
-    BlockIndices: PrimitiveArray,
-    SmallBlockIndices: PrimitiveArray<Item=BlockIndices::Item>,
+    BlockIndices: Array<Item: Primitive> + Copy,
+    SmallBlockIndices: Array<Item=BlockIndices::Item, UninitArray: Copy>,
+    MaskU64Populations: Array<Item=u8> + Copy,
 {
     type Mask = Mask;
 

@@ -2,12 +2,13 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
 use wide::f32x4;
-use hi_sparse_array::{Apply, apply, BitBlock, Op, IntoOwned};
+use hi_sparse_array::{apply, BitBlock, Op};
 use hi_sparse_array::level_block::{Block, IntrusiveMaybeEmptyNode, MaybeEmpty};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::const_utils::ConstFalse;
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
 use hi_sparse_array::sparse_hierarchy::SparseHierarchy;
+use hi_sparse_array::utils::IntoOwned;
 
 #[derive(Clone)]
 struct DataBlock(f32x4);

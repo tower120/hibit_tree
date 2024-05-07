@@ -4,7 +4,7 @@ use std::ops::ControlFlow;
 use std::ops::ControlFlow::{Break, Continue};
 use crate::const_utils::const_bool::{ConstBool, ConstTrue, ConstFalse};
 use crate::const_utils::const_array::{ConstArray};
-use crate::primitive_array::{Array};
+use crate::utils::array::{Array};
 
 pub trait ConstIntVisitor {
     type Out;

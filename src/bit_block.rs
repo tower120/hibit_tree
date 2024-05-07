@@ -1,10 +1,8 @@
-use std::any::TypeId;
 use std::mem;
 use std::ops::{BitAnd, BitOr, ControlFlow};
-use std::ptr::NonNull;
 use crate::bit_queue::{ArrayBitQueue, BitQueue, EmptyBitQueue, PrimitiveBitQueue};
 use crate::bit_utils;
-use crate::primitive_array::{Array, PrimitiveArray};
+use crate::utils::array::Array;
 
 pub trait BitBlock: Eq + Sized + Clone + 'static{
     // TODO: Try use SIZE instead. There is const ilog2
@@ -77,7 +75,7 @@ pub trait BitBlock: Eq + Sized + Clone + 'static{
     #[inline]
     fn into_bits_iter(self) -> Self::BitsIter;
 
-    type Array: PrimitiveArray<Item = u64>;
+    type Array: Array<Item = u64>;
     fn as_array(&self) -> &Self::Array;
     fn as_array_mut(&mut self) -> &mut Self::Array;
 }

@@ -1,8 +1,8 @@
 use std::mem::{MaybeUninit, size_of};
 use crate::bit_block::BitBlock;
 use crate::level_block::{HiBlock, IntrusiveMaybeEmptyNode, MaybeEmpty};
-use crate::primitive::Primitive;
-use crate::primitive_array::PrimitiveArray;
+use crate::utils::Array;
+use crate::utils::primitive::Primitive;
 
 /// TODO: Description
 #[derive(Clone)]
@@ -15,7 +15,7 @@ pub struct Block<Mask, BlockIndices> {
 impl<Mask, BlockIndices> MaybeEmpty for Block<Mask, BlockIndices>
 where
     Mask: BitBlock,
-    BlockIndices: PrimitiveArray
+    BlockIndices: Array
 {
     #[inline]
     fn empty() -> Self {
@@ -34,7 +34,7 @@ where
 impl<Mask, BlockIndices> IntrusiveMaybeEmptyNode for Block<Mask, BlockIndices>
 where
     Mask: BitBlock,
-    BlockIndices: PrimitiveArray
+    BlockIndices: Array
 {
     #[inline]
     fn as_u64_mut(&mut self) -> &mut u64 {
@@ -52,7 +52,7 @@ where
 impl<Mask, BlockIndices> HiBlock for Block<Mask, BlockIndices>
 where
     Mask: BitBlock,
-    BlockIndices: PrimitiveArray
+    BlockIndices: Array<Item: Primitive>
 {
     type Mask = Mask;
 

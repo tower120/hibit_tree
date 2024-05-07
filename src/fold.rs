@@ -1,13 +1,14 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use arrayvec::ArrayVec;
-use crate::{BitBlock, Borrowable, IntoOwned, primitive_array};
+use crate::BitBlock;
 use crate::const_utils::const_bool::ConstBool;
 use crate::const_utils::const_int::ConstInteger;
 use crate::const_utils::const_array::{ConstArray, ConstArrayType};
 use crate::const_utils::ConstUsize;
 use crate::level_block::MaybeEmpty;
-use crate::sparse_hierarchy::{DefaultState, SparseHierarchy, SparseHierarchyState};
+use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
+use crate::utils::{Borrowable, IntoOwned, array};
 
 pub struct Fold<Op, Init, ArrayIter>{
     pub(crate) op: Op,
@@ -143,7 +144,7 @@ where
         Self{
             init_state: SparseHierarchyState::new(this.init.borrow()),
             states,
-            lvls_non_empty_states: primitive_array::Array::from_fn(|_|ArrayVec::new()),
+            lvls_non_empty_states: array::Array::from_fn(|_|ArrayVec::new()),
             phantom_data: PhantomData,
         }
     }

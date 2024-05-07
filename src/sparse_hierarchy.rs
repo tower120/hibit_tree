@@ -1,10 +1,10 @@
 use std::borrow::Borrow;
-use std::marker::PhantomData;
-use crate::{Array, BitBlock, IntoOwned, PrimitiveArray};
+use crate::{Array, BitBlock};
 use crate::sparse_array::level_indices;
 use crate::const_utils::const_int::ConstInteger;
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
 use crate::level_block::MaybeEmpty;
+use crate::utils::IntoOwned;
 
 /// 
 /// TODO: Change description

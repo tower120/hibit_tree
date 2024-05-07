@@ -4,8 +4,8 @@ use std::ptr;
 use std::slice::{from_raw_parts, from_raw_parts_mut};
 use arrayvec::ArrayVec;
 use crate::level_block::{HiBlock, IntrusiveMaybeEmptyNode, MaybeEmpty};
-use crate::{BitBlock, Primitive, PrimitiveArray};
-use crate::primitive_array::Array;
+use crate::{BitBlock, Primitive};
+use crate::utils::array::Array;
 
 type SubBlockMask = u16;
 const SUB_BLOCK_SIZE: usize = size_of::<SubBlockMask>()*8;
@@ -72,8 +72,8 @@ pub struct ClusterBlock<Mask, SubBlockIndices/*: PrimitiveArray*/, SubBlock/*: P
 impl<Mask, SubBlockIndices, SubBlock> ClusterBlock<Mask, SubBlockIndices, SubBlock>
 where
     Mask: BitBlock,
-    SubBlockIndices: PrimitiveArray,
-    SubBlock: PrimitiveArray
+    SubBlockIndices: Array,
+    SubBlock: Array
 {
     #[inline]
     fn sub_masks(mask: &Mask) -> &[SubBlockMask]{
@@ -102,7 +102,7 @@ where
 impl<Mask, SubBlockIndices, SubBlock> MaybeEmpty for ClusterBlock<Mask, SubBlockIndices, SubBlock>
 where
     Mask: BitBlock,
-    SubBlockIndices: PrimitiveArray
+    SubBlockIndices: Array
 {
     // TODO: this should accept Level as arg
     #[inline]
@@ -126,7 +126,7 @@ where
 impl<Mask, SubBlockIndices, SubBlock> IntrusiveMaybeEmptyNode for ClusterBlock<Mask, SubBlockIndices, SubBlock>
 where
     Mask: BitBlock,
-    SubBlockIndices: PrimitiveArray
+    SubBlockIndices: Array
 {
     #[inline]
     fn as_u64_mut(&mut self) -> &mut u64 {
@@ -144,8 +144,8 @@ where
 impl<Mask, SubBlockIndices, SubBlock> HiBlock for ClusterBlock<Mask, SubBlockIndices, SubBlock>
 where
     Mask: BitBlock,
-    SubBlockIndices: PrimitiveArray,
-    SubBlock: PrimitiveArray<Item = u16>
+    SubBlockIndices: Array<Item: Primitive>,
+    SubBlock: Array<Item = u16>
 {
     type Mask = Mask;
 

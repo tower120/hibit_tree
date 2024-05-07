@@ -1,11 +1,12 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
-use hi_sparse_array::{BitBlock, fold, IntoOwned, Op, /*reduce, Reduce, */SparseArray};
+use hi_sparse_array::{BitBlock, fold, Op, /*reduce, Reduce, */SparseArray};
 use hi_sparse_array::level_block::{Block, MaybeEmpty};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::const_utils::ConstTrue;
 use hi_sparse_array::level::{IntrusiveListLevel, Level, SingleBlockLevel};
+use hi_sparse_array::utils::IntoOwned;
 
 type Lvl0Block = Block<u64, [u8;64]>;
 type Lvl1Block = Block<u64, [u16;64]>;

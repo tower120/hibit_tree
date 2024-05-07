@@ -1,8 +1,5 @@
 #![feature(associated_type_bounds)]
 
-mod borrowable;
-mod primitive;
-mod primitive_array;
 mod sparse_array;
 mod sparse_array_levels;
 mod bit_utils;
@@ -19,23 +16,21 @@ pub mod caching_iter;
 pub mod level;
 pub mod level_block;
 pub mod const_utils;
-
+pub mod utils;
 
 //pub use ref_or_val::*;
-pub use borrowable::*;
 pub use bit_block::BitBlock;
-pub use primitive::Primitive;
-pub use primitive_array::{Array, PrimitiveArray};
-pub use sparse_array::{SparseArray};
+pub use sparse_array::SparseArray;
 pub use sparse_array_levels::SparseArrayLevels;
 pub use apply::{Apply, Op};
 pub use fold::Fold;
 //pub use empty::Empty;
 
-
 use std::borrow::Borrow;
 use sparse_hierarchy::SparseHierarchy;
 use crate::const_utils::const_int::{ConstInteger, ConstIntVisitor};
+use utils::primitive::Primitive;
+use utils::array::Array;
 
 // Compile-time loop inside. Ends up with N ADDs.
 #[inline]
@@ -49,28 +44,6 @@ pub(crate) fn data_block_index<T: SparseHierarchy>(
         acc += level_indices.as_ref()[N] << (T::LevelMaskType::SIZE_POT_EXPONENT* (level_count - N - 1));
     }
     acc
-}
-
-/// convert T to value. noop for value, clone - for reference.
-///
-/// # Note
-///
-/// Surprisingly, there is no such thing in `std`. The closest one
-/// is `Cow` enum, with runtime overhead.
-pub trait IntoOwned<T>{
-    fn into_owned(self) -> T;
-}
-impl<T> IntoOwned<T> for T{
-    #[inline]
-    fn into_owned(self) -> T{
-        self
-    }
-}
-impl<T: Clone> IntoOwned<T> for &T{
-    #[inline]
-    fn into_owned(self) -> T{
-        self.clone()
-    }
 }
 
 #[inline]

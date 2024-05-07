@@ -3,14 +3,14 @@ use std::ops::ControlFlow;
 use std::ops::ControlFlow::Continue;
 use std::ptr::{NonNull, null};
 use crate::bit_block::BitBlock;
-use crate::Borrowable;
+use crate::utils::Borrowable;
 use crate::level_block::HiBlock;
 use crate::level::{ILevel, IntrusiveListLevel};
 use crate::sparse_hierarchy::{DefaultState, SparseHierarchy, SparseHierarchyState};
 use crate::const_utils::const_int::{const_for, ConstUsize, ConstInteger, ConstIntVisitor};
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, /* ConstPrimitiveArray, */ConstCopyArrayType};
-use crate::primitive::Primitive;
-use crate::primitive_array::{Array};
+use crate::utils::primitive::Primitive;
+use crate::utils::array::{Array};
 use crate::sparse_array_levels::{FoldMutVisitor, FoldVisitor, MutVisitor, SparseArrayLevels, Visitor};
 
 // TODO: make public
