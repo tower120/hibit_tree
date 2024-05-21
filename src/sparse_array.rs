@@ -390,7 +390,7 @@ where
                     // get directly from root
                     this.get_block_ptr(ConstUsize::<0>, 0)
                 } else {
-                    self.level_block_ptrs.as_mut()[level_block_ptrs_index-1]
+                    *self.level_block_ptrs.as_ref().get_unchecked(level_block_ptrs_index-1)
                 };
             
             let level_block_index = this.get_block_index(level_n.dec(), prev_level_block_ptr, level_index);
@@ -417,7 +417,8 @@ where
             } else {
                 // We do not store the root level's block.
                 let level_block_ptrs_index = last_level_index.dec();
-                let level_block_ptr = self.level_block_ptrs.as_ref()[level_block_ptrs_index.value()];
+                let level_block_ptr = *self.level_block_ptrs.as_ref()
+                                      .get_unchecked(level_block_ptrs_index.value());
                 level_block_ptr
             };
         

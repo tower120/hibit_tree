@@ -68,9 +68,9 @@ where
 
 impl<BlockIndices, SmallBlockIndices, MaskU64Populations> BigSmallArray<BlockIndices, SmallBlockIndices, MaskU64Populations>
 where
-    BlockIndices: /*Primitive*/Array,
-    SmallBlockIndices: /*Primitive*/Array<Item=BlockIndices::Item, UninitArray: Copy>,
-    MaskU64Populations: /*Primitive*/Array<Item=u8> + Copy,
+    BlockIndices: Array,
+    SmallBlockIndices: Array<Item=BlockIndices::Item, UninitArray: Copy>,
+    MaskU64Populations: Array<Item=u8> + Copy,
 {
     #[inline]
     fn is_small(&self) -> bool {
@@ -84,9 +84,9 @@ where
 
 impl<BlockIndices, SmallBlockIndices, MaskU64Populations> Drop for BigSmallArray<BlockIndices, SmallBlockIndices, MaskU64Populations>
 where
-    BlockIndices: /*Primitive*/Array,
-    SmallBlockIndices: /*Primitive*/Array<Item=BlockIndices::Item, UninitArray: Copy>,
-    MaskU64Populations: /*Primitive*/Array<Item=u8> + Copy
+    BlockIndices: Array,
+    SmallBlockIndices: Array<Item=BlockIndices::Item, UninitArray: Copy>,
+    MaskU64Populations: Array<Item=u8> + Copy
 {
     #[inline]
     fn drop(&mut self) {

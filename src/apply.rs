@@ -19,7 +19,7 @@ pub trait Op {
     /// Check and skip empty hierarchies? Any value is safe. Use `false` as default.
     /// 
     /// This incurs some performance overhead, but can greatly reduce
-    /// algorithmic complexity of some [Reduce] operations.
+    /// algorithmic complexity of some [Fold] operations.
     /// 
     /// # In-depth
     /// 
@@ -36,7 +36,7 @@ pub trait Op {
     /// This means that in level2 R's second block's mask will be loaded, 
     /// thou its empty and can be skipped.
     /// 
-    /// [Reduce] cache hierarchy blocks for faster traverse. And when this flag
+    /// [Fold] cache hierarchy blocks for faster traverse. And when this flag
     /// is raised - it checks and does not add empty blocks to the cache list. 
     ///
     /// Notice though, that such thing cannot happen with intersection. 

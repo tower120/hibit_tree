@@ -114,10 +114,11 @@ where
                                     index
                                 )
                             };
-                            self.0
+                            *unsafe{
+                                self.0
                                 .level_iters.as_mut()
-                                [level_depth.value()]
-                            = level_mask.into_owned().into_bits_iter(); 
+                                .get_unchecked_mut(level_depth.value())
+                            } = level_mask.into_owned().into_bits_iter(); 
                             
                             ControlFlow::Break(())
                         } else {

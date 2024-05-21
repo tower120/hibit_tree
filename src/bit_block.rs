@@ -72,7 +72,6 @@ pub trait BitBlock: Eq + Sized + Clone + 'static{
     }    
     
     type BitsIter: BitQueue;
-    #[inline]
     fn into_bits_iter(self) -> Self::BitsIter;
 
     type Array: Array<Item = u64>;
