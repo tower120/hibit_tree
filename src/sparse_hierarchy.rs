@@ -169,22 +169,12 @@ pub trait SparseHierarchy {
 /// For 2-level 64bit hierarchy:
 /// ```
 /// // Select the only level0 block (corresponds to array indices [0..4096))
-/// let (mask0, _) = state.select_level_bock(array, ConstInt::<0>, 0);
+/// let mask0 = state.select_level_bock(array, ConstInt::<0>, 0);
 /// // Select 4th level1 block (corresponds to array indices [192..256))
-/// let (mask1, _) = state.select_level_bock(array, ConstInt::<1>, 3);
+/// let mask1 = state.select_level_bock(array, ConstInt::<1>, 3);
 /// // Select 9th data block (array index 201)
 /// let data = state.data_block(array, 9);
 /// ``` 
-/// 
-/// # is_not_empty
-/// 
-/// [select_level_bock] returns is_not_empty flag, because sometimes you may have
-/// faster ways of checking emptiness, then checking simd register (bitblock) for
-/// zero, in general case.
-/// For example, in [SparseArray] - it is done by checking of level_block 
-/// indirection index for zero.
-/// 
-/// [Fold] with [SKIP_EMPTY_HIERARCHIES] rely heavily on that optimization.
 pub trait SparseHierarchyState{
     type This: SparseHierarchy;
     
@@ -193,8 +183,7 @@ pub trait SparseHierarchyState{
     /// Select block at `level_n` with `level_index`. Where `level_index` is index
     /// in block pointing to `level_n` (which was previously selected). 
     /// 
-    /// Returns `(level_mask, is_not_empty)`.
-    /// `is_not_empty` - mask not empty flag. Allowed to be false-positive.
+    /// Returns `level_mask`.
     /// 
     /// All levels below, considered **not** selected.
     /// 
@@ -207,7 +196,7 @@ pub trait SparseHierarchyState{
         this: &'a Self::This,
         level_n: N, 
         level_index: usize
-    ) -> (<Self::This as SparseHierarchy>::LevelMask<'a>, bool);        
+    ) -> <Self::This as SparseHierarchy>::LevelMask<'a>;        
     
     /// # Safety
     /// 
@@ -245,7 +234,7 @@ impl<This: SparseHierarchy> SparseHierarchyState for DefaultState<This>{
     #[inline]
     unsafe fn select_level_bock<'a, N: ConstInteger>(
         &mut self, this: &'a Self::This, level_n: N, level_index: usize
-    ) -> (<Self::This as SparseHierarchy>::LevelMask<'a>, bool) {
+    ) -> <Self::This as SparseHierarchy>::LevelMask<'a> {
         if /*const*/ level_n.value() == 0 {
             debug_assert!(level_index == 0);
         } else {
@@ -260,9 +249,7 @@ impl<This: SparseHierarchy> SparseHierarchyState for DefaultState<This>{
                     self.level_indices.as_ref()[i]    
                 }
             });
-        let mask     = this.level_mask(indices);
-        let is_empty = mask.borrow().is_zero(); 
-        (mask, is_empty)
+        this.level_mask(indices)
     }
 
     #[inline]

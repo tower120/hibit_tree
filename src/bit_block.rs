@@ -105,3 +105,32 @@ impl BitBlock for u64{
         }        
     }
 }
+
+// TODO: conditional compilation
+impl BitBlock for wide::u64x2{
+    const SIZE_POT_EXPONENT: usize = 7;
+
+    #[inline]
+    fn zero() -> Self {
+        wide::u64x2::ZERO
+    }
+
+    type BitsIter = ArrayBitQueue<u64, 2>;
+
+    #[inline]
+    fn into_bits_iter(self) -> Self::BitsIter {
+        ArrayBitQueue::new(self.to_array())
+    }
+
+    type Array = [u64; 2];
+
+    #[inline]
+    fn as_array(&self) -> &Self::Array {
+        self.as_array()
+    }
+
+    #[inline]
+    fn as_array_mut(&mut self) -> &mut Self::Array {
+        self.as_array_mut()
+    }
+}

@@ -163,18 +163,17 @@ where
     
     #[inline]
     unsafe fn select_level_bock<'a, N: ConstInteger>(&mut self, this: &'a Self::This, level_n: N, level_index: usize) 
-        -> (<Self::This as SparseHierarchy>::LevelMask<'a>, bool) 
+        -> <Self::This as SparseHierarchy>::LevelMask<'a> 
     {
-        let (mask1, _) = self.s1.select_level_bock(
+        let mask1 = self.s1.select_level_bock(
             this.s1.borrow(), level_n, level_index
         );
-        let (mask2, _) = self.s2.select_level_bock(
+        let mask2 = self.s2.select_level_bock(
             this.s2.borrow(), level_n, level_index
         );
         
         let mask = this.op.lvl_op(mask1, mask2);
-        let is_empty = mask.is_zero();
-        (mask, !is_empty)
+        mask
     }
 
     #[inline]

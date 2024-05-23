@@ -152,9 +152,10 @@ where
     #[inline]
     unsafe fn select_level_bock<'t, N: ConstInteger>(
         &mut self, this: &'t Self::This, level_n: N, level_index: usize
-    ) -> (<Self::This as SparseHierarchy>::LevelMask<'t>, bool) {
-        let (acc_mask, _) = self.init_state.select_level_bock(this.init.borrow(), level_n, level_index);
-        let mut acc_mask = acc_mask.into_owned();
+    ) -> <Self::This as SparseHierarchy>::LevelMask<'t> {
+        let mut acc_mask = self.init_state
+                          .select_level_bock(this.init.borrow(), level_n, level_index)
+                          .into_owned();
         
         if Op::SKIP_EMPTY_HIERARCHIES::VALUE
         && N::VALUE != 0 
@@ -164,26 +165,25 @@ where
             lvl_non_empty_states.clear();
             for i in 0..self.states.len(){
                 let (array, array_state) = self.states.get_unchecked_mut(i);
-                let (mask, v) = array_state.select_level_bock(
+                let mask = array_state.select_level_bock(
                     (&*array).borrow(), level_n, level_index
                 );
                 acc_mask = this.op.lvl_op(acc_mask, mask);
                 
-                if v{
+                if !acc_mask.is_zero() {
                     lvl_non_empty_states.push_unchecked(i);
                 }
             }
         } else {
             for (array, array_state) in self.states.iter_mut() {
-                let (mask, _) = array_state.select_level_bock(
+                let mask = array_state.select_level_bock(
                     (&*array).borrow(), level_n, level_index
                 );
                 acc_mask = this.op.lvl_op(acc_mask, mask);
             }
         }
         
-        let is_empty = acc_mask.is_zero();
-        (acc_mask, !is_empty)
+        acc_mask
     }
     
     #[inline]

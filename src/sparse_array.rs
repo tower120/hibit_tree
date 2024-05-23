@@ -371,13 +371,12 @@ where
     unsafe fn select_level_bock<'a, N: ConstInteger>(
         &mut self, this: &'a Self::This, level_n: N, level_index: usize
     )
-        -> (<Self::This as SparseHierarchy>::LevelMask<'a>, bool) 
+        -> <Self::This as SparseHierarchy>::LevelMask<'a> 
     {
         if N::VALUE == 0{
-            assert_eq!(level_index, 0);
+            assert_eq!(level_index, 0); // This act as compile-time check
             let block_ptr = this.get_block_ptr(level_n, 0);
-            let mask = this.get_block_mask(level_n, block_ptr);
-            return (mask, mask.is_zero());
+            return this.get_block_mask(level_n, block_ptr);
         }
         
         // We do not store the root level's block.
@@ -399,10 +398,8 @@ where
         
         // 2. get block mask from level.
         let block_ptr = this.get_block_ptr(level_n, level_block_index);
-        let mask = this.get_block_mask(level_n, block_ptr);
-        self.level_block_ptrs.as_mut()[level_block_ptrs_index] = block_ptr;
-
-        (mask, !level_block_index.is_zero())
+        *self.level_block_ptrs.as_mut().get_unchecked_mut(level_block_ptrs_index) = block_ptr;
+        this.get_block_mask(level_n, block_ptr)
     }
 
     #[inline(always)]

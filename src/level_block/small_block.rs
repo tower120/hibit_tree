@@ -276,7 +276,12 @@ where
             let mask = !(u64::MAX << bit_index);
             block &= mask;
             
-            let offset = *mask_u64_populations.as_ref().get_unchecked(u64_index);
+            let offset = if MaskU64Populations::CAP == 1 {
+                // first always zero
+                0
+            } else {
+                *mask_u64_populations.as_ref().get_unchecked(u64_index)
+            };
             let small_array_index = offset as usize + block.count_ones() as usize;
             array.as_ref().get_unchecked(small_array_index).assume_init_read()
         }        

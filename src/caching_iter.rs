@@ -49,8 +49,7 @@ where
         
         let mut state = T::State::new(container);
         
-        // TODO: This probably could be better
-        let (root_mask, _) = unsafe{
+        let root_mask = unsafe{
             state.select_level_bock(container, ConstUsize::<0>, 0)
         };
         let level0_iter = root_mask.into_owned().into_bits_iter();
@@ -107,7 +106,7 @@ where
                             
                             // 2. update level_iter from mask
                             let level_depth = i.inc();                            
-                            let (level_mask, _) = unsafe{
+                            let level_mask = unsafe{
                                 self.0.state.select_level_bock(
                                     &self.0.container,
                                     level_depth,
