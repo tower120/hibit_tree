@@ -24,6 +24,7 @@ type LevelIterators<T: SparseHierarchy> =
         T::LevelCount
     >;
 
+/// For non-[EXACT_HIERARCHY], iterator may return empty items. 
 pub struct CachingBlockIter<'a, T>
 where
     T: SparseHierarchy,

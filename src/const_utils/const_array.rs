@@ -36,8 +36,10 @@ where
     }
 }
 
+/// [ConstArray] with size `C` and type `T` items.
 pub type ConstArrayType<T, C: ConstInteger> = C::SelfSizeArray<T>;
 
+/// Copyable [ConstArray] with size `C` and type `T` items.
 pub type ConstCopyArrayType<T: Copy, C: ConstInteger> = C::SelfSizeCopyArray<T>;
 
 /*/// [ConstInteger] friendly [PrimitiveArray]

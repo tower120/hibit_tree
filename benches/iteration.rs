@@ -32,10 +32,9 @@ impl MaybeEmptyIntrusive for DataBlock{
     }
 }
 
-type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), IntrusiveListLevel<DataBlock>>;
-type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<CompactLvl1Block>), IntrusiveListLevel<DataBlock>>;
-type ClusterBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<ClusterLvl1Block>), IntrusiveListLevel<DataBlock>>;
-
+type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), DataBlock>;
+type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<CompactLvl1Block>), DataBlock>;
+type ClusterBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<ClusterLvl1Block>), DataBlock>;
 
 fn cluster_array_iter(array: &ClusterBlockArray) -> u64 {
     let mut s = 0;
@@ -95,7 +94,6 @@ pub fn bench_iter(c: &mut Criterion) {
     c.bench_function("cluster level_block array", |b| b.iter(|| cluster_array_iter(black_box(&cluster_block_array))));
     c.bench_function("vec", |b| b.iter(|| vec_iter(black_box(&vec))));
     c.bench_function("hashmap", |b| b.iter(|| hashmap_iter(black_box(&hashmap))));
-    
 }
 
 criterion_group!(benches_iter, bench_iter);

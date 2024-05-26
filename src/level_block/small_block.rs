@@ -115,6 +115,9 @@ where
     SmallBlockIndices: Array<Item=BlockIndices::Item, UninitArray: Copy>,
     MaskU64Populations: Array<Item=u8> + Copy,
 {
+    // This can be the only small_array_index() -> Option<usize> function.
+    // However, unwrap_unchecked() provides no guarantees, and I don't want to risk
+    // the CHECK_FOR_EMPTY block not being elided.
     /// number of 1 bits in mask before `index` bit.
     ///
     /// # Safety
@@ -122,17 +125,70 @@ where
     /// * small must be active.
     /// * `index` must be set.
     #[inline]
-    unsafe fn small_array_index(mask_u64_populations: &MaskU64Populations, mask: &Mask, index: usize) 
-        -> usize
+    unsafe fn small_array_index_impl<const CHECK_FOR_EMPTY: bool>(&self, index: usize) 
+        -> Option<usize> 
     {
-        let u64_index = index / 64;
-        let bit_index = index % 64;
-        let mut block = *mask.as_array().as_ref().get_unchecked(u64_index);
+        let u64_index =
+            if Mask::size() == 64 {
+                0
+            } else {
+                index / 64
+            };
+        let bit_index =
+            if Mask::size() == 64 {
+                index
+            } else {
+                index % 64
+            };
+        let mut block = *self.mask.as_array().as_ref().get_unchecked(u64_index);
+        
+        if CHECK_FOR_EMPTY {
+            let block_mask: u64 = 1 << bit_index;
+            let masked_block = block & block_mask;
+            if masked_block.is_zero(){
+                return None;
+            }
+        }        
+        
         let mask = !(u64::MAX << bit_index);
         block &= mask;
-        let offset = *mask_u64_populations.as_ref().get_unchecked(u64_index);
-        offset as usize + block.count_ones() as usize
+        
+        let offset = if MaskU64Populations::CAP == 1 {
+            // first always zero
+            0
+        } else {
+            let mask_u64_populations = &self.big_small.small.0;
+            *mask_u64_populations.as_ref().get_unchecked(u64_index)
+        };
+        Some(offset as usize + block.count_ones() as usize)
     }
+    
+    #[inline]
+    unsafe fn small_array_index_unchecked(&self, index: usize) -> usize {
+        self.small_array_index_impl::<false>(index).unwrap_unchecked()
+    }
+    
+    #[inline]
+    unsafe fn try_small_array_index(&self, index: usize) -> Option<usize> {
+        self.small_array_index_impl::<true>(index)
+    }
+    
+    #[inline]
+    unsafe fn small_array_len(&self) -> usize {
+        // TODO: Consider storing len directly
+        
+        let population_at_last_mask_block_start = if MaskU64Populations::CAP == 1 {
+            0
+        } else {
+            let mask_u64_populations = &self.big_small.small.0;
+            *mask_u64_populations.as_ref().last().unwrap_unchecked() as usize
+        };
+        
+        let last_mask_block_population =
+            self.mask.as_array().as_ref().last().unwrap_unchecked().count_ones() as usize;
+        
+        population_at_last_mask_block_start + last_mask_block_population
+    }    
     
     /// # Safety
     /// 
@@ -144,16 +200,15 @@ where
             let array = self.big_small.big.1.deref_mut();
             *array.deref_mut().as_mut().get_unchecked_mut(index) = value;
         } else {
-            let (mask_u64_populations, array) = &mut self.big_small.small;
-            let len = *mask_u64_populations.as_ref().last().unwrap_unchecked() as usize + self.mask.as_array().as_ref().last().unwrap_unchecked().count_ones() as usize;
+            let len = self.small_array_len();
             if len == SmallBlockIndices::CAP {
                 // TODO: as non-inline function?
                 // move to Big
                 let mut big: Box<BlockIndices> = Box::new(unsafe{MaybeUninit::zeroed().assume_init()});
                 let big_array = big.deref_mut().as_mut(); 
                 let mut i = 0;
-                
                  
+                let array = &mut self.big_small.small.1;
                 self.mask.traverse_bits(|index|{
                     let value = array.as_ref().get_unchecked(i).assume_init_read();
                     i += 1;
@@ -164,7 +219,8 @@ where
                 *big_array.get_unchecked_mut(index) = value;
                 self.big_small = BigSmallArray::from(big);
             } else {
-                let inner_index = Self::small_array_index(mask_u64_populations, &self.mask, index);
+                let inner_index = self.small_array_index_unchecked(index);
+                let (mask_u64_populations, array) = &mut self.big_small.small;
                 unsafe{
                     let p: *mut _ = array.as_mut().as_mut_ptr().add(inner_index);
                     // Shift everything over to make space. (Duplicating the
@@ -208,7 +264,7 @@ where
 
     #[inline]
     fn is_empty(&self) -> bool {
-        todo!()
+        self.mask.is_zero()
     }
 }
 
@@ -260,30 +316,12 @@ where
             let array = self.big_small.big.1.deref();
             *array.deref().as_ref().get_unchecked(index)
         } else {
-            let (mask_u64_populations, array) = &self.big_small.small;
-            let u64_index = index / 64;
-            let bit_index = index % 64;
-            let mut block = *self.mask.as_array().as_ref().get_unchecked(u64_index);
-            
-            {
-                let block_mask: u64 = 1 << bit_index;
-                let masked_block = block & block_mask;
-                if masked_block.is_zero(){
-                    return Primitive::ZERO;
-                }
-            }
-            
-            let mask = !(u64::MAX << bit_index);
-            block &= mask;
-            
-            let offset = if MaskU64Populations::CAP == 1 {
-                // first always zero
-                0
+            if let Some(small_array_index) = self.try_small_array_index(index) {
+                let (_, array) = &self.big_small.small;
+                array.as_ref().get_unchecked(small_array_index).assume_init_read()
             } else {
-                *mask_u64_populations.as_ref().get_unchecked(u64_index)
-            };
-            let small_array_index = offset as usize + block.count_ones() as usize;
-            array.as_ref().get_unchecked(small_array_index).assume_init_read()
+                Primitive::ZERO
+            }
         }        
     }
     
@@ -307,10 +345,10 @@ where
             // TODO: go back to small at small/2 size? 
             *array.deref_mut().as_mut().get_unchecked_mut(index) = Primitive::ZERO;
         } else {
-            let (mask_u64_populations, array) = &mut self.big_small.small;
-            let len = *mask_u64_populations.as_ref().last().unwrap_unchecked() as usize + self.mask.as_array().as_ref().last().unwrap_unchecked().count_ones() as usize;
-            let inner_index = Self::small_array_index(mask_u64_populations, &self.mask, index);
+            let inner_index = self.small_array_index_unchecked(index);
+            let len = self.small_array_len();
             
+            let (mask_u64_populations, array) = &mut self.big_small.small;
             unsafe{
                 let p: *mut _ = array.as_mut().as_mut_ptr().add(inner_index);
                 ptr::copy(p.offset(1), p, len - inner_index);
@@ -319,6 +357,18 @@ where
             for i in (index/64)+1..Mask::size()/64 {
                 *mask_u64_populations.as_mut().get_unchecked_mut(i) -= 1;
             }            
+        }
+    }
+
+    #[inline]
+    unsafe fn set_unchecked(&mut self, index: usize, item: Self::Item) {
+        if self.big_small.is_big(){
+            let array = self.big_small.big.1.deref_mut();
+            *array.deref_mut().as_mut().get_unchecked_mut(index) = item;
+        } else {
+            let inner_index = self.small_array_index_unchecked(index);
+            let array = self.big_small.small.1.as_mut();
+            array.get_unchecked_mut(inner_index).write(item);
         }
     }
 }

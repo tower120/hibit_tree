@@ -1,4 +1,6 @@
+use std::ops::ControlFlow;
 use crate::BitBlock;
+use crate::const_utils::{const_for_rev, ConstIntVisitor};
 use crate::const_utils::const_int::{ConstUsize, ConstInteger};
 use crate::level::ILevel;
 use crate::level_block::HiBlock;
@@ -21,7 +23,8 @@ pub trait MutVisitor<Mask> {
 
 pub trait FoldVisitor<Mask> {
     type Acc;
-    fn visit<I: ConstInteger, L>(&mut self, i: I, level: &L, acc: Self::Acc) -> Self::Acc
+    fn visit<I: ConstInteger, L>(&mut self, i: I, level: &L, acc: Self::Acc) 
+        -> ControlFlow<Self::Acc, Self::Acc>
     where
         L: ILevel,
         L::Block: HiBlock<Mask=Mask>;
@@ -29,7 +32,8 @@ pub trait FoldVisitor<Mask> {
 
 pub trait FoldMutVisitor<Mask> {
     type Acc;
-    fn visit<I: ConstInteger, L>(&mut self, i: I, level: &mut L, acc: Self::Acc) -> Self::Acc
+    fn visit<I: ConstInteger, L>(&mut self, i: I, level: &mut L, acc: Self::Acc) 
+        -> ControlFlow<Self::Acc, Self::Acc> 
     where
         L: ILevel,
         L::Block: HiBlock<Mask=Mask>;
@@ -47,14 +51,17 @@ pub trait SparseArrayLevels: Default {
     fn fold<Acc>(&self, acc: Acc, visitor: impl FoldVisitor<Self::Mask, Acc=Acc>) -> Acc{
         self.fold_n(Self::LevelCount::DEFAULT, acc, visitor)
     }
+    
     fn fold_mut<Acc>(&mut self, acc: Acc, visitor: impl FoldMutVisitor<Self::Mask, Acc=Acc>) -> Acc;
+    
+    fn fold_rev_mut<Acc>(&mut self, acc: Acc, visitor: impl FoldMutVisitor<Self::Mask, Acc=Acc>) -> Acc;
     
     /// fold first `n` tuple elements.
     fn fold_n<Acc>(&self, n: impl ConstInteger, acc: Acc, visitor: impl FoldVisitor<Self::Mask, Acc=Acc>) -> Acc;
 }
 
 macro_rules! sparse_array_levels_impl {
-    ($n:literal: [$($i:tt,)+]; $first_t:tt, $($t:tt,)* ) => {
+    ($n:literal: [$($i:tt,)+] [$($rev_i:tt,)+]; $first_t:tt, $($t:tt,)* ) => {
         impl<$first_t, $($t,)*> SparseArrayLevels for ($first_t, $($t,)*)
         where
             $first_t: ILevel,
@@ -87,21 +94,42 @@ macro_rules! sparse_array_levels_impl {
                 }
             }
 
-            #[inline]
+            #[inline(always)]
             fn fold_mut<Acc>(&mut self, mut acc: Acc, mut visitor: impl FoldMutVisitor<Self::Mask, Acc = Acc>) -> Acc {
                 $(
-                    acc = visitor.visit(ConstUsize::<$i>, &mut self.$i, acc);
+                    match visitor.visit(ConstUsize::<$i>, &mut self.$i, acc) {
+                        ControlFlow::Break(v) => return v,
+                        ControlFlow::Continue(v) => acc = v,
+                    }
+                )+
+                acc
+            }
+            
+            #[inline(always)]
+            fn fold_rev_mut<Acc>(&mut self, mut acc: Acc, mut visitor: impl FoldMutVisitor<Self::Mask, Acc = Acc>) 
+                -> Acc
+            {
+                $(
+                    match visitor.visit(ConstUsize::<$rev_i>, &mut self.$rev_i, acc) {
+                        ControlFlow::Break(v) => return v,
+                        ControlFlow::Continue(v) => acc = v,
+                    } 
                 )+
                 acc
             }
             
             #[inline]
-            fn fold_n<Acc>(&self, n: impl ConstInteger, mut acc: Acc, mut visitor: impl FoldVisitor<Self::Mask, Acc=Acc>) -> Acc{
+            fn fold_n<Acc>(&self, n: impl ConstInteger, mut acc: Acc, mut visitor: impl FoldVisitor<Self::Mask, Acc=Acc>) 
+                -> Acc
+            {
                 $(
-                    if $i == n.value() {
+                    /*const*/ if $i == n.value() {
                         return acc;
                     }
-                    acc = visitor.visit(ConstUsize::<$i>, &self.$i, acc);
+                    match visitor.visit(ConstUsize::<$i>, &self.$i, acc) {
+                        ControlFlow::Break(v) => return v,
+                        ControlFlow::Continue(v) => acc = v,
+                    }
                 )+
                 acc
             }
@@ -109,11 +137,11 @@ macro_rules! sparse_array_levels_impl {
         }
     };
 }
-sparse_array_levels_impl!(1: [0,]; L0,);
-sparse_array_levels_impl!(2: [0,1,]; L0,L1,);
-sparse_array_levels_impl!(3: [0,1,2,]; L0,L1,L2,);
-sparse_array_levels_impl!(4: [0,1,2,3,]; L0,L1,L2,L3,);
-sparse_array_levels_impl!(5: [0,1,2,3,4,]; L0,L1,L2,L3,L4,);
-sparse_array_levels_impl!(6: [0,1,2,3,4,5,]; L0,L1,L2,L3,L4,L5,);
-sparse_array_levels_impl!(7: [0,1,2,3,4,5,6,]; L0,L1,L2,L3,L4,L5,L6,);
-sparse_array_levels_impl!(8: [0,1,2,3,4,5,6,7,]; L0,L1,L2,L3,L4,L5,L6,L7,);
+sparse_array_levels_impl!(1: [0,] [0,]; L0,);
+sparse_array_levels_impl!(2: [0,1,] [1,0,]; L0,L1,);
+sparse_array_levels_impl!(3: [0,1,2,] [2,1,0,]; L0,L1,L2,);
+sparse_array_levels_impl!(4: [0,1,2,3,] [3,2,1,0,]; L0,L1,L2,L3,);
+sparse_array_levels_impl!(5: [0,1,2,3,4,] [4,3,2,1,0,]; L0,L1,L2,L3,L4,);
+sparse_array_levels_impl!(6: [0,1,2,3,4,5,] [5,4,3,2,1,0,]; L0,L1,L2,L3,L4,L5,);
+sparse_array_levels_impl!(7: [0,1,2,3,4,5,6,] [6,5,4,3,2,1,0,]; L0,L1,L2,L3,L4,L5,L6,);
+sparse_array_levels_impl!(8: [0,1,2,3,4,5,6,7,] [7,6,5,4,3,2,1,0,]; L0,L1,L2,L3,L4,L5,L6,L7,);

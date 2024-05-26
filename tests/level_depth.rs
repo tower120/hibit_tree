@@ -16,23 +16,14 @@ impl MaybeEmpty for DataBlock{
     fn is_empty(&self) -> bool {
         todo!()
     }
-
-    /*fn as_u64_mut(&mut self) -> &mut u64 {
-        &mut self.0
-    }
-
-    fn restore_empty_u64(&mut self) {
-        self.0 = 0;
-    }*/
 }
 
 
 #[test]
 fn level_depth_test(){
-    fn do_test<Levels, DataLevel>(mut array: SparseArray<Levels, DataLevel>, range: Range<usize>)
+    fn do_test<Levels>(mut array: SparseArray<Levels, DataBlock>, range: Range<usize>)
     where
-        DataLevel: ILevel<Block = DataBlock>, 
-        Levels: SparseArrayLevels    
+        Levels: SparseArrayLevels
     {
         for i in range.clone(){
             *array.get_or_insert(i as usize) = DataBlock(i as u64);
@@ -58,18 +49,16 @@ fn level_depth_test(){
     type Lvl1Block = Block<u64, [u16;64]>;
     type Lvl2Block = Block<u64, [u32;64]>;
     
-    type DataLevel = Level<DataBlock>;
-    
     {
-        type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, ), DataLevel>;
+        type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, ), DataBlock>;
         do_test(Array::default(), 0..64);
     }
     {
-        type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), DataLevel>;
+        type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), DataBlock>;
         do_test(Array::default(), 0..64*64);
     }
     {
-        type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>, IntrusiveListLevel<Lvl2Block>), DataLevel>;
+        type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>, IntrusiveListLevel<Lvl2Block>), DataBlock>;
         do_test(Array::default(), 0..64*64*64);
     }
 }

@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
 use hi_sparse_array::{BitBlock, fold, MaybeEmpty, Op, SparseArray};
-use hi_sparse_array::level_block::Block;
+use hi_sparse_array::level_block::{Block, SmallBlock};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::const_utils::ConstTrue;
 use hi_sparse_array::level::{IntrusiveListLevel, Level, SingleBlockLevel};
@@ -31,8 +31,7 @@ impl MaybeEmpty for DataBlock{
     }
 }
 
-type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), /*IntrusiveList*/Level<DataBlock>>;
-
+type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), DataBlock>;
 
 pub struct AndOp<M, LD>(PhantomData<(M, LD)>);
 impl<M, LD> Default for AndOp<M, LD>{
@@ -61,7 +60,6 @@ where
         left.into_owned() & right.into_owned()
     }
 }
-
 
 fn array_iter(array1: &BlockArray, array2: &BlockArray) -> u64 {
     //let list = [array1, array2];

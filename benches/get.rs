@@ -41,8 +41,8 @@ impl MaybeEmptyIntrusive for DataBlock{
 }
 
 type Map = nohash_hasher::IntMap<u64, DataBlock>;
-type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>, IntrusiveListLevel<Lvl2Block>), IntrusiveListLevel<DataBlock>>;
-type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<CompactLvl1Block>, IntrusiveListLevel<CompactLvl2Block>), IntrusiveListLevel<DataBlock>>;
+type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>, IntrusiveListLevel<Lvl2Block>), DataBlock>;
+type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<CompactLvl1Block>, IntrusiveListLevel<CompactLvl2Block>), DataBlock>;
 /*type ClusterBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<ClusterLvl1Block>), IntrusiveListLevel<DataBlock>>;*/
 
 /*fn cluster_array_get(array: &ClusterBlockArray) -> u64 {
@@ -82,9 +82,9 @@ pub fn bench_iter(c: &mut Criterion) {
     let mut hashmap = Map::default();
     
     let mut rng = rand::rngs::StdRng::seed_from_u64(0xe15bb9db3dee3a0f);
-    let mut random_indices = Vec::new();    
+    let mut random_indices = Vec::new();
     
-    for i in 0..COUNT{
+    for _ in 0..COUNT {
         let v = rng.gen_range(0..RANGE);
         random_indices.push(v);
         
@@ -99,7 +99,6 @@ pub fn bench_iter(c: &mut Criterion) {
     c.bench_function("small level_block array", |b| b.iter(|| small_array_get(black_box(&small_block_array), black_box(&random_indices))));
     /*c.bench_function("cluster level_block array", |b| b.iter(|| cluster_array_get(black_box(&cluster_block_array))));*/
     c.bench_function("hashmap", |b| b.iter(|| hashmap_get(black_box(&hashmap), black_box(&random_indices))));
-    
 }
 
 criterion_group!(benches_iter, bench_iter);

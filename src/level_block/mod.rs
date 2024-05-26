@@ -43,11 +43,16 @@ pub trait HiBlock: MaybeEmptyIntrusive {
         f: impl FnMut() -> Self::Item
     ) -> Self::Item;
     
-    /// Return previous mask bit.
-    /// 
     /// # Safety
     ///
     /// * `index` must be set
     /// * `index` is not checked for out-of-bounds.
     unsafe fn remove_unchecked(&mut self, index: usize);
+
+    /// # Safety
+    ///
+    /// * `index` must be set
+    /// * `index` is not checked for out-of-bounds.
+    /// * `item` emptiness must correspond to mask's `index` bit. 
+    unsafe fn set_unchecked(&mut self, index: usize, item: Self::Item);
 }

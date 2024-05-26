@@ -28,7 +28,7 @@ impl MaybeEmpty for DataBlock{
 fn insert_test(){
     type Lvl0Block = Block<u64, [u8;64]>;
     type ClusterLvl1Block = ClusterBlock<u64, [u16;4], [u16;16]>;
-    type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<ClusterLvl1Block>), /*IntrusiveList*/Level<DataBlock>>;
+    type Array = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<ClusterLvl1Block>), DataBlock>;
     
     let mut array: Array = Default::default(); 
     

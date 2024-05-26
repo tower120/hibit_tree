@@ -1,5 +1,6 @@
 use std::borrow::Borrow;
 use crate::{Array, BitBlock};
+use crate::caching_iter::CachingBlockIter;
 use crate::sparse_array::level_indices;
 use crate::const_utils::const_int::ConstInteger;
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
@@ -16,7 +17,7 @@ use crate::utils::IntoOwned;
 /// 
 // We need xxxxType for each concrete level_block/mask type to avoid the need for use `for<'a>`,
 // which is still not working (at Rust level) in cases, where we need it most. 
-pub trait SparseHierarchy {
+pub trait SparseHierarchy: Sized {
     /// TODO: Decription form hi_sparse_bitset TRUSTED_HIERARCHY
     const EXACT_HIERARCHY: bool;
     
@@ -137,6 +138,11 @@ pub trait SparseHierarchy {
             unsafe{ self.get_unchecked(index) }
         }
     }    
+    
+    #[inline]
+    fn iter(&self) -> CachingBlockIter<Self>{
+        CachingBlockIter::new(self)
+    }
     
     /// Use [DefaultState] as default, if you don't want to implement 
     /// stateful SparseHierarchy.

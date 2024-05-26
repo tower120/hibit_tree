@@ -10,7 +10,7 @@ pub trait BitBlock: Eq + Sized + Clone + 'static{
     const SIZE_POT_EXPONENT: usize;
     
     /// Size in bits
-    #[inline]
+    #[inline(always)]
     /*const*/ fn size() -> usize {
         1 << Self::SIZE_POT_EXPONENT
     }

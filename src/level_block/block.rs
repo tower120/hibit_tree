@@ -27,8 +27,9 @@ where
         }
     }
 
+    #[inline]
     fn is_empty(&self) -> bool {
-        todo!()
+        self.mask.is_zero()
     }
 }
 
@@ -94,12 +95,13 @@ where
 
     #[inline]
     unsafe fn remove_unchecked(&mut self, index: usize) {
-        // mask
         self.mask.set_bit::<false>(index);
-        // If we have block_indices section (compile-time check)
-        if !size_of::<BlockIndices>().is_zero(){
-            let block_indices = self.block_indices.as_mut();
-            *block_indices.get_unchecked_mut(index) = Primitive::ZERO;
-        }
+        *self.block_indices.as_mut().get_unchecked_mut(index) = Primitive::ZERO;
+    }
+
+    #[inline]
+    unsafe fn set_unchecked(&mut self, index: usize, item: Self::Item) {
+        let block_indices = self.block_indices.as_mut();
+        *block_indices.get_unchecked_mut(index) = item;
     }
 }

@@ -250,4 +250,8 @@ where
     unsafe fn remove_unchecked(&mut self, index: usize) {
         todo!()
     }
+
+    unsafe fn set_unchecked(&mut self, index: usize, item: Self::Item) {
+        todo!()
+    }
 }

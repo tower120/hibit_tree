@@ -1,14 +1,15 @@
 use std::marker::PhantomData;
 use std::ops::ControlFlow;
-use std::ops::ControlFlow::Continue;
+use std::ops::ControlFlow::{Break, Continue};
 use std::ptr::{NonNull, null};
 use crate::bit_block::BitBlock;
 use crate::utils::Borrowable;
 use crate::level_block::HiBlock;
 use crate::level::{ILevel, IntrusiveListLevel};
 use crate::sparse_hierarchy::{DefaultState, SparseHierarchy, SparseHierarchyState};
-use crate::const_utils::const_int::{const_for, ConstUsize, ConstInteger, ConstIntVisitor};
-use crate::const_utils::const_array::{ConstArray, ConstArrayType, /* ConstPrimitiveArray, */ConstCopyArrayType};
+use crate::const_utils::const_int::{ConstUsize, ConstInteger, ConstIntVisitor};
+use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
+use crate::MaybeEmpty;
 use crate::utils::primitive::Primitive;
 use crate::utils::array::{Array};
 use crate::sparse_array_levels::{FoldMutVisitor, FoldVisitor, MutVisitor, SparseArrayLevels, Visitor};
@@ -74,36 +75,40 @@ fn test_level_indices_new(){
     }
 }
 
-
-// TODO: Can be removed
-pub trait HiLevel: ILevel<Block: HiBlock>{}
-impl<T: ILevel<Block: HiBlock>> HiLevel for T{}
-
-
-
-pub struct SparseArray<Levels, DataLevel> {
+pub struct SparseArray<Levels, Data> {
     levels: Levels,
-    data  : DataLevel,
+    
+    // TODO: some kind of multi-vec, to reduce allocation count? 
+    values: Vec<Data>,
+    keys  : Vec<usize>,
+    
+    // TODO: can be pair of u32's
+    // Used only in remove().
+    /// Coordinates in last level of pointer to value with this vec index.  
+    last_level_block_indices: Vec<(usize/*block_index*/, usize/*in-block index*/)>, 
 }
-impl<Levels, DataLevel> Default for
-    SparseArray<Levels, DataLevel>
+impl<Levels, Data> Default for
+    SparseArray<Levels, Data>
 where
     Levels: SparseArrayLevels,
-    DataLevel: ILevel
+    Data: MaybeEmpty,
 {
     #[inline]
     fn default() -> Self {        
         Self{
             levels: Levels::default(),
-            data  : Default::default(),
+            
+            values: vec![Data::empty()], 
+            keys  : vec![usize::MAX /*doesn't matter*/],
+            last_level_block_indices: vec![(0,0)]
         }
     }
 }
 
-impl<Levels, DataLevel> SparseArray<Levels, DataLevel>
+impl<Levels, Data> SparseArray<Levels, Data>
 where
     Levels: SparseArrayLevels,
-    DataLevel: ILevel
+    Data: MaybeEmpty,
 {
     #[inline(always)]
     unsafe fn get_block_ptr(&self, level_n: impl ConstInteger, level_index: usize) -> *const u8{
@@ -171,72 +176,182 @@ where
     }
     
     #[inline]
-    unsafe fn fetch_block_index<I: ConstArray<Item=usize>>(&self, level_indices: I)
-        -> usize 
+    unsafe fn fetch_block_indices<I: ConstArray<Item=usize>>(&self, level_indices: I)
+        // TODO: compiler should be able to optimize even without explicit last block index
+        -> (I, usize)
     {
-        struct V<LevelIndices>(LevelIndices);
-        impl<LevelIndices: ConstArray<Item=usize>, M> FoldVisitor<M> for V<LevelIndices>{
+        let mut out = I::from_fn(|_|0);
+        struct V<'a, LevelIndices>{
+            level_indices: LevelIndices,
+            out: &'a mut LevelIndices
+        }
+        impl<'a, LevelIndices: ConstArray<Item=usize>, M> FoldVisitor<M> for V<'a, LevelIndices> {
             type Acc = usize;
+            
             #[inline(always)]
             fn visit<I: ConstInteger, L>(&mut self, i: I, level: &L, level_block_index: Self::Acc) 
-                -> Self::Acc 
+                -> ControlFlow<usize, usize> 
             where 
                 L: ILevel, L::Block: HiBlock
             {
                 unsafe{
                     let block = level.blocks().get_unchecked(level_block_index);
-                    let in_block_index = self.0.as_ref().get_unchecked(I::VALUE).as_usize();
-                    block.get_or_zero(in_block_index).as_usize()
+                    let in_block_index = self.level_indices.as_ref().get_unchecked(I::VALUE).as_usize();
+                    let block_index = block.get_or_zero(in_block_index).as_usize();
+                    *self.out.as_mut().get_unchecked_mut(I::VALUE) = block_index; 
+                    Continue(block_index)
                 }
             }
         }        
-        self.levels.fold_n(I::Cap::default(), 0, V(level_indices))
+        let last_level_block_index = self.levels.fold_n(I::Cap::default(), 0, V{level_indices, out: &mut out});
+        (out, last_level_block_index)
+    }
+    
+    #[inline]
+    unsafe fn fetch_block_index<I: ConstArray<Item=usize>>(&self, level_indices: I)
+        -> usize 
+    {
+        self.fetch_block_indices(level_indices).1
     }
     
     // get_mut
     
-    /// Fail to do so will brake TRUSTED_HIERARCHY container promise.
-    /// 
-    /// # Safety
-    /// 
-    /// Pointed level_block at `index` must exist and be empty.
-    pub unsafe fn remove_empty_unchecked(&mut self, index: usize){
-        todo!()
+    pub fn remove(&mut self, index: usize) -> Option<Data> {
+        //assert!(Self::is_in_range(index), "index out of range!");
+
+        let level_indices = level_indices::<Levels::Mask, Levels::LevelCount>(index);
+        let (levels_block_indices, data_block_index) = unsafe { 
+            self.fetch_block_indices(level_indices) 
+        };
+        
+        if data_block_index == 0 {
+            return None;
+        }
+        
+        // 1. Update level masks
+        self.levels.fold_rev_mut((), V{level_indices, levels_block_indices});
+        struct V<LI, LBI>{
+            level_indices: LI,
+            levels_block_indices: LBI
+        }
+        impl<LI, LBI, M> FoldMutVisitor<M> for V<LI, LBI>
+        where
+            LI : ConstArray<Item=usize>,
+            LBI: ConstArray<Item=usize>
+        {
+            type Acc = ();
+            
+            #[inline(always)]
+            fn visit<I: ConstInteger, L>(&mut self, level_number: I, level: &mut L, acc: Self::Acc)
+                 -> ControlFlow<Self::Acc, Self::Acc>  
+            where 
+                L: ILevel, L::Block: HiBlock<Mask=M> 
+            {
+                let block_index = if level_number.value() == 0 {
+                    0
+                } else {
+                    self.levels_block_indices.as_ref()[level_number.dec().value()]
+                };
+                let level_block = unsafe{ level.blocks_mut().get_unchecked_mut(block_index) };
+                unsafe{
+                    let inner_index = self.level_indices.as_ref()[level_number.value()];
+                    level_block.remove_unchecked(inner_index);
+                }
+                
+                if level_block.is_empty() {
+                    if level_number.value() != 0 /*if not root level*/ {
+                        unsafe{ level.remove_empty_block_unchecked(block_index); }
+                    }
+                    Continue(())
+                } else {
+                    Break(())
+                }
+            }
+        }
+        
+        // 3. Update index in last level block. 
+        unsafe{
+            // swap_remove(data_block_index)
+            let last = self.last_level_block_indices.pop().unwrap_unchecked();
+            if self.last_level_block_indices.len() > data_block_index {
+                *self.last_level_block_indices.get_unchecked_mut(data_block_index) = last;
+                let (level_block_index, inner_index) = last;
+                
+                self.levels.visit_mut(Levels::LevelCount::default().dec(), V{level_block_index, inner_index, data_block_index});
+                struct V {
+                    level_block_index: usize,
+                    inner_index: usize,
+                    data_block_index: usize
+                };
+                impl<M> MutVisitor<M> for V {
+                    type Out = ();
+    
+                    #[inline(always)]
+                    fn visit<I: ConstInteger, L>(self, i: I, level: &mut L) -> Self::Out
+                    where
+                        L: ILevel<Block: HiBlock>,                
+                    {
+                        unsafe{
+                            let level_block = level.blocks_mut().get_unchecked_mut(self.level_block_index);                            
+                            level_block.set_unchecked(self.inner_index, Primitive::from_usize(self.data_block_index));
+                        }
+                    }
+                }                    
+            }
+        }
+        
+        // 2. Remove data        
+        self.keys.swap_remove(data_block_index);
+        let value = self.values.swap_remove(data_block_index);
+        
+        Some(value)
     }
     
     /// Inserts and return empty level_block, if not exists.
     /// 
-    /// If returned DataBlock will end up empty - you MUST
-    /// call [remove_empty_unchecked].
-    pub fn get_or_insert(&mut self, index: usize) -> &mut DataLevel::Block {
+    /// If returned DataBlock will end up in empty state - you have to
+    /// call [remove]. This is not required for correctness, but will prevent
+    /// this empty element from appearing in iteration.
+    pub fn get_or_insert(&mut self, index: usize) -> &mut Data {
         //assert!(Self::is_in_range(index), "index out of range!");
 
-        let i = level_indices::<Levels::Mask, Levels::LevelCount>(index);
+        let level_indices = level_indices::<Levels::Mask, Levels::LevelCount>(index);
         
         let this = NonNull::new(self).unwrap();
-        let data_block_index = self.levels.fold_mut(0, V{this, level_indices: i});
-        struct V<Levels: SparseArrayLevels, DataLevel, LevelIndices> {
-            this: NonNull<SparseArray<Levels, DataLevel>>, 
-            level_indices: LevelIndices
+        let data_block_index = self.levels.fold_mut(0, V{this, level_indices, index});
+        struct V<Levels: SparseArrayLevels, Data, LevelIndices> {
+            this: NonNull<SparseArray<Levels, Data>>, 
+            level_indices: LevelIndices,
+            index: usize
         }
-        impl<Levels, DataLevel, LevelIndices, M> FoldMutVisitor<M> for V<Levels, DataLevel, LevelIndices>
+        impl<Levels, Data, LevelIndices, M> FoldMutVisitor<M> for V<Levels, Data, LevelIndices>
         where
-            Levels: SparseArrayLevels, 
-            DataLevel: ILevel,
+            Levels: SparseArrayLevels,
+            Data: MaybeEmpty,
             LevelIndices: Array<Item=usize>
         {
             type Acc = usize;
-            #[inline]
-            fn visit<I: ConstInteger, L: ILevel>(&mut self, i: I, level: &mut L, level_index: usize) -> usize
+            #[inline(always)]
+            fn visit<I: ConstInteger, L: ILevel>(&mut self, i: I, level: &mut L, level_block_index: usize) 
+                -> ControlFlow<usize, usize>
             where
                 L::Block: HiBlock
             {
             unsafe{
-                let block = level.blocks_mut().get_unchecked_mut(level_index);
-                block.get_or_insert(self.level_indices.as_ref()[I::VALUE], ||{
+                let block = level.blocks_mut().get_unchecked_mut(level_block_index);
+                let inner_index = self.level_indices.as_ref()[I::VALUE];
+                let block_index = block.get_or_insert(inner_index, ||{
                     let block_index = 
                         if I::VALUE == Levels::LevelCount::VALUE - 1 {
-                            self.this.as_mut().data.insert_empty_block()
+                            // This is the last level
+                            let this = self.this.as_mut();
+                            let i = this.values.len();
+                            this.values.push(MaybeEmpty::empty());
+                            this.keys.push(self.index);
+                            this.last_level_block_indices.push(
+                                (level_block_index, inner_index)
+                            );
+                            i
                         } else {
                             struct Insert;
                             impl<M> MutVisitor<M> for Insert {
@@ -249,61 +364,48 @@ where
                             self.this.as_mut().levels.visit_mut(i.inc(), Insert)
                         };
                     Primitive::from_usize(block_index)
-                }).as_usize()
+                }).as_usize();
+                Continue(block_index)
             }
             }
         }
 
         // 3. Data level
         unsafe{
-            let data_block = self.data.blocks_mut().get_unchecked_mut(data_block_index);
-            data_block
+            self.values.get_unchecked_mut(data_block_index)
         }  
     }
-
-/*    // TODO: There could be safe NonEmptyDataBlock
-    /// # Safety
-    ///
-    /// * `block` must be non-empty.
-    /// Will panic, if `index` is out of range.
-    pub unsafe fn set_non_empty_unchecked(&mut self, index: usize, block: DataBlock){
-        //assert!(Self::is_in_range(index), "index out of range!");
-
-        // That's indices to next level
-        let (level0_index, level1_index) = Self::level_indices(index);
-
-        // 1. Level0
-        let level1_block_index = unsafe{
-            self.level0.get_or_insert(level0_index, ||{
-                let block_index = self.level1.insert_block();
-                Primitive::from_usize(block_index)
-            })
-        }.as_usize();
-
-        // 2. Level1
-        let data_block_index = unsafe{
-            let level1_block = self.level1.blocks_mut().get_unchecked_mut(level1_block_index);
-            level1_block.get_or_insert(level1_index, ||{
-                let block_index = self.data.insert_block();
-                Primitive::from_usize(block_index)
-            })
-        }.as_usize();
-
-        // 3. Data level
-        unsafe{
-            let data_block = self.data.blocks_mut().get_unchecked_mut(data_block_index);
-            data_block.mask_mut().set_bit::<true>(data_index);
-        }
-    }  */
+    
+    // TODO: concrete type in return
+    /// Return keys and values as contiguous array iterator. 
+    #[inline]
+    pub fn unordered_iter(&self) -> impl ExactSizeIterator<Item = (usize, &Data)>{
+        self.keys[1..].iter().copied().zip(
+            self.values[1..].iter()
+        )
+    }
+    
+    /*#[inline]
+    pub fn keys(&self) -> &[usize]{
+        &self.keys[1..]
+    }
+    
+    #[inline]
+    pub fn values(&self) -> &[Data]{
+        &self.values[1..]
+    }
+    
+    #[inline]
+    pub fn values_mut(&self) -> &mut [Data]{
+        &mut self.values[1..]
+    }*/    
 }
 
 
-
-impl<Levels, DataLevel> SparseHierarchy for SparseArray<Levels, DataLevel>
+impl<Levels, Data> SparseHierarchy for SparseArray<Levels, Data>
 where
     Levels: SparseArrayLevels,
-    DataLevel: ILevel,
-    DataLevel::Block: Clone
+    Data: Clone + MaybeEmpty
 {
     const EXACT_HIERARCHY: bool = true;
     
@@ -318,27 +420,27 @@ where
         self.get_block_mask(I::Cap::default(), block_ptr)
     }
     
-    type DataType = DataLevel::Block;
+    type DataType = Data;
     type Data<'a> where Self: 'a = &'a Self::DataType;
     
     #[inline]
     unsafe fn data_block<I: ConstArray<Item=usize, Cap=Self::LevelCount>>(&self, level_indices: I) -> Self::Data<'_> {
         let data_block_index = self.fetch_block_index(level_indices);
-        self.data.blocks().get_unchecked(data_block_index)
+        self.values.get_unchecked(data_block_index)
     }
 
     #[inline]
     fn empty_data(&self) -> Self::Data<'_> {
         unsafe{
-            self.data.blocks().get_unchecked(0)
+            self.values.get_unchecked(0)
         }
     }
 
-    type State = SparseBlockArrayState<Levels, DataLevel>;
+    type State = SparseBlockArrayState<Levels, Data>;
     //type State = DefaultState<Self>;
 }
 
-pub struct SparseBlockArrayState<Levels, DataLevel>
+pub struct SparseBlockArrayState<Levels, Data>
 where
     Levels: SparseArrayLevels
 {
@@ -349,15 +451,15 @@ where
         *const u8, 
         <Levels::LevelCount as ConstInteger>::Dec
     >,
-    phantom_data: PhantomData<SparseArray<Levels, DataLevel>>
+    phantom_data: PhantomData<SparseArray<Levels, Data>>
 }
 
-impl<Levels, DataLevel> SparseHierarchyState for SparseBlockArrayState<Levels, DataLevel>
+impl<Levels, Data> SparseHierarchyState for SparseBlockArrayState<Levels, Data>
 where
     Levels: SparseArrayLevels,
-    DataLevel: ILevel<Block: Clone>,
+    Data: Clone + MaybeEmpty,
 {
-    type This = SparseArray<Levels, DataLevel>;
+    type This = SparseArray<Levels, Data>;
 
     #[inline]
     fn new(_: &Self::This) -> Self {
@@ -383,17 +485,15 @@ where
         let level_block_ptrs_index = level_n.dec().value();
         
         // 1. get level_block_index from prev level. 
-        let level_block_index ={
+        let level_block_index = {
             let prev_level_block_ptr = 
-                if N::VALUE == 1{
+                if N::VALUE == 1 {
                     // get directly from root
                     this.get_block_ptr(ConstUsize::<0>, 0)
                 } else {
                     *self.level_block_ptrs.as_ref().get_unchecked(level_block_ptrs_index-1)
                 };
-            
-            let level_block_index = this.get_block_index(level_n.dec(), prev_level_block_ptr, level_index);
-            level_block_index
+            this.get_block_index(level_n.dec(), prev_level_block_ptr, level_index)
         };
         
         // 2. get block mask from level.
@@ -419,15 +519,14 @@ where
                 level_block_ptr
             };
         
-
         let data_block_index = this.get_block_index(last_level_index, level_block_ptr, level_index);
-        this.data.blocks().get_unchecked(data_block_index)
+        this.values.get_unchecked(data_block_index)
     }
 }
 
-impl<Levels, DataLevel> Borrowable for SparseArray<Levels, DataLevel>{
-    type Borrowed = SparseArray<Levels, DataLevel>; 
+impl<Levels, Data> Borrowable for SparseArray<Levels, Data>{
+    type Borrowed = SparseArray<Levels, Data>; 
 }
-impl<Levels, DataLevel> Borrowable for &SparseArray<Levels, DataLevel>{
-    type Borrowed = SparseArray<Levels, DataLevel>; 
+impl<Levels, Data> Borrowable for &SparseArray<Levels, Data>{
+    type Borrowed = SparseArray<Levels, Data>; 
 }

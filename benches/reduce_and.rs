@@ -13,6 +13,9 @@ use hi_sparse_array::utils::IntoOwned;
 type Lvl0Block = Block<u64, [u8;64]>;
 type Lvl1Block = Block<u64, [u16;64]>;
 
+/*type Lvl0Block = Block<wide::u64x2, [u8;128]>;
+type Lvl1Block = Block<wide::u64x2, [u16;128]>;*/
+
 #[derive(Clone)]
 struct DataBlock(u64);
 impl BitAnd for DataBlock{
@@ -60,7 +63,7 @@ impl MaybeEmptyIntrusive for DataBlock{
     }
 }
 
-type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), IntrusiveListLevel<DataBlock>>;
+type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), /*IntrusiveListLevel<*/DataBlock/*>*/>;
 
 
 pub struct AndOp<M, LD>(PhantomData<(M, LD)>);
@@ -138,7 +141,7 @@ where
 }
 */
 fn fold_iter(list: &[BlockArray]) -> impl Any {
-    let op: AndOp<u64, DataBlock> = AndOp(PhantomData);
+    let op = AndOp(PhantomData);
     
     let init  = unsafe{ list.get_unchecked(0) };
     let other = unsafe{ list.get_unchecked(1..) };
@@ -168,7 +171,7 @@ fn fold_iter(list: &[BlockArray]) -> impl Any {
 
 
 fn apply_iter(array1: &BlockArray, array2: &BlockArray) -> u64 {
-    let and_op: AndOp<u64, DataBlock> = AndOp(PhantomData);
+    let and_op = AndOp(PhantomData);
     let reduce = apply(and_op, array1, array2);
     
     let mut s = 0;
