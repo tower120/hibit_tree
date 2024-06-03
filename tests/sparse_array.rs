@@ -5,7 +5,7 @@ mod common;
 use rand::{Rng, SeedableRng};
 use rand::prelude::SliceRandom;
 use hi_sparse_array::{MaybeEmpty, SparseArray};
-use hi_sparse_array::sparse_hierarchy::SparseHierarchy;
+use hi_sparse_array::SparseHierarchy;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 struct Data(usize);

@@ -6,7 +6,7 @@ use crate::bit_block::BitBlock;
 use crate::utils::Borrowable;
 use crate::level_block::HiBlock;
 use crate::level::{ILevel, IntrusiveListLevel};
-use crate::sparse_hierarchy::{DefaultState, SparseHierarchy, SparseHierarchyState};
+use crate::sparse_hierarchy::{DefaultSparseHierarchyState, SparseHierarchy, SparseHierarchyState};
 use crate::const_utils::const_int::{ConstUsize, ConstInteger, ConstIntVisitor};
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
 use crate::MaybeEmpty;
@@ -407,7 +407,7 @@ where
     Levels: SparseArrayLevels,
     Data: Clone + MaybeEmpty
 {
-    const EXACT_HIERARCHY: bool = true;
+    const EXACT_HIERARCHY: bool = false;
     
     type LevelCount = Levels::LevelCount;
     type LevelMaskType = Levels::Mask;
@@ -436,11 +436,11 @@ where
         }
     }
 
-    type State = SparseBlockArrayState<Levels, Data>;
+    type State = SparseArrayState<Levels, Data>;
     //type State = DefaultState<Self>;
 }
 
-pub struct SparseBlockArrayState<Levels, Data>
+pub struct SparseArrayState<Levels, Data>
 where
     Levels: SparseArrayLevels
 {
@@ -454,7 +454,7 @@ where
     phantom_data: PhantomData<SparseArray<Levels, Data>>
 }
 
-impl<Levels, Data> SparseHierarchyState for SparseBlockArrayState<Levels, Data>
+impl<Levels, Data> SparseHierarchyState for SparseArrayState<Levels, Data>
 where
     Levels: SparseArrayLevels,
     Data: Clone + MaybeEmpty,

@@ -144,7 +144,7 @@ pub trait SparseHierarchy: Sized {
         CachingBlockIter::new(self)
     }
     
-    /// Use [DefaultState] as default, if you don't want to implement 
+    /// Use [DefaultSparseHierarchyState] as default, if you don't want to implement 
     /// stateful SparseHierarchy.
     type State: SparseHierarchyState<This = Self>;
     
@@ -216,7 +216,7 @@ pub trait SparseHierarchyState{
 }
 
 /// Redirect to [SparseHierarchy] stateless methods.
-pub struct DefaultState<This>
+pub struct DefaultSparseHierarchyState<This>
 where
     This: SparseHierarchy
 {
@@ -227,7 +227,7 @@ where
     >
 }
 
-impl<This: SparseHierarchy> SparseHierarchyState for DefaultState<This>{
+impl<This: SparseHierarchy> SparseHierarchyState for DefaultSparseHierarchyState<This>{
     type This = This;
 
     #[inline]

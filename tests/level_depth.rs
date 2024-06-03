@@ -4,7 +4,7 @@ use hi_sparse_array::level_block::Block;
 use hi_sparse_array::level::{ILevel, IntrusiveListLevel, Level, SingleBlockLevel};
 use hi_sparse_array::{MaybeEmpty, SparseArray, SparseArrayLevels};
 use hi_sparse_array::caching_iter::CachingBlockIter;
-use hi_sparse_array::sparse_hierarchy::SparseHierarchy;
+use hi_sparse_array::SparseHierarchy;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct DataBlock(u64);

@@ -1,5 +1,55 @@
 #![feature(associated_type_bounds)]
 
+//! The core of the lib is [SparseArray] container and [SparseHierarchy] 
+//! interface. They represent concept of data structure that filled
+//! with "empty" elements across whole range, and populated with values.    
+//! 
+//! All elements that are not actually stored in [SparseArray], 
+//! considered to be [MaybeEmpty::empty()]. Accessing such elements
+//! does not involve branching, and as fast as accessing the real data.
+//! 
+//! Also inter container intersection and merging possible. With fast O(1) 
+//! intersected/merged element search.
+//!
+//! # Data structure
+//! 
+//! TODO: image of container structure from hi_sparse_bitset.
+//! 
+//! TODO: level block description from hi_sparse_bitset.
+//! 
+//! ## Bitmasks
+//! 
+//! Each node supplemented with bitmask, where raised bits corresponds to
+//! sub-tree childs with data. All other node childs point to the empty data.
+//! This allows to iterate non-empty nodes without search.
+//! This also allows **FAST** container-to-container intersections.
+//! 
+//! # Performance
+//! 
+//! Accessing element by index act as dereferencing N pointers (where N - number
+//! of levels in hierarchy). This is significantly faster then traversing tree 
+//! with dynamic depth, since it does not involve any kind of branching.
+//! 
+//! Insert basically same as by index element access, plus some minor overhead.
+//!
+//! Ordered (by index) iteration is fast. Traversing each hierarchy node is fast O(1)
+//! operation, which basically is just BMI's pop_cnt/trail_cnt. There is no "scan"
+//! across node child items, for finding non-empty child/sub-tree.
+//! 
+//! Unordered iteration is as fast as it can possibly be. It just iterating Vec.
+//! 
+//! # Inter SparseHierarchy operations
+//! 
+//! As you can see SparseArray is a form of set/map, and hence, can be used for
+//! inter set operations, such as intersection, merge, diff. 
+//! 
+//! Due to the fact, that each hierarchy block supplemented with bitmask, finding
+//! intersection is just a matter of ANDing bitmasks.
+//! 
+//! # Exact hierarchy
+//! 
+//! TODO
+
 mod sparse_array;
 mod sparse_array_levels;
 mod bit_utils;
@@ -7,8 +57,9 @@ mod bit_block;
 mod apply;
 mod fold;
 //mod empty;
+mod exact_sparse_hierarchy;
+/*pub*/ mod sparse_hierarchy;
 
-pub mod sparse_hierarchy;
 pub mod bit_queue;
 //pub mod simple_iter;
 pub mod caching_iter;
@@ -25,9 +76,11 @@ pub use sparse_array_levels::SparseArrayLevels;
 pub use apply::{Apply, Op};
 pub use fold::Fold;
 //pub use empty::Empty;
+pub use sparse_hierarchy::*;
+pub use exact_sparse_hierarchy::ExactSparseHierarchy;
 
 use std::borrow::Borrow;
-use sparse_hierarchy::SparseHierarchy;
+//use sparse_hierarchy::SparseHierarchy;
 use crate::const_utils::const_int::{ConstInteger, ConstIntVisitor};
 use utils::primitive::Primitive;
 use utils::array::Array;
@@ -41,7 +94,7 @@ pub trait MaybeEmpty {
 /// 
 /// Implementing this will allow your [MaybeEmpty] struct in an empty state 
 /// to be used as a LinkedList node with [IntrusiveListLevel]. 
-pub trait MaybeEmptyIntrusive: MaybeEmpty {
+pub(crate) trait MaybeEmptyIntrusive: MaybeEmpty {
     fn as_u64_mut(&mut self) -> &mut u64;
     /// Restore [empty()] state, after [as_u64_mut()] mutation.
     fn restore_empty(&mut self);
