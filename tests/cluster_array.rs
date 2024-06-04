@@ -34,7 +34,7 @@ fn insert_test(){
     
     let range = 0..3000;
     for i in range.clone(){
-        *array.get_or_insert(i as usize) = DataBlock(i as u64);
+        *array.get_mut(i as usize) = DataBlock(i as u64);
     }
 
     let values = CachingBlockIter::new(&array).map(|(_,v)|v.0);

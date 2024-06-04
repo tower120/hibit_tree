@@ -66,7 +66,7 @@ impl SparseVector{
         let block_index   = index / BLOCK_SIZE;
         let in_block_index= index % BLOCK_SIZE;        
         
-        let block = self.sparse_array.get_or_insert(block_index);
+        let block = self.sparse_array.get_mut(block_index);
         unsafe{
             *block.0.as_array_mut().get_unchecked_mut(in_block_index) = value;
         }

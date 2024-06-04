@@ -10,11 +10,6 @@ use crate::utils::IntoOwned;
 /// 
 /// TODO: Change description
 ///
-/// # Infinity
-/// 
-/// SparseHierarchy will act as infinite-size data source, if you try to
-/// access elements outside of [max_range] in a safe manner ([get]/[contains]).   
-/// 
 // We need xxxxType for each concrete level_block/mask type to avoid the need for use `for<'a>`,
 // which is still not working (at Rust level) in cases, where we need it most. 
 pub trait SparseHierarchy: Sized {
@@ -28,10 +23,22 @@ pub trait SparseHierarchy: Sized {
     type LevelMask<'a>: Borrow<Self::LevelMaskType> + IntoOwned<Self::LevelMaskType>
         where Self: 'a;
     
-    /// Returns mask for level `I::CAP`. 
+    /// Returns bitmask for level `I::CAP`. 
     /// 
     /// Each `level_indices` array elements corresponds to each level, skipping root.
     /// Root level skipped, for performance reasons, since root block is always one.
+    /// 
+    /// # Exapmle
+    /// 
+    /// ```
+    /// // 2 level 64 bit hierarchy.
+    /// let array;
+    /// // Root node corresponds to range 0..4095
+    /// let root_mask = array.level_mask();
+    /// // Mask of root node's child node with index 10.
+    /// // This node corresponds to range 640..703
+    /// let lvl1_mask = array.level_mask([10]);
+    /// ```
     /// 
     /// # Safety
     ///
@@ -51,14 +58,6 @@ pub trait SparseHierarchy: Sized {
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy;
     
-    // We need this, because Data may return reference.
-    // And we can't have a non-const constructible static in rust,
-    // for taking reference from arbitrary DataBlockType::empty() 
-    // without overhead.
-    //
-    // Used by get().
-    fn empty_data(&self) -> Self::Data<'_>;
-    
     /// Same as [may_contain], but without range checks.
     /// 
     /// # Safety
@@ -77,16 +76,13 @@ pub trait SparseHierarchy: Sized {
     /// Faster than [get] + [is_empty], since output is based on hierarchy data only.
     /// May return false positives with non-[EXACT_HIERARCHY].
     /// 
-    /// Returns false if `index` outside of range.
+    /// # Panics
     /// 
-    /// This makes SparseHierarchy basically infinite.
+    /// Will panic if `index` is outside [max_range()].
     #[inline]
     fn may_contain(&self, index: usize) -> bool {
-        if index > Self::max_range(){
-            false
-        } else {
-            unsafe{ self.may_contain_unchecked(index) }
-        }        
+        assert!(index <= Self::max_range(), "index out of range!");
+        unsafe{ self.may_contain_unchecked(index) }
     }
     
     /// Same as [contains], but without range checks.
@@ -108,14 +104,13 @@ pub trait SparseHierarchy: Sized {
     /// If [EXACT_HIERARCHY] - faster than [get] + [is_empty].
     /// Otherwise - just do the job.
     /// 
-    /// Returns false if `index` outside of range.
+    /// # Panics
+    /// 
+    /// Will panic if `index` is outside [max_range()].
     #[inline]
     fn contains(&self, index: usize) -> bool {
-        if index > Self::max_range() {
-            false
-        } else {
-            unsafe{ self.contains_unchecked(index) }
-        }
+        assert!(index <= Self::max_range(), "index out of range!");
+        unsafe{ self.contains_unchecked(index) }
     }
     
     /// # Safety
@@ -127,16 +122,13 @@ pub trait SparseHierarchy: Sized {
         self.data_block(indices)
     }
     
-    /// Returns [empty_data_block()] if `index` outside of range.
+    /// # Panics
     /// 
-    /// This makes SparseHierarchy basically infinite.
+    /// Will panic if `index` is outside [max_range()].
     #[inline]
     fn get(&self, index: usize) -> Self::Data<'_>{
-        if index > Self::max_range(){
-            self.empty_data()
-        } else {
-            unsafe{ self.get_unchecked(index) }
-        }
+        assert!(index <= Self::max_range(), "index out of range!");
+        unsafe{ self.get_unchecked(index) }
     }    
     
     #[inline]
@@ -144,7 +136,7 @@ pub trait SparseHierarchy: Sized {
         CachingBlockIter::new(self)
     }
     
-    /// Use [DefaultSparseHierarchyState] as default, if you don't want to implement 
+    /// Use [DefaultHierarchyState] as default, if you don't want to implement 
     /// stateful SparseHierarchy.
     type State: SparseHierarchyState<This = Self>;
     
@@ -215,8 +207,8 @@ pub trait SparseHierarchyState{
     ) -> <Self::This as SparseHierarchy>::Data<'a>;    
 }
 
-/// Redirect to [SparseHierarchy] stateless methods.
-pub struct DefaultSparseHierarchyState<This>
+/// [SparseHierarchyState] that use [SparseHierarchy] stateless methods.
+pub struct DefaultHierarchyState<This>
 where
     This: SparseHierarchy
 {
@@ -227,7 +219,7 @@ where
     >
 }
 
-impl<This: SparseHierarchy> SparseHierarchyState for DefaultSparseHierarchyState<This>{
+impl<This: SparseHierarchy> SparseHierarchyState for DefaultHierarchyState<This>{
     type This = This;
 
     #[inline]

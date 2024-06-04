@@ -88,8 +88,8 @@ pub fn bench_iter(c: &mut Criterion) {
         let v = rng.gen_range(0..RANGE);
         random_indices.push(v);
         
-        *block_array.get_or_insert(v) = DataBlock(v as u64);
-        *small_block_array.get_or_insert(v) = DataBlock(v as u64);
+        *block_array.get_mut(v) = DataBlock(v as u64);
+        *small_block_array.get_mut(v) = DataBlock(v as u64);
         /* *cluster_block_array.get_or_insert(v) = DataBlock(v as u64);*/
         hashmap.insert(v as u64, DataBlock(v as u64));
     }

@@ -189,10 +189,10 @@ pub fn bench_iter(c: &mut Criterion) {
     let mut block_array4 = BlockArray::default();
 
     for i in 0..100{
-        *block_array1.get_or_insert(i*20) = DataBlock(i as u64);
-        *block_array2.get_or_insert(i*20) = DataBlock(i as u64);
-        *block_array3.get_or_insert(i*20) = DataBlock(i as u64);
-        *block_array4.get_or_insert(i*20) = DataBlock(i as u64);
+        *block_array1.get_mut(i*20) = DataBlock(i as u64);
+        *block_array2.get_mut(i*20) = DataBlock(i as u64);
+        *block_array3.get_mut(i*20) = DataBlock(i as u64);
+        *block_array4.get_mut(i*20) = DataBlock(i as u64);
     }
     let arrays = [block_array1, block_array2/*, block_array3*/];
 

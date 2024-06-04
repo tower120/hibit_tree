@@ -6,7 +6,7 @@ use crate::bit_block::BitBlock;
 use crate::utils::Borrowable;
 use crate::level_block::HiBlock;
 use crate::level::{ILevel, IntrusiveListLevel};
-use crate::sparse_hierarchy::{DefaultSparseHierarchyState, SparseHierarchy, SparseHierarchyState};
+use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::const_utils::const_int::{ConstUsize, ConstInteger, ConstIntVisitor};
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
 use crate::MaybeEmpty;
@@ -108,8 +108,13 @@ where
 impl<Levels, Data> SparseArray<Levels, Data>
 where
     Levels: SparseArrayLevels,
-    Data: MaybeEmpty,
+    Data: MaybeEmpty + Clone,
 {
+    #[inline(always)]
+    fn check_index_range(index: usize){
+        assert!(index <= Self::max_range(), "index out of range!");
+    }
+    
     #[inline(always)]
     unsafe fn get_block_ptr(&self, level_n: impl ConstInteger, level_index: usize) -> *const u8{
         struct V(usize);
@@ -214,10 +219,14 @@ where
         self.fetch_block_indices(level_indices).1
     }
     
-    // get_mut
-    
+    /// Returns `Some(item)` if there is an element at `index` in container.
+    /// `None` otherwise. 
+    /// 
+    /// # Panics
+    /// 
+    /// Will panic if `index` is outside [max_range()].
     pub fn remove(&mut self, index: usize) -> Option<Data> {
-        //assert!(Self::is_in_range(index), "index out of range!");
+        Self::check_index_range(index);
 
         let level_indices = level_indices::<Levels::Mask, Levels::LevelCount>(index);
         let (levels_block_indices, data_block_index) = unsafe { 
@@ -307,13 +316,20 @@ where
         Some(value)
     }
     
-    /// Inserts and return empty level_block, if not exists.
+    /// Returns mutable reference to item at `index`, if exists.
+    /// Inserts and return [empty] level_block, otherwise.
     /// 
-    /// If returned DataBlock will end up in empty state - you have to
-    /// call [remove]. This is not required for correctness, but will prevent
-    /// this empty element from appearing in iteration.
-    pub fn get_or_insert(&mut self, index: usize) -> &mut Data {
-        //assert!(Self::is_in_range(index), "index out of range!");
+    /// # Panics
+    ///
+    /// Will panic if `index` is outside [max_range()].
+    ///
+    /// # Tip
+    /// 
+    /// Even though this container is ![EXACT_HIERARCHY], removing empty item  
+    /// will prevent it from appearing in iteration. So if you somehow know, that
+    /// item became in empty state after mutation - consider calling [remove()]. 
+    pub fn get_mut(&mut self, index: usize) -> &mut Data {
+        Self::check_index_range(index);
 
         let level_indices = level_indices::<Levels::Mask, Levels::LevelCount>(index);
         
@@ -376,6 +392,56 @@ where
         }  
     }
     
+    /// Returns `Some`, if an element with `index` exists in container.
+    /// `None` - otherwise.
+    /// 
+    /// # Panics
+    ///
+    /// Will panic if `index` is outside [max_range()].
+    #[inline]
+    pub fn try_get(&self, index: usize) -> Option<&Data> {
+        Self::check_index_range(index);
+        let level_indices = level_indices::<Levels::Mask, Levels::LevelCount>(index);
+        let data_block_index = unsafe{ self.fetch_block_index(level_indices) };
+        
+        if data_block_index != 0 {
+            Some(unsafe{ self.values.get_unchecked(data_block_index) })
+        } else {
+            None
+        }
+    }    
+    
+    /// Returns `Some`, if element with `index` exists in container.
+    /// `None` - otherwise.
+    /// 
+    /// # Panics
+    ///
+    /// Will panic if `index` is outside [max_range()].
+    #[inline]
+    pub fn try_get_mut(&mut self, index: usize) -> Option<&mut Data> {
+        Self::check_index_range(index);
+        let level_indices = level_indices::<Levels::Mask, Levels::LevelCount>(index);
+        let data_block_index = unsafe{ self.fetch_block_index(level_indices) };
+        
+        if data_block_index != 0{
+            Some(unsafe{ self.values.get_unchecked_mut(data_block_index) })
+        } else {
+            None
+        }
+    }
+    
+    /// # Safety
+    /// 
+    /// - element at `index` must exist in container.
+    #[inline]
+    pub unsafe fn get_mut_unchecked(&mut self, index: usize) -> &mut Data {
+        let level_indices = level_indices::<Levels::Mask, Levels::LevelCount>(index);
+        let data_block_index = self.fetch_block_index(level_indices);
+        debug_assert!(data_block_index != 0);
+        self.values.get_unchecked_mut(data_block_index)
+    }
+    
+    // TODO: mut version
     // TODO: concrete type in return
     /// Return keys and values as contiguous array iterator. 
     #[inline]
@@ -429,15 +495,7 @@ where
         self.values.get_unchecked(data_block_index)
     }
 
-    #[inline]
-    fn empty_data(&self) -> Self::Data<'_> {
-        unsafe{
-            self.values.get_unchecked(0)
-        }
-    }
-
     type State = SparseArrayState<Levels, Data>;
-    //type State = DefaultState<Self>;
 }
 
 pub struct SparseArrayState<Levels, Data>

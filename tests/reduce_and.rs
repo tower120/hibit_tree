@@ -83,8 +83,8 @@ pub fn bench_iter() {
     let mut block_array2 = BlockArray::default();
 
     for i in 0..3000{
-        *block_array1.get_or_insert(i) = DataBlock(i as u64);
-        *block_array2.get_or_insert(i) = DataBlock(i as u64);
+        *block_array1.get_mut(i) = DataBlock(i as u64);
+        *block_array2.get_mut(i) = DataBlock(i as u64);
     }
 
     array_iter(&block_array1, &block_array2);

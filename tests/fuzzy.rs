@@ -70,7 +70,7 @@ fn fuzzy_test(){
         // insert
         for _ in 0..rng.gen_range(0..COUNT) {
             let v = rng.gen_range(0..RANGE);
-            *a.get_or_insert(v) = Data(v);
+            *a.get_mut(v) = Data(v);
             h.insert(v, Data(v));
         }
         check(&mut rng, &a, &h);   

@@ -70,12 +70,7 @@ where
             }
         )
     }
-
-    #[inline]
-    fn empty_data(&self) -> Self::Data<'_> {
-        <Op::DataBlockO as MaybeEmpty>::empty()
-    }
-
+    
     type State = FoldState<Op, Init, ArrayIter>;
 }
 

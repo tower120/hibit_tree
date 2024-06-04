@@ -31,16 +31,16 @@ fn insert_test(){
     let mut small_block_array = Array::default();
     for _ in 0..COUNT{
         let v = rng.gen_range(0..RANGE);
-        *small_block_array.get_or_insert(v) = Data(v);
+        *small_block_array.get_mut(v) = Data(v);
     }
 }
 
 #[test]
 fn remove_test(){
     let mut a = Array::default();
-    *a.get_or_insert(1) = Data(1);
-    *a.get_or_insert(2) = Data(2);
-    *a.get_or_insert(400) = Data(400);
+    *a.get_mut(1) = Data(1);
+    *a.get_mut(2) = Data(2);
+    *a.get_mut(400) = Data(400);
     
     a.remove(1);
     a.remove(2);

@@ -82,9 +82,9 @@ pub fn bench_iter(c: &mut Criterion) {
     let mut vec = Vec::default();
     let mut hashmap = HashMap::default();
     for i in 0..3000{
-        *block_array.get_or_insert(i) = DataBlock(i as u64);
-        *small_block_array.get_or_insert(i) = DataBlock(i as u64);
-        *cluster_block_array.get_or_insert(i) = DataBlock(i as u64);
+        *block_array.get_mut(i) = DataBlock(i as u64);
+        *small_block_array.get_mut(i) = DataBlock(i as u64);
+        *cluster_block_array.get_mut(i) = DataBlock(i as u64);
         vec.push(DataBlock(i as u64));
         hashmap.insert(i as u64, DataBlock(i as u64));
     }

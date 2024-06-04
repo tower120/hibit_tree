@@ -26,7 +26,7 @@ fn level_depth_test(){
         Levels: SparseArrayLevels
     {
         for i in range.clone(){
-            *array.get_or_insert(i as usize) = DataBlock(i as u64);
+            *array.get_mut(i as usize) = DataBlock(i as u64);
         }
         
         for i in range.clone(){

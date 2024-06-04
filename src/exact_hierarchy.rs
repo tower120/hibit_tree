@@ -3,8 +3,8 @@ use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::utils::Borrowable;
 
 /// Wrapper around [SparseHierarchy] that makes it [EXACT_HIERARCHY].  
-pub struct ExactSparseHierarchy<T>(T);
-impl<T> ExactSparseHierarchy<T>
+pub struct ExactHierarchy<T>(T);
+impl<T> ExactHierarchy<T>
 where 
     T: Borrowable<Borrowed: SparseHierarchy>
 {
@@ -19,7 +19,7 @@ where
     }
 }
 
-impl<T> SparseHierarchy for ExactSparseHierarchy<T>
+impl<T> SparseHierarchy for ExactHierarchy<T>
 where 
     T: Borrowable<Borrowed: SparseHierarchy>
 {
@@ -47,25 +47,20 @@ where
         self.0.borrow().data_block(level_indices)
     }
 
-    #[inline]
-    fn empty_data(&self) -> Self::Data<'_> {
-        self.0.borrow().empty_data()
-    }
-
-    type State = ExactSparseHierarchyState<T>;
+    type State = ExactHierarchyState<T>;
     
     // TODO: forward other functions
 }
 
-pub struct ExactSparseHierarchyState<T>(<T::Borrowed as SparseHierarchy>::State)
+pub struct ExactHierarchyState<T>(<T::Borrowed as SparseHierarchy>::State)
 where 
     T: Borrowable<Borrowed: SparseHierarchy>;
 
-impl<T> SparseHierarchyState for ExactSparseHierarchyState<T>
+impl<T> SparseHierarchyState for ExactHierarchyState<T>
 where
     T: Borrowable<Borrowed: SparseHierarchy>
 {
-    type This = ExactSparseHierarchy<T>;
+    type This = ExactHierarchy<T>;
 
     #[inline]
     fn new(this: &Self::This) -> Self {

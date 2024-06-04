@@ -21,8 +21,9 @@
 //! 
 //! Each node supplemented with bitmask, where raised bits corresponds to
 //! sub-tree childs with data. All other node childs point to the empty data.
-//! This allows to iterate non-empty nodes without search.
-//! This also allows **FAST** container-to-container intersections.
+//! With bitmasks, instead of searching non-empty node child in childs array,
+//! we just iterate bitmask population.
+//! Also, bitmasks allows **FAST** container-to-container intersections.
 //! 
 //! # Performance
 //! 
@@ -48,7 +49,24 @@
 //! 
 //! # Exact hierarchy
 //! 
-//! TODO
+//! "Exact hierarchy" - is hierarchy that DOES NOT have nodes pointing to 
+//! empty elements or nodes. Hence, it's bitmasks contains "exact" emptiness info.
+//! 
+//! If you can guarantee that your ![EXACT_HIERARCHY] SparseHierarchy is 
+//! actually exact - you can use [ExactHierarchy]. 
+//! 
+//! Speeds up following operations:
+//! - [Eq]
+//! - [is_empty()]
+//! - [contains()]
+//! - TODO From<impl SparseHierarchy>
+//! - iterated elements are guaranteed to be ![is_empty].
+//! 
+//! N.B. In order to meet "exact hierarchy" constraints, [SparseArray] would have
+//! to check data for emptiness after each mutated access. Since you may never
+//! actually use operations that speed-up by [EXACT_HIERARCHY] (or performance 
+//! gains does not matter) - we made [SparseArray] non-exact.
+//! TODO Use [ExactSparseArray] for "exact hierarchy" version.
 
 mod sparse_array;
 mod sparse_array_levels;
@@ -57,7 +75,7 @@ mod bit_block;
 mod apply;
 mod fold;
 //mod empty;
-mod exact_sparse_hierarchy;
+mod exact_hierarchy;
 /*pub*/ mod sparse_hierarchy;
 
 pub mod bit_queue;
@@ -77,7 +95,7 @@ pub use apply::{Apply, Op};
 pub use fold::Fold;
 //pub use empty::Empty;
 pub use sparse_hierarchy::*;
-pub use exact_sparse_hierarchy::ExactSparseHierarchy;
+pub use exact_hierarchy::ExactHierarchy;
 
 use std::borrow::Borrow;
 //use sparse_hierarchy::SparseHierarchy;
