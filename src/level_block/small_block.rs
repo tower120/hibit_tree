@@ -326,13 +326,16 @@ where
     }
     
     #[inline]
-    unsafe fn get_or_insert(&mut self, index: usize, mut f: impl FnMut() -> Self::Item) -> Self::Item {
+    unsafe fn get_or_insert(&mut self, index: usize, mut f: impl FnOnce() -> Self::Item) 
+        -> (Self::Item, bool) 
+    {
         let mut block_index = self.get_or_zero(index);
-        if block_index.is_zero(){
+        let insert = block_index.is_zero(); 
+        if insert{
             block_index = f();
             self.insert_unchecked(index, block_index);
         }
-        block_index
+        (block_index, insert)
     }
 
     #[inline]

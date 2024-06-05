@@ -9,6 +9,7 @@ use crate::level::{ILevel, IntrusiveListLevel};
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::const_utils::const_int::{ConstUsize, ConstInteger, ConstIntVisitor};
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
+use crate::const_utils::{ConstBool, ConstFalse, ConstTrue};
 use crate::MaybeEmpty;
 use crate::utils::primitive::Primitive;
 use crate::utils::array::{Array};
@@ -296,7 +297,7 @@ where
                     type Out = ();
     
                     #[inline(always)]
-                    fn visit<I: ConstInteger, L>(self, i: I, level: &mut L) -> Self::Out
+                    fn visit<I: ConstInteger, L>(self, _: I, level: &mut L) -> Self::Out
                     where
                         L: ILevel<Block: HiBlock>,                
                     {
@@ -325,18 +326,49 @@ where
     ///
     /// # Tip
     /// 
-    /// Even though this container is ![EXACT_HIERARCHY], removing empty item  
-    /// will prevent it from appearing in iteration. So if you somehow know, that
-    /// item became in empty state after mutation - consider calling [remove()]. 
+    /// Even though this container is ![EXACT_HIERARCHY], if you end up 
+    /// with a value in empty state - consider calling [remove()].
     pub fn get_mut(&mut self, index: usize) -> &mut Data {
+        self.get_or_insert(index, ConstFalse, ||Data::empty())
+    }
+
+    /// Inserts `value` at `index`.
+    /// If there was a value - it will be replaced.
+    ///
+    /// Somewhat faster than *[get_mut()] = `value`, since it will not insert intermediate
+    /// [empty] value [^1], if `index` unoccupied.
+    ///
+    /// [^1]: Thou, if empty constructor is not complex - compiler may be 
+    /// able to optimize away intermediate value anyway. But better safe then sorry.
+    /// 
+    /// # Panics
+    ///
+    /// Will panic if `index` is outside [max_range()].
+    ///
+    /// # Tip
+    /// 
+    /// Even though this container is ![EXACT_HIERARCHY], try not to insert empty 
+    /// `value`, as it will appear in iteration. 
+    pub fn insert(&mut self, index: usize, value: Data) {
+        self.get_or_insert(index, ConstTrue, ||value);
+    }
+    
+    /// insert:
+    /// true  - for insert
+    /// false - for get_mut
+    #[inline]
+    fn get_or_insert(&mut self, index: usize, insert: impl ConstBool, value_fn: impl FnOnce() -> Data)
+        -> &mut Data 
+    {
         Self::check_index_range(index);
 
         let level_indices = level_indices::<Levels::Mask, Levels::LevelCount>(index);
+        let last_level_inner_index = unsafe{ *level_indices.as_ref().last().unwrap_unchecked() }; 
         
         let this = NonNull::new(self).unwrap();
-        let data_block_index = self.levels.fold_mut(0, V{this, level_indices, index});
-        struct V<Levels: SparseArrayLevels, Data, LevelIndices> {
-            this: NonNull<SparseArray<Levels, Data>>, 
+        let last_level_block_index = self.levels.fold_mut(0, V{this, level_indices, index});
+        struct V<Levels, Data, LevelIndices> {
+            this: NonNull<SparseArray<Levels, Data>>,
             level_indices: LevelIndices,
             index: usize
         }
@@ -347,6 +379,7 @@ where
             LevelIndices: Array<Item=usize>
         {
             type Acc = usize;
+            
             #[inline(always)]
             fn visit<I: ConstInteger, L: ILevel>(&mut self, i: I, level: &mut L, level_block_index: usize) 
                 -> ControlFlow<usize, usize>
@@ -354,39 +387,93 @@ where
                 L::Block: HiBlock
             {
             unsafe{
+                /*const*/ if I::VALUE == Levels::LevelCount::VALUE - 1 {
+                    // Skip last level, will process outside of the loop.
+                    return Continue(level_block_index);
+                }
+                
                 let block = level.blocks_mut().get_unchecked_mut(level_block_index);
                 let inner_index = self.level_indices.as_ref()[I::VALUE];
-                let block_index = block.get_or_insert(inner_index, ||{
-                    let block_index = 
-                        if I::VALUE == Levels::LevelCount::VALUE - 1 {
-                            // This is the last level
-                            let this = self.this.as_mut();
-                            let i = this.values.len();
-                            this.values.push(MaybeEmpty::empty());
-                            this.keys.push(self.index);
-                            this.last_level_block_indices.push(
-                                (level_block_index, inner_index)
-                            );
-                            i
-                        } else {
-                            struct Insert;
-                            impl<M> MutVisitor<M> for Insert {
-                                type Out = usize;
-                                #[inline(always)]
-                                fn visit<I:ConstInteger, L: ILevel>(self, i: I, level: &mut L) -> usize {
-                                    level.insert_empty_block()
-                                }
-                            }
-                            self.this.as_mut().levels.visit_mut(i.inc(), Insert)
-                        };
+                let (block_index, _) = block.get_or_insert(inner_index, ||{
+                    struct Insert;
+                    impl<M> MutVisitor<M> for Insert {
+                        type Out = usize;
+                        #[inline(always)]
+                        fn visit<I:ConstInteger, L: ILevel>(self, _: I, level: &mut L) -> usize {
+                            level.insert_empty_block()
+                        }
+                    }
+                    let block_index = self.this.as_mut().levels.visit_mut(i.inc(), Insert);
                     Primitive::from_usize(block_index)
-                }).as_usize();
-                Continue(block_index)
+                });
+                Continue(block_index.as_usize())
+            }
+            }
+        }
+        
+        // 3. Last level
+        let data_block_index = self.levels.visit_mut(
+            Levels::LevelCount::default().dec(), 
+            LastLevelVisitor{
+                this,
+                level_block_index: last_level_block_index,
+                block_inner_index: last_level_inner_index,
+                insert, value_fn, index
+            }
+        );
+        struct LastLevelVisitor<Levels, Data, Insert, ValueFn>{
+            this: NonNull<SparseArray<Levels, Data>>,
+            level_block_index: usize,
+            block_inner_index: usize,
+            insert: Insert,
+            value_fn: ValueFn,
+            index: usize
+        }
+        impl<Levels, Data, Insert, ValueFn, M> MutVisitor<M> for LastLevelVisitor<Levels, Data, Insert, ValueFn>
+        where
+            Insert: ConstBool,
+            ValueFn: FnOnce() -> Data
+        {
+            type Out = usize;
+
+            #[inline(always)]
+            fn visit<I: ConstInteger, L>(mut self, _: I, level: &mut L) -> Self::Out 
+            where 
+                L: ILevel, L::Block: HiBlock<Mask=M> 
+            {
+            unsafe{ 
+                let block = level.blocks_mut().get_unchecked_mut(self.level_block_index);
+                
+                let this = self.this.as_mut();
+                let (block_index, inserted) = block.get_or_insert(self.block_inner_index, ||{
+                    let i = this.values.len();
+                    // Make RUST happy, push value latter
+                    //this.values.push(value);
+                    this.keys.push(self.index);
+                    this.last_level_block_indices.push(
+                        (self.level_block_index, self.block_inner_index)
+                    );
+                    Primitive::from_usize(i)                        
+                });
+                let block_index = block_index.as_usize();
+                
+                // Compiler should be able to eliminate this branch,
+                // and put it's contains into the inner get_or_insert branch.
+                // If not - split get_or_insert into try_get + insert_unchecked.  
+                if inserted {        
+                    this.values.push((self.value_fn)());
+                } else {
+                    if Insert::VALUE {
+                        *this.values.get_unchecked_mut(block_index) = (self.value_fn)();
+                    } 
+                }
+                
+                block_index
             }
             }
         }
 
-        // 3. Data level
+        // 4. Data
         unsafe{
             self.values.get_unchecked_mut(data_block_index)
         }  

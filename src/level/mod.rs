@@ -9,6 +9,7 @@ pub use level::*;
 use crate::MaybeEmpty;
 
 pub trait ILevel: Default {
+    // TODO: Nwo it is always "HiBlock"
     type Block: MaybeEmpty;
     
     fn blocks(&self) -> &[Self::Block];

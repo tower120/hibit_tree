@@ -78,18 +78,19 @@ where
     }
 
     #[inline]
-    unsafe fn get_or_insert(&mut self, index: usize, mut f: impl FnMut() -> Self::Item) -> Self::Item {
-        // mask
-        let exists = self.mask.set_bit::<true>(index);
-
-        // indices
-        let block_indices = self.block_indices.as_mut();
-        if exists {
-            *block_indices.get_unchecked(index)
+    unsafe fn get_or_insert(&mut self, index: usize, mut f: impl FnOnce() -> Self::Item) 
+        -> (Self::Item, bool) 
+    {
+        let block_index_mut = self.block_indices.as_mut().get_unchecked_mut(index);
+        let block_index = *block_index_mut; 
+        if !block_index.is_zero(){
+            (block_index, false)
         } else {
+            self.mask.set_bit::<true>(index);
+            
             let block_index = f();
-            *block_indices.get_unchecked_mut(index) = block_index;
-            block_index
+            *block_index_mut = block_index; 
+            (block_index, true)
         }
     }
 

@@ -40,8 +40,8 @@ pub trait HiBlock: MaybeEmptyIntrusive {
     unsafe fn get_or_insert(
         &mut self,
         index: usize,
-        f: impl FnMut() -> Self::Item
-    ) -> Self::Item;
+        f: impl FnOnce() -> Self::Item
+    ) -> (Self::Item, bool/*inserted*/);
     
     /// # Safety
     ///

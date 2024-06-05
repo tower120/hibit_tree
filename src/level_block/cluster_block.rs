@@ -189,7 +189,7 @@ where
         *sub_block.as_ref().get_unchecked(sub_block_inner_index)
     }
 
-    unsafe fn get_or_insert(&mut self, index: usize, mut f: impl FnMut() -> Self::Item) -> Self::Item {
+    unsafe fn get_or_insert(&mut self, index: usize, mut f: impl FnOnce() -> Self::Item) -> (Self::Item, bool) {
         let sub_block_index     = index / SUB_BLOCK_SIZE; 
         let sub_block_bit_index = index % SUB_BLOCK_SIZE;
         let sub_block_mask_mut  = Self::sub_masks_mut(&mut self.mask).get_unchecked_mut(sub_block_index);
@@ -239,12 +239,12 @@ where
                     // element.
                     ptr::write(p, block_index);
                 }                
-                return block_index;
+                return (block_index, true);
             }
         }      
         
         // get
-        *sub_block.as_ref().get_unchecked(sub_block_inner_index)            
+        (*sub_block.as_ref().get_unchecked(sub_block_inner_index), false)            
     }
 
     unsafe fn remove_unchecked(&mut self, index: usize) {
