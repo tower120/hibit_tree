@@ -5,7 +5,7 @@ use crate::sparse_array::level_indices;
 use crate::const_utils::const_int::ConstInteger;
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
 use crate::MaybeEmpty;
-use crate::utils::IntoOwned;
+use crate::utils::{IntoOwned, Take};
 
 /// 
 /// TODO: Change description
@@ -47,9 +47,8 @@ pub trait SparseHierarchy: Sized {
     where
         I: ConstArray<Item=usize> + Copy;
     
-    // TODO: Try to remove IntoOwned here. This requires Data to impl Clone. 
     type DataType: MaybeEmpty;
-    type Data<'a>: Borrow<Self::DataType> + IntoOwned<Self::DataType>
+    type Data<'a>: Borrow<Self::DataType> + Take<Self::DataType>
         where Self: 'a;
     /// # Safety
     ///

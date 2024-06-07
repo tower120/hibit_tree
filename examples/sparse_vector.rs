@@ -2,13 +2,13 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
 use wide::f32x4;
-use hi_sparse_array::{apply, BitBlock, MaybeEmpty, MaybeEmptyIntrusive, Op};
+use hi_sparse_array::{apply, BitBlock, MaybeEmpty, BinaryOp};
 use hi_sparse_array::level_block::Block;
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::const_utils::ConstFalse;
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
-use hi_sparse_array::sparse_hierarchy::SparseHierarchy;
-use hi_sparse_array::utils::IntoOwned;
+use hi_sparse_array::SparseHierarchy;
+use hi_sparse_array::utils::{IntoOwned, Take};
 
 #[derive(Clone)]
 struct DataBlock(f32x4);
@@ -31,19 +31,6 @@ impl MaybeEmpty for DataBlock{
     }
 }
 
-impl MaybeEmptyIntrusive for DataBlock{
-    fn as_u64_mut(&mut self) -> &mut u64 {
-        unsafe{
-            &mut*self.0.as_array_mut().as_mut_ptr().cast::<u64>()
-        }
-    }
-
-    fn restore_empty(&mut self) {
-        // Is this correct for float??
-        *self.as_u64_mut() = 0;
-    }
-}
-
 type Lvl0Block = Block<u64, [u8; 64]>;
 type Lvl1Block = Block<u64, [u16; 64]>;
 type SparseArray = hi_sparse_array::SparseArray<
@@ -51,7 +38,7 @@ type SparseArray = hi_sparse_array::SparseArray<
         SingleBlockLevel<Lvl0Block>,
         //Level<Lvl1Block>,
     ),
-    IntrusiveListLevel<DataBlock>
+    DataBlock
 >;
 
 #[derive(Default)]
@@ -80,10 +67,10 @@ impl<M, D> Default for MulOp<M, D>{
     }
 } 
 
-impl<M, D> Op for MulOp<M, D>
+impl<M, D> BinaryOp for MulOp<M, D>
 where
     M: BitBlock + BitAnd<Output = M>, 
-    D: Mul<Output = D> + MaybeEmpty
+    D: Mul<Output = D> + MaybeEmpty + Clone
 {
     const EXACT_HIERARCHY: bool = false;
     type SKIP_EMPTY_HIERARCHIES = ConstFalse;
@@ -93,11 +80,11 @@ where
         left.into_owned() & right.into_owned()
     }
 
-    type DataBlockL = D;
-    type DataBlockR = D;
-    type DataBlockO = D;
-    fn data_op(&self, left: impl Borrow<D> + IntoOwned<D>, right: impl Borrow<D> + IntoOwned<D>) -> Self::DataBlockO {
-        left.into_owned() * right.into_owned()
+    type Left  = D;
+    type Right = D;
+    type Out   = D;
+    fn data_op(&self, left: impl Borrow<D> + Take<D>, right: impl Borrow<D> + Take<D>) -> Self::Out {
+        left.take_or_clone() * right.take_or_clone()
     }
 }
 

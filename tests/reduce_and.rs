@@ -1,12 +1,12 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
-use hi_sparse_array::{BitBlock, fold, MaybeEmpty, Op, SparseArray};
+use hi_sparse_array::{BitBlock, fold, MaybeEmpty, BinaryOp, SparseArray};
 use hi_sparse_array::level_block::{Block, SmallBlock};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::const_utils::ConstTrue;
 use hi_sparse_array::level::{IntrusiveListLevel, Level, SingleBlockLevel};
-use hi_sparse_array::utils::IntoOwned;
+use hi_sparse_array::utils::{IntoOwned, Take};
 
 type Lvl0Block = Block<u64, [u8;64]>;
 type Lvl1Block = Block<u64, [u16;64]>;
@@ -18,6 +18,14 @@ impl BitAnd for DataBlock{
 
     #[inline]
     fn bitand(self, rhs: Self) -> Self::Output {
+        Self(self.0 & rhs.0)
+    }
+}
+impl BitAnd<&Self> for DataBlock{
+    type Output = Self;
+
+    #[inline]
+    fn bitand(self, rhs: &Self) -> Self::Output {
         Self(self.0 & rhs.0)
     }
 }
@@ -40,10 +48,10 @@ impl<M, LD> Default for AndOp<M, LD>{
     }
 } 
 
-impl<M, LD> Op for AndOp<M, LD>
+impl<M, LD> BinaryOp for AndOp<M, LD>
 where
     M: BitBlock + BitAnd<Output = M>, 
-    LD: BitAnd<Output = LD> + MaybeEmpty
+    LD: for<'a> BitAnd<&'a LD, Output = LD> + MaybeEmpty
 {
     const EXACT_HIERARCHY: bool = false;
     type SKIP_EMPTY_HIERARCHIES = ConstTrue;
@@ -53,11 +61,11 @@ where
         left.into_owned() & right.into_owned()
     }
 
-    type DataBlockL = LD;
-    type DataBlockR = LD;
-    type DataBlockO = LD;
-    fn data_op(&self, left: impl Borrow<LD> + IntoOwned<LD>, right: impl Borrow<LD> + IntoOwned<LD>) -> Self::DataBlockO {
-        left.into_owned() & right.into_owned()
+    type Left  = LD;
+    type Right = LD;
+    type Out   = LD;
+    fn data_op(&self, acc: impl Take<LD>, right: impl Borrow<LD>) -> Self::Out {
+        acc.take() & right.borrow()
     }
 }
 

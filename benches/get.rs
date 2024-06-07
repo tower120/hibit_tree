@@ -1,11 +1,11 @@
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
 use rand::{Rng, SeedableRng};
 use rand::seq::SliceRandom;
-use hi_sparse_array::{MaybeEmpty, MaybeEmptyIntrusive, SparseArray};
+use hi_sparse_array::{MaybeEmpty, SparseArray};
 use hi_sparse_array::level_block::{Block, ClusterBlock, SmallBlock};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
-use hi_sparse_array::sparse_hierarchy::SparseHierarchy;
+use hi_sparse_array::SparseHierarchy;
 
 const RANGE: usize = 260_000;
 const COUNT: usize = 4000;
@@ -28,15 +28,6 @@ impl MaybeEmpty for DataBlock{
 
     fn is_empty(&self) -> bool {
         todo!()
-    }
-}
-impl MaybeEmptyIntrusive for DataBlock{
-    fn as_u64_mut(&mut self) -> &mut u64 {
-        &mut self.0
-    }
-
-    fn restore_empty(&mut self) {
-        self.0 = 0;
     }
 }
 

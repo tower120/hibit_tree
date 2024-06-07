@@ -3,7 +3,7 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, BitOr, Mul};
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
-use hi_sparse_array::{apply, BitBlock, fold, MaybeEmpty, MaybeEmptyIntrusive, Op, SparseArray};
+use hi_sparse_array::{apply, BitBlock, fold, MaybeEmpty, BinaryOp, SparseArray};
 use hi_sparse_array::level_block::Block;
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::const_utils::ConstFalse;
@@ -53,15 +53,6 @@ impl MaybeEmpty for DataBlock{
         todo!()
     }
 }
-impl MaybeEmptyIntrusive for DataBlock{
-    fn as_u64_mut(&mut self) -> &mut u64 {
-        &mut self.0
-    }
-
-    fn restore_empty(&mut self) {
-        self.0 = 0;
-    }
-}
 
 type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), /*IntrusiveListLevel<*/DataBlock/*>*/>;
 
@@ -73,7 +64,7 @@ impl<M, LD> Default for AndOp<M, LD>{
     }
 } 
 
-impl<M, LD> Op for AndOp<M, LD>
+impl<M, LD> BinaryOp for AndOp<M, LD>
 where
     M: BitBlock + BitAnd<Output = M>, 
     LD: BitAnd<Output = LD> + MaybeEmpty,
@@ -88,11 +79,11 @@ where
         left.into_owned() & right.into_owned()
     }
 
-    type DataBlockL = LD;
-    type DataBlockR = LD;
-    type DataBlockO = LD;
+    type Left  = LD;
+    type Right = LD;
+    type Out   = LD;
     #[inline]
-    fn data_op(&self, left: impl Borrow<LD> + IntoOwned<LD>, right: impl Borrow<LD> + IntoOwned<LD>) -> Self::DataBlockO {
+    fn data_op(&self, left: impl Borrow<LD>, right: impl Borrow<LD>) -> Self::Out {
         //left.into_owned() & right.into_owned()
         left.borrow() & right.borrow()
     }

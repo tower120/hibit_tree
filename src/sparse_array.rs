@@ -109,7 +109,7 @@ where
 impl<Levels, Data> SparseArray<Levels, Data>
 where
     Levels: SparseArrayLevels,
-    Data: MaybeEmpty + Clone,
+    Data: MaybeEmpty,
 {
     #[inline(always)]
     fn check_index_range(index: usize){
@@ -561,7 +561,7 @@ where
 impl<Levels, Data> SparseHierarchy for SparseArray<Levels, Data>
 where
     Levels: SparseArrayLevels,
-    Data: Clone + MaybeEmpty
+    Data: MaybeEmpty
 {
     const EXACT_HIERARCHY: bool = false;
     
@@ -605,7 +605,7 @@ where
 impl<Levels, Data> SparseHierarchyState for SparseArrayState<Levels, Data>
 where
     Levels: SparseArrayLevels,
-    Data: Clone + MaybeEmpty,
+    Data: MaybeEmpty,
 {
     type This = SparseArray<Levels, Data>;
 

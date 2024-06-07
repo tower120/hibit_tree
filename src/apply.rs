@@ -7,13 +7,13 @@ use crate::const_utils::const_int::ConstInteger;
 use crate::const_utils::const_array::ConstArray;
 use crate::MaybeEmpty;
 use crate::sparse_hierarchy::SparseHierarchyState;
-use crate::utils::{Borrowable, IntoOwned};
+use crate::utils::{Borrowable, IntoOwned, Take};
 
 // TODO: move out from apply.
 // We need more advanced GAT in Rust to make `DataBlock<'a>` work here 
 // in a meaningful way.
 // For now, should be good enough as-is for Apply.
-pub trait Op {
+pub trait BinaryOp {
     const EXACT_HIERARCHY: bool;
     
     /// Check and skip empty hierarchies? Any value is safe. Use `false` as default.
@@ -50,14 +50,13 @@ pub trait Op {
         right: impl Borrow<Self::LevelMask> + IntoOwned<Self::LevelMask>
     ) -> Self::LevelMask;
     
-    // TODO: rename
-    type DataBlockL;
-    type DataBlockR;
-    type DataBlockO: MaybeEmpty;
+    type Left;
+    type Right;
+    type Out: MaybeEmpty;
     fn data_op(&self,
-        left : impl Borrow<Self::DataBlockL> + IntoOwned<Self::DataBlockL>,
-        right: impl Borrow<Self::DataBlockR> + IntoOwned<Self::DataBlockR>
-    ) -> Self::DataBlockO;
+       left : impl Borrow<Self::Left>  + Take<Self::Left>,
+       right: impl Borrow<Self::Right> + Take<Self::Right>
+    ) -> Self::Out;
 }
 
 pub struct Apply<Op, B1, B2>{
@@ -76,10 +75,10 @@ where
         >
     >,
 
-    Op: self::Op<
-        LevelMask  = <B1::Borrowed as SparseHierarchy>::LevelMaskType,
-        DataBlockL = <B1::Borrowed as SparseHierarchy>::DataType,
-        DataBlockR = <B2::Borrowed as SparseHierarchy>::DataType,
+    Op: BinaryOp<
+        LevelMask = <B1::Borrowed as SparseHierarchy>::LevelMaskType,
+        Left  = <B1::Borrowed as SparseHierarchy>::DataType,
+        Right = <B2::Borrowed as SparseHierarchy>::DataType,
     >
 {
     const EXACT_HIERARCHY: bool = Op::EXACT_HIERARCHY;
@@ -101,8 +100,8 @@ where
         )
     }
 
-    type DataType = Op::DataBlockO;
-    type Data<'a> = Op::DataBlockO where Self:'a;
+    type DataType = Op::Out;
+    type Data<'a> = Op::Out where Self:'a;
     #[inline]
     unsafe fn data_block<I>(&self, level_indices: I) -> Self::Data<'_>
     where
@@ -139,10 +138,10 @@ where
         >
     >,
 
-    Op: self::Op<
-        LevelMask  = <B1::Borrowed as SparseHierarchy>::LevelMaskType,
-        DataBlockL = <B1::Borrowed as SparseHierarchy>::DataType,
-        DataBlockR = <B2::Borrowed as SparseHierarchy>::DataType,
+    Op: BinaryOp<
+        LevelMask = <B1::Borrowed as SparseHierarchy>::LevelMaskType,
+        Left  = <B1::Borrowed as SparseHierarchy>::DataType,
+        Right = <B2::Borrowed as SparseHierarchy>::DataType,
     >
 {
     type This = Apply<Op, B1, B2>;

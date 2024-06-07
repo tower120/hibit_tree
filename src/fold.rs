@@ -1,14 +1,14 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use arrayvec::ArrayVec;
-use crate::BitBlock;
+use crate::{BinaryOp, BitBlock};
 use crate::const_utils::const_bool::ConstBool;
 use crate::const_utils::const_int::ConstInteger;
 use crate::const_utils::const_array::{ConstArray, ConstArrayType};
 use crate::const_utils::ConstUsize;
 use crate::MaybeEmpty;
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
-use crate::utils::{Borrowable, IntoOwned, array};
+use crate::utils::{Borrowable, IntoOwned, array, Take};
 
 pub struct Fold<Op, Init, ArrayIter>{
     pub(crate) op: Op,
@@ -16,30 +16,31 @@ pub struct Fold<Op, Init, ArrayIter>{
     pub(crate) array_iter: ArrayIter,
 }
 
-type Array<ArrayIter> = <<ArrayIter as Iterator>::Item as Borrowable>::Borrowed;
+type ArrayItem<ArrayIter> = <<ArrayIter as Iterator>::Item as Borrowable>::Borrowed;
 
 impl<Op, Init, ArrayIter> SparseHierarchy for Fold<Op, Init, ArrayIter>
 where
     Init: Borrowable< 
         Borrowed: SparseHierarchy<
-            LevelCount    = <Array<ArrayIter> as SparseHierarchy>::LevelCount,
-            LevelMaskType = <Array<ArrayIter> as SparseHierarchy>::LevelMaskType,
+            LevelCount    = <ArrayItem<ArrayIter> as SparseHierarchy>::LevelCount,
+            LevelMaskType = <ArrayItem<ArrayIter> as SparseHierarchy>::LevelMaskType,
+            DataType: Clone
         >
     >,
 
     ArrayIter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + Clone,
 
-    Op: crate::apply::Op<
-        LevelMask  = <Array<ArrayIter> as SparseHierarchy>::LevelMaskType,
-        DataBlockL = <Init::Borrowed as SparseHierarchy>::DataType,
-        DataBlockR = <Array<ArrayIter> as SparseHierarchy>::DataType,
-        DataBlockO = <Init::Borrowed as SparseHierarchy>::DataType,
+    Op: BinaryOp<
+        LevelMask = <ArrayItem<ArrayIter> as SparseHierarchy>::LevelMaskType,
+        Left  = <Init::Borrowed as SparseHierarchy>::DataType,
+        Right = <ArrayItem<ArrayIter> as SparseHierarchy>::DataType,
+        Out   = <Init::Borrowed as SparseHierarchy>::DataType,
     >,
 {
     const EXACT_HIERARCHY: bool = Op::EXACT_HIERARCHY;
-    type LevelCount = <Array<ArrayIter> as SparseHierarchy>::LevelCount;
+    type LevelCount = <ArrayItem<ArrayIter> as SparseHierarchy>::LevelCount;
 
-    type LevelMaskType = <Array<ArrayIter> as SparseHierarchy>::LevelMaskType;
+    type LevelMaskType = <ArrayItem<ArrayIter> as SparseHierarchy>::LevelMaskType;
     type LevelMask<'b> = Self::LevelMaskType where Self: 'b;
 
     #[inline]
@@ -55,8 +56,8 @@ where
         )
     }
 
-    type DataType = Op::DataBlockO;
-    type Data<'b> where Self: 'b = Op::DataBlockO;
+    type DataType = Op::Out;
+    type Data<'b> where Self: 'b = Op::Out;
 
     #[inline]
     unsafe fn data_block<I>(&self, level_indices: I) -> Self::Data<'_>
@@ -64,7 +65,7 @@ where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
     {
         self.array_iter.clone().fold(
-            self.init.borrow().data_block(level_indices).into_owned(),
+            self.init.borrow().data_block(level_indices).take_or_clone(),
             |acc, array|{
                 self.op.data_op(acc, array.borrow().data_block(level_indices))
             }
@@ -74,17 +75,18 @@ where
     type State = FoldState<Op, Init, ArrayIter>;
 }
 
+// TODO: Configurable FoldState storage 
 const N: usize = 32;
 
 pub struct FoldState<Op, Init, ArrayIter>
 where
     Init: Borrowable<Borrowed: SparseHierarchy>,
     ArrayIter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>>,
-    Op: crate::apply::Op
+    Op: BinaryOp
 {
     init_state: <Init::Borrowed as SparseHierarchy>::State,
     states: ArrayVec<
-        (<ArrayIter as Iterator>::Item, <Array<ArrayIter> as SparseHierarchy>::State),
+        (<ArrayIter as Iterator>::Item, <ArrayItem<ArrayIter> as SparseHierarchy>::State),
         N
     >,
     
@@ -96,7 +98,7 @@ where
     lvls_non_empty_states: ConstArrayType<
         ArrayVec<usize, N>,
         <Op::SKIP_EMPTY_HIERARCHIES as ConstBool>::ConditionalInt<
-            <<Array<ArrayIter> as SparseHierarchy>::LevelCount as ConstInteger>::Dec,
+            <<ArrayItem<ArrayIter> as SparseHierarchy>::LevelCount as ConstInteger>::Dec,
             ConstUsize<0>
         >
     >,
@@ -110,18 +112,19 @@ for
 where
     Init: Borrowable< 
         Borrowed: SparseHierarchy<
-            LevelCount    = <Array<ArrayIter> as SparseHierarchy>::LevelCount,
-            LevelMaskType = <Array<ArrayIter> as SparseHierarchy>::LevelMaskType,
+            LevelCount    = <ArrayItem<ArrayIter> as SparseHierarchy>::LevelCount,
+            LevelMaskType = <ArrayItem<ArrayIter> as SparseHierarchy>::LevelMaskType,
+            DataType: Clone
         >
     >,
 
     ArrayIter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + Clone,
 
-    Op: crate::apply::Op<
-        LevelMask  = <Array<ArrayIter> as SparseHierarchy>::LevelMaskType,
-        DataBlockL = <Init::Borrowed as SparseHierarchy>::DataType,
-        DataBlockR = <Array<ArrayIter> as SparseHierarchy>::DataType,
-        DataBlockO = <Init::Borrowed as SparseHierarchy>::DataType,
+    Op: BinaryOp<
+        LevelMask = <ArrayItem<ArrayIter> as SparseHierarchy>::LevelMaskType,
+        Left  = <Init::Borrowed as SparseHierarchy>::DataType,
+        Right = <ArrayItem<ArrayIter> as SparseHierarchy>::DataType,
+        Out   = <Init::Borrowed as SparseHierarchy>::DataType,
     >,
 {
     type This = Fold<Op, Init, ArrayIter>;
@@ -185,7 +188,7 @@ where
     unsafe fn data_block<'this>(&self, this: &'this Self::This, level_index: usize) 
         -> <Self::This as SparseHierarchy>::Data<'this> 
     {
-        let mut acc = self.init_state.data_block(this.init.borrow(), level_index).into_owned();
+        let mut acc = self.init_state.data_block(this.init.borrow(), level_index).take_or_clone();
         
         if Op::SKIP_EMPTY_HIERARCHIES::VALUE {
             let lvl_non_empty_states = self.lvls_non_empty_states.as_ref()

@@ -1,4 +1,5 @@
 #![feature(associated_type_bounds)]
+#![feature(inline_const)]
 
 //! The core of the lib is [SparseArray] container and [SparseHierarchy] 
 //! interface. They represent concept of data structure that filled
@@ -91,7 +92,7 @@ pub mod utils;
 pub use bit_block::BitBlock;
 pub use sparse_array::SparseArray;
 pub use sparse_array_levels::SparseArrayLevels;
-pub use apply::{Apply, Op};
+pub use apply::{Apply, BinaryOp};
 pub use fold::Fold;
 //pub use empty::Empty;
 pub use sparse_hierarchy::*;
@@ -150,6 +151,7 @@ pub(crate) fn data_block_index<T: SparseHierarchy>(
     acc
 }
 
+/// Apply [BinaryOp] between two [SparseHierarchy]ies.
 #[inline]
 pub fn apply<Op, B1, B2>(op: Op, s1: B1, s2: B2) -> Apply<Op, B1, B2>
 // TODO: more detail bounds?/ no bounds?
@@ -166,9 +168,21 @@ pub fn apply<Op, B1, B2>(op: Op, s1: B1, s2: B2) -> Apply<Op, B1, B2>
     Apply{op, s1, s2}
 }
 
+/// Fold [SparseHierarchy]ies into virtual one using [BinaryOp]. 
+/// 
+/// # Arguments
+/// 
+/// * `Op`::[data_op] in form of `(Init, ArrayIter::Item) -> Init`.
+/// * All `LevelMask`s and `LevelCount`s must match (have same hierarchy configurations).
+/// * `init`'s [DataType] must be [Clone]able. This restriction may be lifted in the future.
+/// * `array_iter` will be cloned multiple times. Use cheaply cloneable iterator.
 #[inline]
 pub fn fold<Op, Init, ArrayIter>(op: Op, init: Init, array_iter: ArrayIter) 
     -> Fold<Op, Init, ArrayIter>
+where
+    Init: Borrowable<Borrowed:SparseHierarchy<DataType: Clone>>,
+    ArrayIter: Iterator<Item:Borrowable<Borrowed:SparseHierarchy>> + Clone,
+    Op: BinaryOp
 /*where
     Op: apply::Op,
     ArrayIter: Iterator<Item = &'a Array> + Clone,
@@ -197,7 +211,7 @@ pub(crate) struct IntersectionOp<F, L, R, O, M>{
     f: F,
     phantom_data: PhantomData<(L, R, O, M)>
 }
-impl<F, Left, Right, Out, Mask> Op for IntersectionOp<F, Left, Right, Out, Mask>
+impl<F, Left, Right, Out, Mask> BinaryOp for IntersectionOp<F, Left, Right, Out, Mask>
 where
     Out: MaybeEmpty,
     for<'a> F: Fn(&'a Left, &'a Right) -> Out,
@@ -211,21 +225,21 @@ where
 
     fn lvl_op(
         &self, 
-        left : impl Borrow<Self::LevelMask> + IntoOwned<Self::LevelMask>, 
-        right: impl Borrow<Self::LevelMask> + IntoOwned<Self::LevelMask>
+        left : impl Borrow<Self::LevelMask>, 
+        right: impl Borrow<Self::LevelMask>
     ) -> Self::LevelMask {
         left.borrow() & right.borrow()
     }
 
-    type DataBlockL = Left;
-    type DataBlockR = Right;
-    type DataBlockO = Out;
+    type Left  = Left;
+    type Right = Right;
+    type Out   = Out;
 
     fn data_op(
-        &self, 
-        left : impl Borrow<Self::DataBlockL> + IntoOwned<Self::DataBlockL>, 
-        right: impl Borrow<Self::DataBlockR> + IntoOwned<Self::DataBlockR>
-    ) -> Self::DataBlockO {
+        &self,
+        left : impl Borrow<Self::Left>,
+        right: impl Borrow<Self::Right>
+    ) -> Self::Out {
         (self.f)(left.borrow(), right.borrow())
     }
 }
