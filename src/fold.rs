@@ -8,7 +8,7 @@ use crate::const_utils::const_array::{ConstArray, ConstArrayType};
 use crate::const_utils::ConstUsize;
 use crate::MaybeEmpty;
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
-use crate::utils::{Borrowable, IntoOwned, array, Take};
+use crate::utils::{Borrowable, array, Take};
 
 pub struct Fold<Op, Init, ArrayIter>{
     pub(crate) op: Op,
@@ -49,7 +49,7 @@ where
         I: ConstArray<Item=usize> + Copy
     {
         self.array_iter.clone().fold(
-            self.init.borrow().level_mask(level_indices).into_owned(), 
+            self.init.borrow().level_mask(level_indices).take_or_clone(), 
             |acc, array|{
                 self.op.lvl_op(acc, array.borrow().level_mask(level_indices))
             }
@@ -153,7 +153,7 @@ where
     ) -> <Self::This as SparseHierarchy>::LevelMask<'t> {
         let mut acc_mask = self.init_state
                           .select_level_bock(this.init.borrow(), level_n, level_index)
-                          .into_owned();
+                          .take_or_clone();
         
         if Op::SKIP_EMPTY_HIERARCHIES::VALUE
         && N::VALUE != 0 

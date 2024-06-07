@@ -13,36 +13,11 @@ pub trait Borrowable: Borrow<Self::Borrowed>{
 // Not necessary?
 /*pub trait BorrowableMut: Borrowable + BorrowMut<Self::Borrowed>{}*/
 
-// TODO: remove
-/// convert T to value. noop for value, clone - for reference.
-///
-/// # Note
-///
-/// Surprisingly, there is no such thing in `std`. The closest one
-/// is `Cow` enum, with runtime overhead.
-pub trait IntoOwned<T>{
-    fn into_owned(self) -> T;
-}
-
-impl<T> IntoOwned<T> for T{
-    #[inline]
-    fn into_owned(self) -> T{
-        self
-    }
-}
-
-impl<T: Clone> IntoOwned<T> for &T{
-    #[inline]
-    fn into_owned(self) -> T{
-        self.clone()
-    }
-}
-
-
 /// Means of converting T/&T to value.
 /// 
 /// Allows to store/pass reference or pointer generically.
-/// In conjunction with [Borrow] can be used as C++'s &&T (forwarding reference).
+/// In conjunction with [Borrow] can be used as something like C++'s &&T 
+/// (forwarding reference), that can be taken both by ref or value.
 /// 
 /// Everything zero overhead.
 pub trait Take<T>{

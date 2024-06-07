@@ -108,7 +108,7 @@ use utils::array::Array;
 use crate::const_utils::ConstFalse;
 use crate::level::{IntrusiveListLevel, SingleBlockLevel};
 use crate::level_block::Block;
-use crate::utils::{Borrowable, IntoOwned};
+use crate::utils::Borrowable;
 
 pub trait MaybeEmpty {
     fn empty() -> Self;

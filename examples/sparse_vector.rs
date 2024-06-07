@@ -8,7 +8,7 @@ use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::const_utils::ConstFalse;
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
 use hi_sparse_array::SparseHierarchy;
-use hi_sparse_array::utils::{IntoOwned, Take};
+use hi_sparse_array::utils::Take;
 
 #[derive(Clone)]
 struct DataBlock(f32x4);
@@ -76,8 +76,8 @@ where
     type SKIP_EMPTY_HIERARCHIES = ConstFalse;
     
     type LevelMask = M;
-    fn lvl_op(&self, left: impl IntoOwned<M>, right: impl IntoOwned<M>) -> Self::LevelMask {
-        left.into_owned() & right.into_owned()
+    fn lvl_op(&self, left: impl Take<M>, right: impl Take<M>) -> Self::LevelMask {
+        left.take_or_clone() & right.take_or_clone()
     }
 
     type Left  = D;

@@ -5,7 +5,7 @@ use crate::sparse_array::level_indices;
 use crate::const_utils::const_int::ConstInteger;
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
 use crate::MaybeEmpty;
-use crate::utils::{IntoOwned, Take};
+use crate::utils::Take;
 
 /// 
 /// TODO: Change description
@@ -20,7 +20,7 @@ pub trait SparseHierarchy: Sized {
     type LevelCount: ConstInteger;
     
     type LevelMaskType: BitBlock;
-    type LevelMask<'a>: Borrow<Self::LevelMaskType> + IntoOwned<Self::LevelMaskType>
+    type LevelMask<'a>: Borrow<Self::LevelMaskType> + Take<Self::LevelMaskType>
         where Self: 'a;
     
     /// Returns bitmask for level `I::CAP`. 

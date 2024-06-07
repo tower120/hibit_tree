@@ -4,7 +4,7 @@ use crate::{BitBlock, data_block_index};
 use crate::bit_queue::BitQueue;
 use crate::const_utils::const_int::{const_for_rev, ConstInteger, ConstIntVisitor, ConstUsize};
 use crate::const_utils::const_array::ConstArrayType;
-use crate::utils::IntoOwned;
+use crate::utils::Take;
 use crate::utils::array::Array;
 
 // TODO: could be u32's
@@ -53,7 +53,7 @@ where
         let root_mask = unsafe{
             state.select_level_bock(container, ConstUsize::<0>, 0)
         };
-        let level0_iter = root_mask.into_owned().into_bits_iter();
+        let level0_iter = root_mask.take_or_clone().into_bits_iter();
         
         level_iters.as_mut()[0] = level0_iter; 
         
@@ -118,7 +118,7 @@ where
                                 self.0
                                 .level_iters.as_mut()
                                 .get_unchecked_mut(level_depth.value())
-                            } = level_mask.into_owned().into_bits_iter(); 
+                            } = level_mask.take_or_clone().into_bits_iter(); 
                             
                             ControlFlow::Break(())
                         } else {

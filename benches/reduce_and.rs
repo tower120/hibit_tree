@@ -8,7 +8,7 @@ use hi_sparse_array::level_block::Block;
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::const_utils::ConstFalse;
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
-use hi_sparse_array::utils::IntoOwned;
+use hi_sparse_array::utils::Take;
 
 type Lvl0Block = Block<u64, [u8;64]>;
 type Lvl1Block = Block<u64, [u16;64]>;
@@ -75,8 +75,8 @@ where
      
     type LevelMask = M;
     #[inline]
-    fn lvl_op(&self, left: impl IntoOwned<M>, right: impl IntoOwned<M>) -> Self::LevelMask {
-        left.into_owned() & right.into_owned()
+    fn lvl_op(&self, left: impl Take<M>, right: impl Take<M>) -> Self::LevelMask {
+        left.take_or_clone() & right.take_or_clone()
     }
 
     type Left  = LD;

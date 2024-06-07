@@ -7,7 +7,7 @@ use crate::const_utils::const_int::ConstInteger;
 use crate::const_utils::const_array::ConstArray;
 use crate::MaybeEmpty;
 use crate::sparse_hierarchy::SparseHierarchyState;
-use crate::utils::{Borrowable, IntoOwned, Take};
+use crate::utils::{Borrowable, /*IntoOwned, */Take};
 
 // TODO: move out from apply.
 // We need more advanced GAT in Rust to make `DataBlock<'a>` work here 
@@ -46,8 +46,8 @@ pub trait BinaryOp {
     
     type LevelMask: BitBlock;
     fn lvl_op(&self,
-        left : impl Borrow<Self::LevelMask> + IntoOwned<Self::LevelMask>,
-        right: impl Borrow<Self::LevelMask> + IntoOwned<Self::LevelMask>
+        left : impl Borrow<Self::LevelMask> + Take<Self::LevelMask>,
+        right: impl Borrow<Self::LevelMask> + Take<Self::LevelMask>
     ) -> Self::LevelMask;
     
     type Left;
