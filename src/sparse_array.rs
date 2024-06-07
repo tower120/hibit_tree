@@ -519,7 +519,10 @@ where
     
     /// # Safety
     /// 
-    /// - element at `index` must exist in container.
+    /// Element at `index` must exist in container [^1].
+    /// 
+    /// [^1]: Pay attention that this is a stricter requirement than
+    /// [SparseHierarchy::get_unchecked]'s.
     #[inline]
     pub unsafe fn get_mut_unchecked(&mut self, index: usize) -> &mut Data {
         let level_indices = level_indices::<Levels::Mask, Levels::LevelCount>(index);

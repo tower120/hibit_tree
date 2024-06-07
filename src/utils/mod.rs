@@ -36,3 +36,36 @@ impl<T: Clone> IntoOwned<T> for &T{
         self.clone()
     }
 }
+
+
+// TODO: unite with IntoOwned
+pub trait TryTake<T>{
+    /// Returned Option variant can
+    /// be used for compile-time switch. 
+    fn try_take(self) -> Option<T>;
+    fn take_or_clone(self) -> T where T: Clone;
+}
+
+impl<T> TryTake<T> for T{
+    #[inline]
+    fn try_take(self) -> Option<T>{
+        Some(self)
+    }
+    
+    #[inline]
+    fn take_or_clone(self) -> T{
+        self
+    }
+}
+
+impl<T> TryTake<T> for &T{
+    #[inline]
+    fn try_take(self) -> Option<T>{
+        None
+    }
+    
+    #[inline]
+    fn take_or_clone(self) -> T where T: Clone{
+        self.clone()
+    }
+}

@@ -98,14 +98,32 @@ pub use sparse_hierarchy::*;
 pub use exact_hierarchy::ExactHierarchy;
 
 use std::borrow::Borrow;
+use std::marker::PhantomData;
+use std::ops::BitAnd;
 //use sparse_hierarchy::SparseHierarchy;
 use crate::const_utils::const_int::{ConstInteger, ConstIntVisitor};
 use utils::primitive::Primitive;
 use utils::array::Array;
+use crate::const_utils::ConstFalse;
+use crate::level::{IntrusiveListLevel, SingleBlockLevel};
+use crate::level_block::Block;
+use crate::utils::{Borrowable, IntoOwned};
 
 pub trait MaybeEmpty {
     fn empty() -> Self;
     fn is_empty(&self) -> bool;
+}
+
+impl<T> MaybeEmpty for Option<T>{
+    #[inline]
+    fn empty() -> Self {
+        None
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.is_none()
+    }
 }
 
 /// [MaybeEmpty] that can be used as a node in intrusive list.
@@ -174,3 +192,118 @@ where
         None
     }
 }*/
+
+pub(crate) struct IntersectionOp<F, L, R, O, M>{
+    f: F,
+    phantom_data: PhantomData<(L, R, O, M)>
+}
+impl<F, Left, Right, Out, Mask> Op for IntersectionOp<F, Left, Right, Out, Mask>
+where
+    Out: MaybeEmpty,
+    for<'a> F: Fn(&'a Left, &'a Right) -> Out,
+
+    Mask: BitBlock,
+    for<'a> &'a Mask: BitAnd<Output=Mask>
+{
+    const EXACT_HIERARCHY: bool = false;
+    type SKIP_EMPTY_HIERARCHIES = ConstFalse;
+    type LevelMask = Mask;
+
+    fn lvl_op(
+        &self, 
+        left : impl Borrow<Self::LevelMask> + IntoOwned<Self::LevelMask>, 
+        right: impl Borrow<Self::LevelMask> + IntoOwned<Self::LevelMask>
+    ) -> Self::LevelMask {
+        left.borrow() & right.borrow()
+    }
+
+    type DataBlockL = Left;
+    type DataBlockR = Right;
+    type DataBlockO = Out;
+
+    fn data_op(
+        &self, 
+        left : impl Borrow<Self::DataBlockL> + IntoOwned<Self::DataBlockL>, 
+        right: impl Borrow<Self::DataBlockR> + IntoOwned<Self::DataBlockR>
+    ) -> Self::DataBlockO {
+        (self.f)(left.borrow(), right.borrow())
+    }
+}
+
+// `Res` should be deducible from `F`, but RUST still
+// not dealt with Fn's.
+pub type Intersection<'a, H1, H2, F, Res> = Apply<
+    IntersectionOp<
+        F, 
+        <H1 as SparseHierarchy>::DataType,
+        <H2 as SparseHierarchy>::DataType,
+        Res, 
+        <H1 as SparseHierarchy>::LevelMaskType
+    >, 
+    &'a H1, 
+    &'a H2
+>; 
+
+pub fn intersection<'a, H1, H2, F, R>(h1: &'a H1, h2: &'a H2, f: F)
+    -> Intersection<'a, H1, H2, F, R>
+where
+    H1: SparseHierarchy,
+    H2: SparseHierarchy<
+        LevelCount = H1::LevelCount,
+        LevelMaskType = H1::LevelMaskType
+    >,
+
+    F: Fn(
+        &H1::DataType,
+        &H2::DataType,
+    ) -> R,
+
+    R: MaybeEmpty,
+{
+    apply(
+        IntersectionOp {
+            f,
+            phantom_data: Default::default() 
+        },
+        h1,
+        h2
+    )
+}
+
+
+#[test]
+fn test_intersect(){
+    type Lvl0Block = Block<u64, [u8;64]>;
+    type Lvl1Block = Block<u64, [u16;64]>;
+    
+    // TODO: MaybeEmpty impl Option
+    #[derive(Clone)]
+    struct DataBlock(u64);
+    impl BitAnd for DataBlock{
+        type Output = Self;
+    
+        #[inline]
+        fn bitand(self, rhs: Self) -> Self::Output {
+            Self(self.0 & rhs.0)
+        }
+    }
+    impl MaybeEmpty for DataBlock{
+        fn empty() -> Self {
+            Self(0)
+        }
+    
+        fn is_empty(&self) -> bool {
+            todo!()
+        }
+    }
+    
+    type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), DataBlock>;
+    let mut a1 = BlockArray::default();
+    a1.insert(12, DataBlock(100));
+    
+    let mut a2 = BlockArray::default();
+    a2.insert(12, DataBlock(200));
+    
+    let res = intersection(&a1, &a2, |a1, a2| DataBlock(a1.0 + a2.0));
+    assert_eq!(res.get(12).0, 300);
+}
