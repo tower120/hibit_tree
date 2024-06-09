@@ -1,6 +1,9 @@
 use crate::level::ILevel;
 use crate::MaybeEmpty;
 
+/// Simple level implementation. Works with all `Block`s.
+///
+/// Prefer using [IntrusiveListLevel] whenever possible.
 pub struct Level<Block: MaybeEmpty>{
     blocks: Vec<Block>,
     empty_block_indices: Vec<usize>

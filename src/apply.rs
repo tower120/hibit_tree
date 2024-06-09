@@ -187,6 +187,3 @@ where
 impl<Op, B1, B2> Borrowable for Apply<Op, B1, B2>{ 
     type Borrowed = Apply<Op, B1, B2>; 
 }
-impl<Op, B1, B2> Borrowable for &Apply<Op, B1, B2>{ 
-    type Borrowed = Apply<Op, B1, B2>; 
-}

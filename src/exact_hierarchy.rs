@@ -81,3 +81,7 @@ where
         self.data_block(this, level_index)
     }
 }
+
+impl<T> Borrowable for ExactHierarchy<T>{
+    type Borrowed = ExactHierarchy<T>; 
+}

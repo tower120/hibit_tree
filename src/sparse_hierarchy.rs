@@ -5,14 +5,14 @@ use crate::sparse_array::level_indices;
 use crate::const_utils::const_int::ConstInteger;
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
 use crate::MaybeEmpty;
-use crate::utils::Take;
+use crate::utils::{Borrowable, Take};
 
 /// 
 /// TODO: Change description
 ///
 // We need xxxxType for each concrete level_block/mask type to avoid the need for use `for<'a>`,
 // which is still not working (at Rust level) in cases, where we need it most. 
-pub trait SparseHierarchy: Sized {
+pub trait SparseHierarchy: Sized + Borrowable<Borrowed=Self> {
     /// TODO: Decription form hi_sparse_bitset TRUSTED_HIERARCHY
     const EXACT_HIERARCHY: bool;
     

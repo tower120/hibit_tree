@@ -1,10 +1,17 @@
 use std::mem;
-use std::ops::{BitAnd, BitOr, ControlFlow};
+use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, ControlFlow};
 use crate::bit_queue::{ArrayBitQueue, BitQueue, EmptyBitQueue, PrimitiveBitQueue};
 use crate::bit_utils;
 use crate::utils::array::Array;
 
-pub trait BitBlock: Eq + Sized + Clone + 'static{
+pub trait BitBlock
+    : Eq
+    + BitAnd<Output = Self>
+    + for<'a> BitAndAssign<&'a Self>
+    + BitOr<Output = Self>
+    + for<'a> BitOrAssign<&'a Self>
+    + Sized + Clone + 'static
+{
     // TODO: Try use SIZE instead. There is const ilog2
     /// 2^N bits
     const SIZE_POT_EXPONENT: usize;

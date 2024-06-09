@@ -675,6 +675,3 @@ where
 impl<Levels, Data> Borrowable for SparseArray<Levels, Data>{
     type Borrowed = SparseArray<Levels, Data>; 
 }
-impl<Levels, Data> Borrowable for &SparseArray<Levels, Data>{
-    type Borrowed = SparseArray<Levels, Data>; 
-}
