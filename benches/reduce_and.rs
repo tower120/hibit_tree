@@ -5,10 +5,10 @@ use std::ops::{BitAnd, BitOr, Mul};
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
 use hi_sparse_array::{apply, BitBlock, Empty, fold, SparseArray};
 use hi_sparse_array::level_block::Block;
-use hi_sparse_array::caching_iter::CachingBlockIter;
+use hi_sparse_array::Iter;
 use hi_sparse_array::const_utils::ConstFalse;
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
-use hi_sparse_array::op::BinaryOp;
+use hi_sparse_array::BinaryOp;
 use hi_sparse_array::utils::Take;
 
 type Lvl0Block = Block<u64, [u8;64]>;
@@ -142,7 +142,7 @@ fn fold_iter(list: &[BlockArray]) -> impl Any {
     let fold = fold(op, init, other.iter());
     
     let mut s = 0;
-    for (_, i) in CachingBlockIter::new(&fold){
+    for (_, i) in Iter::new(&fold){
         s += i.0;
     }
     s
@@ -167,7 +167,7 @@ fn apply_iter(array1: &BlockArray, array2: &BlockArray) -> u64 {
     let reduce = apply(and_op, array1, array2);
     
     let mut s = 0;
-    for (_, i) in CachingBlockIter::new(&reduce){
+    for (_, i) in Iter::new(&reduce){
         s += i.0;
     }
     s

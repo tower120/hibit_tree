@@ -1,7 +1,7 @@
 use hi_sparse_array::level_block::{Block, ClusterBlock};
 use hi_sparse_array::{Empty, SparseArray};
 use itertools::assert_equal;
-use hi_sparse_array::caching_iter::CachingBlockIter;
+use hi_sparse_array::Iter;
 use hi_sparse_array::level::{IntrusiveListLevel, Level, SingleBlockLevel};
 
 #[derive(Clone, Debug)]
@@ -14,14 +14,6 @@ impl Empty for DataBlock{
     fn is_empty(&self) -> bool {
         todo!()
     }
-/*
-    fn as_u64_mut(&mut self) -> &mut u64 {
-        &mut self.0
-    }
-
-    fn restore_empty_u64(&mut self) {
-        self.0 = 0;
-    }*/
 }
 
 #[test]
@@ -37,6 +29,6 @@ fn insert_test(){
         *array.get_mut(i as usize) = DataBlock(i as u64);
     }
 
-    let values = CachingBlockIter::new(&array).map(|(_,v)|v.0);
+    let values = Iter::new(&array).map(|(_,v)|v.0);
     assert_equal(values, range.clone());
 }

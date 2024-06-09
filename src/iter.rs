@@ -24,8 +24,10 @@ type LevelIterators<T: SparseHierarchy> =
         T::LevelCount
     >;
 
+/// [SparseHierarchy] iterator.
+/// 
 /// For non-[EXACT_HIERARCHY], iterator may return empty items. 
-pub struct CachingBlockIter<'a, T>
+pub struct Iter<'a, T>
 where
     T: SparseHierarchy,
 {
@@ -40,7 +42,7 @@ where
     state: T::State,
 }
 
-impl<'a, T> CachingBlockIter<'a, T>
+impl<'a, T> Iter<'a, T>
 where
     T: SparseHierarchy,
 {
@@ -71,7 +73,7 @@ where
     }
 }
 
-impl<'a, T> Iterator for CachingBlockIter<'a, T>
+impl<'a, T> Iterator for Iter<'a, T>
 where
     T: SparseHierarchy,
 {
@@ -86,7 +88,7 @@ where
                 break index;
             } else {
                 let ctrl = const_for_rev(ConstUsize::<0>, T::LevelCount::DEFAULT.dec(), V(self)); 
-                struct V<'b,'a,T: SparseHierarchy>(&'b mut CachingBlockIter<'a, T>); 
+                struct V<'b,'a,T: SparseHierarchy>(&'b mut Iter<'a, T>); 
                 impl<'b,'a,T: SparseHierarchy> ConstIntVisitor for V<'b,'a,T> {
                     type Out = ();
                     #[inline(always)]

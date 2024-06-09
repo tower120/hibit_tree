@@ -1,6 +1,6 @@
 use std::borrow::Borrow;
 use crate::{Array, BitBlock};
-use crate::caching_iter::CachingBlockIter;
+use crate::iter::Iter;
 use crate::sparse_array::level_indices;
 use crate::const_utils::const_int::ConstInteger;
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
@@ -131,8 +131,8 @@ pub trait SparseHierarchy: Sized + Borrowable<Borrowed=Self> {
     }    
     
     #[inline]
-    fn iter(&self) -> CachingBlockIter<Self>{
-        CachingBlockIter::new(self)
+    fn iter(&self) -> Iter<Self>{
+        Iter::new(self)
     }
     
     /// Use [DefaultHierarchyState] as default, if you don't want to implement 

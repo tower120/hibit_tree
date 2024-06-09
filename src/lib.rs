@@ -81,10 +81,9 @@ mod exact_hierarchy;
 mod sparse_hierarchy;
 mod ops;
 mod op;
+mod iter;
 
 pub mod bit_queue;
-//pub mod simple_iter;
-pub mod caching_iter;
 //mod ref_or_val;
 pub mod level;
 pub mod level_block;
@@ -102,15 +101,15 @@ pub use sparse_hierarchy::*;
 pub use exact_hierarchy::ExactHierarchy;
 pub use ops::*;
 pub use op::*;
+pub use iter::*;
 
 use std::borrow::Borrow;
 use std::ops::BitAnd;
-pub use op::BinaryOp;
-use crate::const_utils::const_int::{ConstInteger, ConstIntVisitor};
+use const_utils::const_int::{ConstInteger, ConstIntVisitor};
 use utils::primitive::Primitive;
 use utils::array::Array;
-use crate::level::IntrusiveListLevel;
-use crate::utils::Borrowable;
+use level::IntrusiveListLevel;
+use utils::Borrowable;
 
 pub trait Empty {
     fn empty() -> Self;

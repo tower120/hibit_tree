@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
 use hi_sparse_array::{Empty, SparseArray};
 use hi_sparse_array::level_block::{Block, ClusterBlock, SmallBlock};
-use hi_sparse_array::caching_iter::CachingBlockIter;
+use hi_sparse_array::Iter;
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
 
 type Lvl0Block = Block<u64, [u8;64]>;
@@ -29,14 +29,14 @@ type ClusterBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveList
 
 fn cluster_array_iter(array: &ClusterBlockArray) -> u64 {
     let mut s = 0;
-    for (_, i) in CachingBlockIter::new(array){
+    for (_, i) in Iter::new(array){
         s += i.0;
     }
     s
 }
 fn small_array_iter(array: &SmallBlockArray) -> u64 {
     let mut s = 0;
-    for (_, i) in CachingBlockIter::new(array){
+    for (_, i) in Iter::new(array){
         s += i.0;
     }
     s
@@ -44,7 +44,7 @@ fn small_array_iter(array: &SmallBlockArray) -> u64 {
 
 fn array_iter(array: &BlockArray) -> u64 {
     let mut s = 0;
-    for (_, i) in CachingBlockIter::new(array){
+    for (_, i) in Iter::new(array){
         s += i.0;
     }
     s

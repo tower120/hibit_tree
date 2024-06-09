@@ -3,7 +3,7 @@ use itertools::assert_equal;
 use hi_sparse_array::level_block::Block;
 use hi_sparse_array::level::{ILevel, IntrusiveListLevel, SingleBlockLevel};
 use hi_sparse_array::{Empty, SparseArray, SparseArrayLevels};
-use hi_sparse_array::caching_iter::CachingBlockIter;
+use hi_sparse_array::Iter;
 use hi_sparse_array::SparseHierarchy;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -41,8 +41,8 @@ fn level_depth_test(){
         /*for (index, data) in CachingBlockIter::new(&array){
             println!("{index}: {:}", data.0);
         }*/
-        assert_equal(CachingBlockIter::new(&array).map(|(_, d)|d.0 as usize), range.clone());
-        assert_equal(CachingBlockIter::new(&array).map(|(i, _)|i), range.clone());
+        assert_equal(Iter::new(&array).map(|(_, d)|d.0 as usize), range.clone());
+        assert_equal(Iter::new(&array).map(|(i, _)|i), range.clone());
     }
     
     type Lvl0Block = Block<u64, [u8;64]>;

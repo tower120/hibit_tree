@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
 use hi_sparse_array::{BitBlock, Empty, fold, SparseArray};
 use hi_sparse_array::level_block::Block;
-use hi_sparse_array::caching_iter::CachingBlockIter;
+use hi_sparse_array::Iter;
 use hi_sparse_array::const_utils::ConstTrue;
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
 use hi_sparse_array::BinaryOp;
@@ -79,7 +79,7 @@ fn array_iter(array1: &BlockArray, array2: &BlockArray) -> u64 {
     let reduce = fold(and_op, array1, list.iter().map(|a|*a));
     
     let mut s = 0;
-    for (_, i) in CachingBlockIter::new(&reduce){
+    for (_, i) in Iter::new(&reduce){
         s += i.0;
     }
     s

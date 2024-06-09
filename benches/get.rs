@@ -3,7 +3,7 @@ use rand::{Rng, SeedableRng};
 use rand::seq::SliceRandom;
 use hi_sparse_array::{Empty, SparseArray};
 use hi_sparse_array::level_block::{Block, ClusterBlock, SmallBlock};
-use hi_sparse_array::caching_iter::CachingBlockIter;
+use hi_sparse_array::Iter;
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
 use hi_sparse_array::SparseHierarchy;
 

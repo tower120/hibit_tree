@@ -2,7 +2,7 @@ use crate::const_utils::{ConstArray, ConstInteger};
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::utils::Borrowable;
 
-/// Wrapper around [SparseHierarchy] that makes it [EXACT_HIERARCHY].  
+/// [SparseHierarchy] wrapper that makes it [EXACT_HIERARCHY].  
 pub struct ExactHierarchy<T>(T);
 impl<T> ExactHierarchy<T>
 where 
