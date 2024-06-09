@@ -1,9 +1,10 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::BitAnd;
-use crate::{Apply, apply, BinaryOp, BitBlock, MaybeEmpty, SparseHierarchy};
+use crate::{Apply, apply, BitBlock, Empty, SparseHierarchy};
 use crate::const_utils::ConstFalse;
 use crate::level_block::Block;
+use crate::op::BinaryOp;
 use crate::utils::{Borrowable, Take};
 
 pub(crate) struct IntersectionOp<F, L, R, O, M>{
@@ -12,7 +13,7 @@ pub(crate) struct IntersectionOp<F, L, R, O, M>{
 }
 impl<F, Left, Right, Out, Mask> BinaryOp for IntersectionOp<F, Left, Right, Out, Mask>
 where
-    Out: MaybeEmpty,
+    Out: Empty,
     F: Fn(&Left, &Right) -> Out,
     Mask: BitBlock,
 {
@@ -20,6 +21,7 @@ where
     type SKIP_EMPTY_HIERARCHIES = ConstFalse;
     type LevelMask = Mask;
 
+    #[inline]
     fn lvl_op(
         &self, 
         left : impl Take<Self::LevelMask>, 
@@ -32,6 +34,7 @@ where
     type Right = Right;
     type Out   = Out;
 
+    #[inline]
     fn data_op(
         &self,
         left : impl Borrow<Self::Left>,
@@ -55,6 +58,12 @@ pub type Intersection<H1, H2, F, Res> = Apply<
     H2
 >;
 
+/// Intersection between two [SparseHierarchy]ies.
+///
+/// Finds an intersection between two [SparseHierarchy]ies, and applies `f`
+/// to each pair of intersected items.
+/// 
+/// [SparseHierarchy]ies can be of different types, but must have the same configuration.
 #[inline]
 pub fn intersection<H1, H2, F, R>(h1: H1, h2: H2, f: F)
     -> Intersection<H1, H2, F, R>
@@ -65,7 +74,7 @@ where
         LevelMaskType = <H1::Borrowed as SparseHierarchy>::LevelMaskType
     >>,
     F: Fn(&<H1::Borrowed as SparseHierarchy>::DataType, &<H2::Borrowed as SparseHierarchy>::DataType) -> R,
-    R: MaybeEmpty,
+    R: Empty,
 {
     apply(IntersectionOp{ f, phantom_data: PhantomData }, h1, h2)
 }
@@ -83,7 +92,7 @@ mod test{
         
         #[derive(Clone)]
         struct DataBlock(u64);
-        impl MaybeEmpty for DataBlock{
+        impl Empty for DataBlock{
             fn empty() -> Self {
                 Self(0)
             }

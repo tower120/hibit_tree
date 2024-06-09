@@ -4,12 +4,12 @@ mod common;
 
 use rand::{Rng, SeedableRng};
 use rand::prelude::SliceRandom;
-use hi_sparse_array::{MaybeEmpty, SparseArray};
+use hi_sparse_array::{Empty, SparseArray};
 use hi_sparse_array::SparseHierarchy;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 struct Data(usize);
-impl MaybeEmpty for Data {
+impl Empty for Data {
     fn empty() -> Self {
         Self(0)
     }

@@ -1,14 +1,14 @@
 use std::ops::Range;
 use itertools::assert_equal;
 use hi_sparse_array::level_block::Block;
-use hi_sparse_array::level::{ILevel, IntrusiveListLevel, Level, SingleBlockLevel};
-use hi_sparse_array::{MaybeEmpty, SparseArray, SparseArrayLevels};
+use hi_sparse_array::level::{ILevel, IntrusiveListLevel, SingleBlockLevel};
+use hi_sparse_array::{Empty, SparseArray, SparseArrayLevels};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::SparseHierarchy;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct DataBlock(u64);
-impl MaybeEmpty for DataBlock{
+impl Empty for DataBlock{
     fn empty() -> Self {
         Self(0)
     }

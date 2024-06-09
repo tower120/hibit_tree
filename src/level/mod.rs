@@ -6,11 +6,11 @@ pub use single_block_level::*;
 pub use intrusive_list_level::*;
 pub use level::*;
 
-use crate::MaybeEmpty;
+use crate::Empty;
 
 pub trait ILevel: Default {
-    // TODO: Nwo it is always "HiBlock"
-    type Block: MaybeEmpty;
+    // TODO: Now it is always "HiBlock"
+    type Block: Empty;
     
     fn blocks(&self) -> &[Self::Block];
     fn blocks_mut(&mut self) -> &mut [Self::Block];

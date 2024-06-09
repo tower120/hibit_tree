@@ -2,7 +2,7 @@ use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ops::{Deref, DerefMut};
 use std::ops::ControlFlow::Continue;
 use std::ptr;
-use crate::{BitBlock, MaybeEmpty, MaybeEmptyIntrusive};
+use crate::{BitBlock, Empty, MaybeEmptyIntrusive};
 use crate::level_block::HiBlock;
 use crate::utils::{Array, Primitive};
 
@@ -241,7 +241,7 @@ where
 }
 
 
-impl<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices> MaybeEmpty for SmallBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
+impl<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices> Empty for SmallBlock<Mask, MaskU64Populations, BlockIndices, SmallBlockIndices>
 where
     Mask: BitBlock,
     BlockIndices: Array + Copy,

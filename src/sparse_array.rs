@@ -10,7 +10,7 @@ use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::const_utils::const_int::{ConstUsize, ConstInteger, ConstIntVisitor};
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
 use crate::const_utils::{ConstBool, ConstFalse, ConstTrue};
-use crate::MaybeEmpty;
+use crate::Empty;
 use crate::utils::primitive::Primitive;
 use crate::utils::array::{Array};
 use crate::sparse_array_levels::{FoldMutVisitor, FoldVisitor, MutVisitor, SparseArrayLevels, Visitor};
@@ -92,7 +92,7 @@ impl<Levels, Data> Default for
     SparseArray<Levels, Data>
 where
     Levels: SparseArrayLevels,
-    Data: MaybeEmpty,
+    Data: Empty,
 {
     #[inline]
     fn default() -> Self {        
@@ -109,7 +109,7 @@ where
 impl<Levels, Data> SparseArray<Levels, Data>
 where
     Levels: SparseArrayLevels,
-    Data: MaybeEmpty,
+    Data: Empty,
 {
     #[inline(always)]
     fn check_index_range(index: usize){
@@ -375,7 +375,7 @@ where
         impl<Levels, Data, LevelIndices, M> FoldMutVisitor<M> for V<Levels, Data, LevelIndices>
         where
             Levels: SparseArrayLevels,
-            Data: MaybeEmpty,
+            Data: Empty,
             LevelIndices: Array<Item=usize>
         {
             type Acc = usize;
@@ -561,7 +561,7 @@ where
 impl<Levels, Data> SparseHierarchy for SparseArray<Levels, Data>
 where
     Levels: SparseArrayLevels,
-    Data: MaybeEmpty
+    Data: Empty
 {
     const EXACT_HIERARCHY: bool = false;
     
@@ -605,7 +605,7 @@ where
 impl<Levels, Data> SparseHierarchyState for SparseArrayState<Levels, Data>
 where
     Levels: SparseArrayLevels,
-    Data: MaybeEmpty,
+    Data: Empty,
 {
     type This = SparseArray<Levels, Data>;
 

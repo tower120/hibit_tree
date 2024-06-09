@@ -1,15 +1,15 @@
 use crate::level::ILevel;
-use crate::MaybeEmpty;
+use crate::Empty;
 
 /// Simple level implementation. Works with all `Block`s.
 ///
 /// Prefer using [IntrusiveListLevel] whenever possible.
-pub struct Level<Block: MaybeEmpty>{
+pub struct Level<Block: Empty>{
     blocks: Vec<Block>,
     empty_block_indices: Vec<usize>
 }
 
-impl<Block: MaybeEmpty> Default for Level<Block> {
+impl<Block: Empty> Default for Level<Block> {
     #[inline]
     fn default() -> Self {
         Self{
@@ -20,7 +20,7 @@ impl<Block: MaybeEmpty> Default for Level<Block> {
     }
 }
 
-impl<Block: MaybeEmpty> ILevel for Level<Block> {
+impl<Block: Empty> ILevel for Level<Block> {
     type Block = Block;
 
     #[inline]

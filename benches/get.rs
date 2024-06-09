@@ -1,7 +1,7 @@
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
 use rand::{Rng, SeedableRng};
 use rand::seq::SliceRandom;
-use hi_sparse_array::{MaybeEmpty, SparseArray};
+use hi_sparse_array::{Empty, SparseArray};
 use hi_sparse_array::level_block::{Block, ClusterBlock, SmallBlock};
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
@@ -21,7 +21,7 @@ type ClusterLvl1Block = ClusterBlock<u64, [u16;4], [u16;16]>;
 
 #[derive(Clone)]
 struct DataBlock(u64);
-impl MaybeEmpty for DataBlock{
+impl Empty for DataBlock{
     fn empty() -> Self {
         Self(0)
     }

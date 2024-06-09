@@ -6,11 +6,12 @@
 //! with "empty" elements across whole range, and populated with values.    
 //! 
 //! All elements that are not actually stored in [SparseArray], 
-//! considered to be [MaybeEmpty::empty()]. Accessing such elements
+//! considered to be [Empty::empty()]. Accessing such elements
 //! does not involve branching, and as fast as accessing the real data.
 //! 
-//! Also inter container intersection and merging possible. With fast O(1) 
-//! intersected/merged element search.
+//! Also inter container intersection and merging possible. All merged/intersected
+//! element indices are become known basically instantly, since they obtained in bulk 
+//! as bitmasks primitive operations(AND/OR). So intersection is basically free.
 //!
 //! # Data structure
 //! 
@@ -79,6 +80,7 @@ mod fold;
 mod exact_hierarchy;
 mod sparse_hierarchy;
 mod ops;
+mod op;
 
 pub mod bit_queue;
 //pub mod simple_iter;
@@ -93,31 +95,29 @@ pub mod utils;
 pub use bit_block::BitBlock;
 pub use sparse_array::SparseArray;
 pub use sparse_array_levels::SparseArrayLevels;
-pub use apply::{Apply, BinaryOp};
+pub use apply::Apply;
 pub use fold::Fold;
 //pub use empty::Empty;
 pub use sparse_hierarchy::*;
 pub use exact_hierarchy::ExactHierarchy;
 pub use ops::*;
+pub use op::*;
 
 use std::borrow::Borrow;
-use std::marker::PhantomData;
 use std::ops::BitAnd;
+pub use op::BinaryOp;
 use crate::const_utils::const_int::{ConstInteger, ConstIntVisitor};
 use utils::primitive::Primitive;
 use utils::array::Array;
-use crate::const_utils::ConstFalse;
-use crate::level::{IntrusiveListLevel, SingleBlockLevel};
-use crate::level_block::Block;
+use crate::level::IntrusiveListLevel;
 use crate::utils::Borrowable;
 
-// TODO: rename to Empty?
-pub trait MaybeEmpty {
+pub trait Empty {
     fn empty() -> Self;
     fn is_empty(&self) -> bool;
 }
 
-impl<T> MaybeEmpty for Option<T>{
+impl<T> Empty for Option<T>{
     #[inline]
     fn empty() -> Self {
         None
@@ -129,11 +129,11 @@ impl<T> MaybeEmpty for Option<T>{
     }
 }
 
-/// [MaybeEmpty] that can be used as a node in intrusive list.
+/// [Empty] that can be used as a node in intrusive list.
 /// 
-/// Implementing this will allow your [MaybeEmpty] struct in an empty state 
+/// Implementing this will allow your [Empty] struct in an empty state 
 /// to be used as a LinkedList node with [IntrusiveListLevel]. 
-pub(crate) trait MaybeEmptyIntrusive: MaybeEmpty {
+pub(crate) trait MaybeEmptyIntrusive: Empty {
     fn as_u64_mut(&mut self) -> &mut u64;
     /// Restore [empty()] state, after [as_u64_mut()] mutation.
     fn restore_empty(&mut self);

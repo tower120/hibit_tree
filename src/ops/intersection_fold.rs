@@ -2,9 +2,10 @@ use std::any::Any;
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, BitAndAssign, BitOrAssign};
-use crate::{BinaryOp, BitBlock, fold, Fold, MaybeEmpty, SparseHierarchy};
+use crate::{BitBlock, Empty, fold, Fold, SparseHierarchy};
 use crate::const_utils::ConstFalse;
 use crate::level_block::Block;
+use crate::op::BinaryOp;
 use crate::utils::{Borrowable, Take};
 
 pub(crate) struct IntersectionFoldOp<F, Acc, Data, Mask>{
@@ -13,7 +14,7 @@ pub(crate) struct IntersectionFoldOp<F, Acc, Data, Mask>{
 }
 impl<F, Acc, Data, Mask> BinaryOp for IntersectionFoldOp<F, Acc, Data, Mask>
 where
-    Acc: MaybeEmpty,
+    Acc: Empty,
     F: Fn(Acc, &Data) -> Acc,
     Mask: BitBlock,
 {
@@ -21,9 +22,10 @@ where
     type SKIP_EMPTY_HIERARCHIES = ConstFalse;
     type LevelMask = Mask;
 
+    #[inline]
     fn lvl_op(
         &self, 
-        left : impl Take<Self::LevelMask> + Borrow<Self::LevelMask>, 
+        left : impl Take<Self::LevelMask>, 
         right: impl Borrow<Self::LevelMask>
     ) -> Self::LevelMask {
         let mut acc = left.take();
@@ -35,6 +37,7 @@ where
     type Right = Data;
     type Out   = Acc;
 
+    #[inline]
     fn data_op(
         &self,
         acc  : impl Take<Self::Left>,
@@ -55,6 +58,10 @@ pub type IntersectionFold<Init, Iter, F> = Fold<
     Iter
 >;
 
+/// Intersection between N [SparseHierarchy]ies in fold-style.
+/// 
+/// `Init`'s type may differ, but all [SparseHierarchy]ies 
+/// must have the same configuration.
 #[inline]
 pub fn intersection_fold<Init, Iter, F>(init: Init, iter: Iter, f: F)
     -> IntersectionFold<Init, Iter, F>
@@ -83,7 +90,7 @@ mod test{
         
         #[derive(Clone)]
         struct DataBlock(u64);
-        impl MaybeEmpty for DataBlock{
+        impl Empty for DataBlock{
             fn empty() -> Self {
                 Self(0)
             }

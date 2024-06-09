@@ -4,7 +4,7 @@ use crate::caching_iter::CachingBlockIter;
 use crate::sparse_array::level_indices;
 use crate::const_utils::const_int::ConstInteger;
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
-use crate::MaybeEmpty;
+use crate::Empty;
 use crate::utils::{Borrowable, Take};
 
 /// 
@@ -47,7 +47,7 @@ pub trait SparseHierarchy: Sized + Borrowable<Borrowed=Self> {
     where
         I: ConstArray<Item=usize> + Copy;
     
-    type DataType: MaybeEmpty;
+    type DataType: Empty;
     type Data<'a>: Borrow<Self::DataType> + Take<Self::DataType>
         where Self: 'a;
     /// # Safety

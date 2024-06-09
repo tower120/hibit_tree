@@ -6,7 +6,7 @@ pub use small_block::*;
 pub use cluster_block::*;
 pub use block::*;
 
-use crate::{BitBlock, MaybeEmpty, MaybeEmptyIntrusive, Primitive};
+use crate::{BitBlock, Empty, MaybeEmptyIntrusive, Primitive};
 
 // TODO: rename to LevelBlock
 /// Hierarchy level level_block

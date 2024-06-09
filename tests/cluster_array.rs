@@ -1,12 +1,12 @@
 use hi_sparse_array::level_block::{Block, ClusterBlock};
-use hi_sparse_array::{MaybeEmpty, SparseArray};
+use hi_sparse_array::{Empty, SparseArray};
 use itertools::assert_equal;
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::level::{IntrusiveListLevel, Level, SingleBlockLevel};
 
 #[derive(Clone, Debug)]
 struct DataBlock(u64);
-impl MaybeEmpty for DataBlock{
+impl Empty for DataBlock{
     fn empty() -> Self {
         Self(0)
     }

@@ -3,11 +3,12 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, BitOr, Mul};
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
-use hi_sparse_array::{apply, BitBlock, fold, MaybeEmpty, BinaryOp, SparseArray};
+use hi_sparse_array::{apply, BitBlock, Empty, fold, SparseArray};
 use hi_sparse_array::level_block::Block;
 use hi_sparse_array::caching_iter::CachingBlockIter;
 use hi_sparse_array::const_utils::ConstFalse;
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
+use hi_sparse_array::op::BinaryOp;
 use hi_sparse_array::utils::Take;
 
 type Lvl0Block = Block<u64, [u8;64]>;
@@ -44,7 +45,7 @@ impl BitOr for DataBlock{
         Self(self.0 | rhs.0)
     }
 }
-impl MaybeEmpty for DataBlock{
+impl Empty for DataBlock{
     fn empty() -> Self {
         Self(0)
     }
@@ -67,7 +68,7 @@ impl<M, LD> Default for AndOp<M, LD>{
 impl<M, LD> BinaryOp for AndOp<M, LD>
 where
     M: BitBlock + BitAnd<Output = M>, 
-    LD: BitAnd<Output = LD> + MaybeEmpty,
+    LD: BitAnd<Output = LD> + Empty,
     for<'a> &'a LD: BitAnd<&'a LD, Output = LD>
 {
     const EXACT_HIERARCHY: bool = false;

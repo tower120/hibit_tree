@@ -1,7 +1,7 @@
 use std::mem::{MaybeUninit, size_of};
 use crate::bit_block::BitBlock;
 use crate::level_block::HiBlock;
-use crate::{MaybeEmpty, MaybeEmptyIntrusive};
+use crate::{Empty, MaybeEmptyIntrusive};
 use crate::utils::Array;
 use crate::utils::primitive::Primitive;
 
@@ -13,7 +13,7 @@ pub struct Block<Mask, BlockIndices> {
     block_indices: BlockIndices,
 }
 
-impl<Mask, BlockIndices> MaybeEmpty for Block<Mask, BlockIndices>
+impl<Mask, BlockIndices> Empty for Block<Mask, BlockIndices>
 where
     Mask: BitBlock,
     BlockIndices: Array

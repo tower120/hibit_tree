@@ -1,13 +1,13 @@
 use std::slice;
 use crate::level::ILevel;
-use crate::MaybeEmpty;
+use crate::Empty;
 
 #[derive(Clone)]
-pub struct SingleBlockLevel<Block: MaybeEmpty>{
+pub struct SingleBlockLevel<Block: Empty>{
     block: Block
 }
 
-impl<Block: MaybeEmpty> ILevel for SingleBlockLevel<Block>{
+impl<Block: Empty> ILevel for SingleBlockLevel<Block>{
     type Block = Block;
 
     #[inline]
@@ -29,7 +29,7 @@ impl<Block: MaybeEmpty> ILevel for SingleBlockLevel<Block>{
     }
 }
 
-impl<Block: MaybeEmpty> Default for SingleBlockLevel<Block> {
+impl<Block: Empty> Default for SingleBlockLevel<Block> {
     #[inline]
     fn default() -> Self {
         Self{ block: Block::empty() }

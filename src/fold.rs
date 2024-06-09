@@ -1,14 +1,14 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use arrayvec::ArrayVec;
-use crate::{BinaryOp, BitBlock};
+use crate::BitBlock;
 use crate::const_utils::const_bool::ConstBool;
 use crate::const_utils::const_int::ConstInteger;
 use crate::const_utils::const_array::{ConstArray, ConstArrayType};
 use crate::const_utils::ConstUsize;
-use crate::MaybeEmpty;
+use crate::op::BinaryOp;
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
-use crate::utils::{Borrowable, array, Take};
+use crate::utils::{array, Borrowable, Take};
 
 pub struct Fold<Op, Init, ArrayIter>{
     pub(crate) op: Op,

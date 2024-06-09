@@ -57,9 +57,9 @@ impl<T: Borrowable> Borrowable for &T{
 
 /// Means of converting T/&T to value.
 /// 
-/// Allows to store/pass reference or pointer generically.
+/// Allows to store/pass reference or value generically.
 /// In conjunction with [Borrow] can be used as something like C++'s &&T 
-/// (forwarding reference), that can be taken both by ref or value.
+/// (forwarding reference), that can be taken by ref or value.
 /// 
 /// Everything zero overhead.
 pub trait Take<T>{
