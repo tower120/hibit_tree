@@ -1,5 +1,4 @@
-#![feature(associated_type_bounds)]
-#![feature(inline_const)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 //! The core of the lib is [SparseArray] container and [SparseHierarchy] 
 //! interface. They represent concept of data structure that filled
@@ -11,7 +10,7 @@
 //! 
 //! Also inter container intersection and merging possible. All merged/intersected
 //! element indices are become known basically instantly, since they obtained in bulk 
-//! as bitmasks primitive operations(AND/OR). So intersection is basically free.
+//! as bitmasks primitive operations(AND/OR). So intersection is very, very cheap.
 //!
 //! # Data structure
 //! 
@@ -39,7 +38,24 @@
 //! operation, which basically is just BMI's pop_cnt/trail_cnt. There is no "scan"
 //! across node child items, for finding non-empty child/sub-tree.
 //! 
-//! Unordered iteration is as fast as it can possibly be. It just iterating Vec.
+//! Unordered iteration is as fast as it can possibly be. It is just plain Vec iteration.
+//! 
+//! ## Benchmarks data
+//! 
+//! At any default configuration random access and ordered iteration 
+//! is always faster then no_hash HashMap with usize uniformly distributed keys 
+//! (ideal HashMap scenario). [config::sbo] is faster up to 4 levels.
+//! Shallow trees (2-3 levels) are up to x3 faster.
+//! 
+//! In general, performance does not depends on data distribution across index range.
+//!
+//! Insertion is not benchmarked, but it can be viewed as special case of random access.
+//!
+//! Iteration of intersection between N [SparseArray]s in worst case scenario,
+//! where all elements intersects, took N times of usual ordered iteration. In best
+//! case scenario where nothing intersects - basically free. Finding intersected
+//! sub-trees costs almost nothing by itself. [SparseArray] acts as acceleration
+//! structure for intersection.
 //! 
 //! # Inter SparseHierarchy operations
 //! 
@@ -89,6 +105,7 @@ pub mod level;
 pub mod level_block;
 pub mod const_utils;
 pub mod utils;
+pub mod config;
 
 //pub use ref_or_val::*;
 pub use bit_block::BitBlock;
@@ -147,7 +164,7 @@ pub(crate) fn data_block_index<T: SparseHierarchy>(
     let level_count = T::LevelCount::VALUE;
     let mut acc = data_index;
     for N in 0..level_count - 1{
-        acc += level_indices.as_ref()[N] << (T::LevelMaskType::SIZE_POT_EXPONENT* (level_count - N - 1));
+        acc += level_indices.as_ref()[N] << (T::LevelMaskType::SIZE.ilog2() as usize * (level_count - N - 1));
     }
     acc
 }

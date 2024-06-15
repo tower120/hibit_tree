@@ -12,15 +12,8 @@ pub trait BitBlock
     + for<'a> BitOrAssign<&'a Self>
     + Sized + Clone + 'static
 {
-    // TODO: Try use SIZE instead. There is const ilog2
-    /// 2^N bits
-    const SIZE_POT_EXPONENT: usize;
-    
     /// Size in bits
-    #[inline(always)]
-    /*const*/ fn size() -> usize {
-        1 << Self::SIZE_POT_EXPONENT
-    }
+    const SIZE: usize;
     
     fn zero() -> Self;
     
@@ -87,7 +80,7 @@ pub trait BitBlock
 }
 
 impl BitBlock for u64{
-    const SIZE_POT_EXPONENT: usize = 6;
+    const SIZE: usize = 64;
 
     fn zero() -> Self { 0 }
 
@@ -113,9 +106,10 @@ impl BitBlock for u64{
     }
 }
 
-// TODO: conditional compilation
+#[cfg(feature = "simd")]
+#[cfg_attr(docsrs, doc(cfg(feature = "simd")))]
 impl BitBlock for wide::u64x2{
-    const SIZE_POT_EXPONENT: usize = 7;
+    const SIZE: usize = 128;
 
     #[inline]
     fn zero() -> Self {
@@ -133,7 +127,37 @@ impl BitBlock for wide::u64x2{
 
     #[inline]
     fn as_array(&self) -> &Self::Array {
-        self.as_array()
+        self.as_array_ref()
+    }
+
+    #[inline]
+    fn as_array_mut(&mut self) -> &mut Self::Array {
+        self.as_array_mut()
+    }
+}
+
+#[cfg(feature = "simd")]
+#[cfg_attr(docsrs, doc(cfg(feature = "simd")))]
+impl BitBlock for wide::u64x4{
+    const SIZE: usize = 256;
+
+    #[inline]
+    fn zero() -> Self {
+        wide::u64x4::ZERO
+    }
+
+    type BitsIter = ArrayBitQueue<u64, 4>;
+
+    #[inline]
+    fn into_bits_iter(self) -> Self::BitsIter {
+        ArrayBitQueue::new(self.to_array())
+    }
+
+    type Array = [u64; 4];
+
+    #[inline]
+    fn as_array(&self) -> &Self::Array {
+        self.as_array_ref()
     }
 
     #[inline]

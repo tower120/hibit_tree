@@ -129,13 +129,13 @@ where
         -> Option<usize> 
     {
         let u64_index =
-            if Mask::size() == 64 {
+            if Mask::SIZE == 64 {
                 0
             } else {
                 index / 64
             };
         let bit_index =
-            if Mask::size() == 64 {
+            if Mask::SIZE == 64 {
                 index
             } else {
                 index % 64
@@ -231,7 +231,7 @@ where
                     ptr::write(p, MaybeUninit::new(value));
                 }
                 
-                for i in (index/64)+1..Mask::size()/64 {
+                for i in (index/64)+1..Mask::SIZE/64 {
                     *mask_u64_populations.as_mut().get_unchecked_mut(i) += 1;
                 }
             }
@@ -357,7 +357,7 @@ where
                 ptr::copy(p.offset(1), p, len - inner_index);
             }
             
-            for i in (index/64)+1..Mask::size()/64 {
+            for i in (index/64)+1..Mask::SIZE/64 {
                 *mask_u64_populations.as_mut().get_unchecked_mut(i) -= 1;
             }            
         }

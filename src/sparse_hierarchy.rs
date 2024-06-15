@@ -144,7 +144,7 @@ pub trait SparseHierarchy: Sized + Borrowable<Borrowed=Self> {
     /// Act as `const` - noop.
     #[inline]
     /*const*/ fn max_range() -> usize {
-        Self::LevelMaskType::size().pow(Self::LevelCount::VALUE as _) - 1 
+        Self::LevelMaskType::SIZE.pow(Self::LevelCount::VALUE as _) - 1 
     }
 }
 

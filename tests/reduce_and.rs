@@ -1,11 +1,10 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, Mul};
-use hi_sparse_array::{BitBlock, Empty, fold, SparseArray};
+use hi_sparse_array::{BitBlock, config, Empty, fold, SparseArray};
 use hi_sparse_array::level_block::Block;
 use hi_sparse_array::Iter;
 use hi_sparse_array::const_utils::ConstTrue;
-use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
 use hi_sparse_array::BinaryOp;
 use hi_sparse_array::utils::Take;
 
@@ -40,7 +39,8 @@ impl Empty for DataBlock{
     }
 }
 
-type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), DataBlock>;
+//type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), DataBlock>;
+type BlockArray = SparseArray<config::width_64::depth_2, DataBlock>;
 
 pub struct AndOp<M, LD>(PhantomData<(M, LD)>);
 impl<M, LD> Default for AndOp<M, LD>{

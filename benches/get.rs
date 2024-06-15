@@ -1,7 +1,7 @@
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
 use rand::{Rng, SeedableRng};
 use rand::seq::SliceRandom;
-use hi_sparse_array::{Empty, SparseArray};
+use hi_sparse_array::{config, Empty, SparseArray};
 use hi_sparse_array::level_block::{Block, ClusterBlock, SmallBlock};
 use hi_sparse_array::Iter;
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
@@ -32,8 +32,12 @@ impl Empty for DataBlock{
 }
 
 type Map = nohash_hasher::IntMap<u64, DataBlock>;
-type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>, IntrusiveListLevel<Lvl2Block>), DataBlock>;
-type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<CompactLvl1Block>, IntrusiveListLevel<CompactLvl2Block>), DataBlock>;
+
+//type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>, IntrusiveListLevel<Lvl2Block>), DataBlock>;
+type BlockArray = SparseArray<config::width_64::depth_3, DataBlock>;
+
+//type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<CompactLvl1Block>, IntrusiveListLevel<CompactLvl2Block>), DataBlock>;
+type SmallBlockArray = SparseArray<config::sbo::width_64::depth_3, DataBlock>;
 /*type ClusterBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<ClusterLvl1Block>), IntrusiveListLevel<DataBlock>>;*/
 
 /*fn cluster_array_get(array: &ClusterBlockArray) -> u64 {

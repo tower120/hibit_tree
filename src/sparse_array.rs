@@ -30,8 +30,8 @@ where
     let mut level_remainder = index;
     let level_count = LevelsCount::VALUE;
     for level in 0..level_count - 1{
-        //let rev_level = level_count - level;
-        let level_capacity_exp = LevelMask::SIZE_POT_EXPONENT * (level_count - level - 1);
+        // LevelMask::SIZE * 2^(level_count - level - 1)
+        let level_capacity_exp = LevelMask::SIZE.ilog2() as usize * (level_count - level - 1);
         let level_capacity = 1 << level_capacity_exp;
         
         // level_remainder / level_capacity_exp
