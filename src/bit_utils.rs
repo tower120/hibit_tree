@@ -1,3 +1,4 @@
+use std::mem;
 use std::mem::size_of;
 use std::ops::ControlFlow;
 use crate::Primitive;
@@ -72,9 +73,11 @@ where
 /// `bit_index` validity is not checked.
 #[inline]
 pub unsafe fn get_bit_unchecked<T: Primitive>(block: T, bit_index: usize) -> bool {
-    let block_mask: T = T::ONE << bit_index;
+/*    let block_mask: T = T::ONE << bit_index;
     let masked_block = block & block_mask;
-    !masked_block.is_zero()
+    !masked_block.is_zero()*/
+    let out = (block >> bit_index) & T::ONE;
+    mem::transmute(out.as_u8())
 }
 
 /// Blocks traversed in the same order as [set_array_bit], [get_array_bit].

@@ -1,5 +1,5 @@
 use std::fmt::Debug;
-use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl, ShlAssign/*, Shr, ShrAssign*/};
+use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl, ShlAssign, Shr, ShrAssign};
 
 // num_traits was just **TOO** hard to use with primitives...
 // Cast from/to concrete primitive was a final nail into num_trait's coffin.
@@ -14,9 +14,9 @@ pub trait Primitive:
     + Shl<Output = Self>
     + Shl<usize, Output = Self>
     + ShlAssign
-/*    + Shr<Output = Self>
+    + Shr<Output = Self>
     + Shr<usize, Output = Self>
-    + ShrAssign */
+    + ShrAssign
     + Not<Output = Self>
     + Copy 
     + Ord 
@@ -31,6 +31,8 @@ pub trait Primitive:
     
     fn from_usize(i: usize) -> Self;
     fn as_usize(self) -> usize;
+    
+    fn as_u8(self) -> u8;
     
     fn trailing_zeros(self) -> u32;
     fn wrapping_neg(self) -> Self;
@@ -55,7 +57,12 @@ macro_rules! impl_primitive {
             #[inline]
             fn as_usize(self) -> usize {
                 self as usize
-            }        
+            }
+            
+            #[inline]
+            fn as_u8(self) -> u8 {
+                self as u8
+            }
 
             #[inline]
             fn trailing_zeros(self) -> u32 {
