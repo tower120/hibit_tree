@@ -2,17 +2,24 @@
 
 use std::alloc::{alloc, Layout, realloc};
 use std::{mem, ptr};
+use std::marker::PhantomData;
 use std::mem::{align_of, ManuallyDrop, MaybeUninit, size_of};
-use std::ptr::{addr_of_mut, NonNull};
+use std::ptr::{addr_of_mut, NonNull, null};
 use crate::bit_utils::{get_bit_unchecked, set_bit_unchecked};
-use crate::const_utils::{ConstInteger, ConstUsize};
+use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger, ConstUsize};
 use crate::sparse_array::level_indices;
-use crate::utils::Primitive;
+use crate::sparse_hierarchy2::{SparseHierarchy2, SparseHierarchyState2};
+use crate::utils::{Array, Borrowable, Primitive};
 
 type Mask = u64;
 type DataIndex = u32;
 
 const DEFAULT_CAP: u8 = 2;
+
+/// Just for safety
+trait NodeChild{}
+impl NodeChild for NonNull<Node>{} 
+impl NodeChild for u32{}
 
 #[repr(C)]
 struct Node{
@@ -28,22 +35,27 @@ struct Node{
 
 impl Node{
     #[inline]
-    pub unsafe fn get_child<T>(&self, index: usize) -> &T {
+    pub fn mask(&self) -> &Mask {
+        &self.mask
+    }
+    
+    #[inline]
+    pub unsafe fn get_child<T: NodeChild>(&self, index: usize) -> &T {
         let dense_index = self.get_dense_index(index);
         &*self.children_ptr::<T>().add(dense_index)
     }
     
     #[inline]
-    pub unsafe fn get_child_mut<T>(&mut self, index: usize) -> &mut T {
+    pub unsafe fn get_child_mut<T: NodeChild>(&mut self, index: usize) -> &mut T {
         let dense_index = self.get_dense_index(index);
         &mut*self.children_mut_ptr::<T>().add(dense_index)
     }
     
-    unsafe fn children_ptr<T>(&self) -> *const T{
+    unsafe fn children_ptr<T: NodeChild>(&self) -> *const T{
         self.children_placeholder.as_ptr() as *const u8 as _
     }
     
-    unsafe fn children_mut_ptr<T>(&mut self) -> *mut T{
+    unsafe fn children_mut_ptr<T: NodeChild>(&mut self) -> *mut T{
         self.children_placeholder.as_mut_ptr() as *mut u8 as _
     }
     
@@ -52,7 +64,7 @@ impl Node{
     }
     
     #[inline]
-    fn layout<T>(cap: u8) -> Layout {
+    fn layout<T: NodeChild>(cap: u8) -> Layout {
         let array_size = size_of::<T>() * cap as usize;
         let size = Self::node_children_addr_offset() + array_size;
         
@@ -63,7 +75,7 @@ impl Node{
     }
     
     #[inline]
-    pub fn new<T>(cap: u8) -> NonNull<Self> {
+    pub fn new<T: NodeChild>(cap: u8) -> NonNull<Self> {
         unsafe {
             let node = alloc(Self::layout::<T>(cap)) as *mut Self;
             
@@ -101,7 +113,7 @@ impl Node{
     /// - `this_ptr` must be valid.
     /// - `index` must be in range.
     #[inline]
-    pub unsafe fn insert<T>(mut this_ptr: NonNull<Node>, index: usize, value: T)
+    pub unsafe fn insert<T: NodeChild>(mut this_ptr: NonNull<Node>, index: usize, value: T)
         // TODO: try Option
         -> (NonNull<T>, /*Option<*/NonNull<Self>/*>*/) 
     {
@@ -269,17 +281,131 @@ where
     }
 }
 
+impl<T, const DEPTH: usize> SparseHierarchy2 for CompactSparseArray2<T, DEPTH>
+where
+    ConstUsize<DEPTH>: ConstInteger
+{
+    type LevelCount = ConstUsize<DEPTH>;
+    
+    type LevelMaskType = Mask;
+    type LevelMask<'a> = &'a Mask where Self: 'a;
+    
+    type DataType = T;
+    type Data<'a> = &'a T where Self: 'a;
+
+    #[inline]
+    unsafe fn data<I>(&self, level_indices: I) -> Option<Self::Data<'_>>
+    where
+        I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
+    {
+        todo!()
+    }
+
+    #[inline]
+    unsafe fn data_unchecked<I>(&self, level_indices: I) -> Self::Data<'_>
+    where
+        I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
+    {
+        todo!()
+    }
+    
+    type State = State<T, DEPTH>;
+}
+
+pub struct State<T, const DEPTH: usize>
+where
+    ConstUsize<DEPTH>: ConstInteger
+{
+    /// [*const Node; Levels::LevelCount-1]
+    /// 
+    /// Level0 skipped - we can get it from self/this.
+    level_nodes: ConstArrayType<
+        *const Node, 
+        <ConstUsize<DEPTH> as ConstInteger>::Dec
+    >,     
+    phantom_data: PhantomData<T>
+}
+impl<T, const DEPTH: usize> SparseHierarchyState2 for State<T, DEPTH>
+where
+    ConstUsize<DEPTH>: ConstInteger
+{
+    type This = CompactSparseArray2<T, DEPTH>;
+
+    #[inline]
+    fn new(_: &Self::This) -> Self {
+        Self{
+            level_nodes: Array::from_fn(|_|null()),
+            phantom_data: Default::default(),
+        }
+    }
+
+    #[inline]
+    unsafe fn select_level_node_unchecked<'a, N: ConstInteger>(
+        &mut self, 
+        this: &'a Self::This, 
+        level_n: N, 
+        level_index: usize
+    ) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
+        if N::VALUE == 0 {
+            return this.root.as_ref().mask();
+        }
+        
+        // We do not store the root level's node.
+        let level_node_index = level_n.dec().value();
+        
+        // 1. get &Node from prev level.
+        let prev_node = if N::VALUE == 1 {
+            this.root.as_ref()
+        } else {
+            &**self.level_nodes.as_ref().get_unchecked(level_node_index - 1)
+        };
+        
+        // 2. store *node in state cache
+        let node = prev_node.get_child::<NonNull<Node>>(level_index);
+        *self.level_nodes.as_mut().get_unchecked_mut(level_node_index) = node.as_ptr();
+        
+        node.as_ref().mask()
+    }
+
+    #[inline]
+    unsafe fn data_unchecked<'a>(&self, this: &'a Self::This, level_index: usize) 
+        -> <Self::This as SparseHierarchy2>::Data<'a> 
+    {
+        let node = if DEPTH == 1{
+            // We do not store the root level's block.
+            this.root.as_ref()
+        } else {
+            &**self.level_nodes.as_ref().last().unwrap_unchecked()
+        };
+            
+        let data_index = node.get_child::<DataIndex>(level_index).as_usize();
+        this.data.get_unchecked(data_index)
+    }
+}
+
+impl<T, const DEPTH: usize> Borrowable for CompactSparseArray2<T, DEPTH>{ type Borrowed = Self; }
+
 #[cfg(test)]
 mod test{
-    use super::CompactSparseArray2;
+    use std::ptr::NonNull;
+    use std::slice;
+    use itertools::assert_equal;
+    use crate::sparse_hierarchy2::SparseHierarchy2;
+    use crate::utils::Primitive;
+    use super::{CompactSparseArray2, Node};
     
     #[test]
     fn test(){
         let mut a: CompactSparseArray2<usize, 3> = Default::default();
         *a.get_or_insert(15) = 89;
+        assert_eq!(*a.get(15).unwrap(), 89);
+
+        for (_, v) in a.iter() {
+            println!("{:?}", *v);
+        }
                 
         assert_eq!(*a.get_or_insert(15), 89);
         assert_eq!(*a.get_or_insert(0), 0);
-        assert_eq!(*a.get_or_insert(100), 0);        
+        assert_eq!(*a.get_or_insert(100), 0);
     }
 }

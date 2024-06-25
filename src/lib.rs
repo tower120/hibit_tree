@@ -108,6 +108,9 @@ pub mod const_utils;
 pub mod utils;
 pub mod config;
 pub mod compact_sparse_array2;
+mod sparse_hierarchy2;
+mod iter2;
+pub mod ops2;
 
 //pub use ref_or_val::*;
 pub use bit_block::BitBlock;
@@ -158,6 +161,7 @@ pub(crate) trait MaybeEmptyIntrusive: Empty {
     fn restore_empty(&mut self);
 }
 
+// TODO: remove
 // Compile-time loop inside. Ends up with N ADDs.
 #[inline]
 pub(crate) fn data_block_index<T: SparseHierarchy>(
@@ -171,6 +175,20 @@ pub(crate) fn data_block_index<T: SparseHierarchy>(
     }
     acc
 }
+
+#[inline]
+pub(crate) fn data_block_index2<LevelCount: ConstInteger, LevelMaskType: BitBlock>(
+    level_indices: &impl Array<Item=usize>,
+    data_index: usize
+) -> usize {
+    let level_count = LevelCount::VALUE;
+    let mut acc = data_index;
+    for N in 0..level_count - 1{
+        acc += level_indices.as_ref()[N] << (LevelMaskType::SIZE.ilog2() as usize * (level_count - N - 1));
+    }
+    acc
+}
+
 
 /// Apply [BinaryOp] between two [SparseHierarchy]ies.
 #[inline]
