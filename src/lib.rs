@@ -108,7 +108,7 @@ pub mod const_utils;
 pub mod utils;
 pub mod config;
 pub mod compact_sparse_array2;
-mod sparse_hierarchy2;
+pub mod sparse_hierarchy2;
 mod iter2;
 pub mod ops2;
 

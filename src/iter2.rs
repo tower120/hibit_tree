@@ -1,6 +1,6 @@
 use std::ops::ControlFlow;
 use crate::sparse_hierarchy2::{SparseHierarchy2, SparseHierarchyState2};
-use crate::{BitBlock, data_block_index, data_block_index2};
+use crate::{BitBlock, data_block_index2};
 use crate::bit_queue::BitQueue;
 use crate::const_utils::const_int::{const_for_rev, ConstInteger, ConstIntVisitor, ConstUsize};
 use crate::const_utils::const_array::ConstArrayType;

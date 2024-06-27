@@ -159,7 +159,7 @@ mod test{
         *a1.get_or_insert(200) = 200;
         
         *a2.get_or_insert(100) = 100;
-        *a2.get_or_insert(15) = 15;
+        *a2.get_or_insert(15)  = 15;
         *a2.get_or_insert(200) = 200;        
         
         let i = intersection2(&a1, &a2, |i0, i1| i0+i1);

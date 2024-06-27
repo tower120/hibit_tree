@@ -39,3 +39,7 @@ harness = false
 [[bench]]
 name = "reduce_and"
 harness = false
+
+[[bench]]
+name = "reduce_or"
+harness = false

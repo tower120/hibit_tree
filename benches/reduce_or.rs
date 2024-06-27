@@ -6,10 +6,11 @@ use criterion::{black_box, Criterion, criterion_group, criterion_main};
 use hi_sparse_array::{apply, BitBlock, Empty, fold, SparseArray};
 use hi_sparse_array::level_block::{Block, SmallBlock};
 use hi_sparse_array::Iter;
-use hi_sparse_array::const_utils::ConstFalse;
+use hi_sparse_array::const_utils::{ConstFalse, ConstTrue};
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
 use hi_sparse_array::BinaryOp;
 use hi_sparse_array::compact_sparse_array2::CompactSparseArray2;
+use hi_sparse_array::ops2::union2::union2;
 use hi_sparse_array::utils::Take;
 
 type Lvl0Block = Block<u64, [u8;64]>;
@@ -74,13 +75,13 @@ where
     LD: BitAnd<Output = LD> + Empty,
     for<'a> &'a LD: BitAnd<&'a LD, Output = LD>
 {
-    const EXACT_HIERARCHY: bool = false;
-    type SKIP_EMPTY_HIERARCHIES = ConstFalse;
+    const EXACT_HIERARCHY: bool = true;
+    type SKIP_EMPTY_HIERARCHIES = ConstTrue;
      
     type LevelMask = M;
     #[inline]
     fn lvl_op(&self, left: impl Take<M>, right: impl Take<M>) -> Self::LevelMask {
-        left.take_or_clone() & right.take_or_clone()
+        left.take_or_clone() | right.take_or_clone()
     }
 
     type Left  = LD;
@@ -164,6 +165,16 @@ fn fold_iter(list: &[BlockArray]) -> impl Any {
     s
 }*/
 
+fn apply_small_iter(array1: &SmallBlockArray, array2: &SmallBlockArray) -> u64 {
+    let and_op = AndOp(PhantomData);
+    let reduce = apply(and_op, array1, array2);
+    
+    let mut s = 0;
+    for (_, i) in Iter::new(&reduce){
+        s += i.0;
+    }
+    s
+}
 
 fn apply_iter(array1: &BlockArray, array2: &BlockArray) -> u64 {
     let and_op = AndOp(PhantomData);
@@ -176,30 +187,21 @@ fn apply_iter(array1: &BlockArray, array2: &BlockArray) -> u64 {
     s
 }
 
-fn apply_small_iter(array1: &SmallBlockArray, array2: &SmallBlockArray) -> u64 {
-    let and_op = AndOp(PhantomData);
-    let reduce = apply(and_op, array1, array2);
+fn union2_iter(array1: &CompactArray, array2: &CompactArray) -> u64 {
+     use hi_sparse_array::sparse_hierarchy2::SparseHierarchy2;
+    
+    let union = union2(array1, array2, |v0, v1|{
+        let v0 = v0.map_or(0, |v|v.0);
+        let v1 = v1.map_or(0, |v|v.0);
+        DataBlock(v0 + v1)
+    });
     
     let mut s = 0;
-    for (_, i) in Iter::new(&reduce){
+    for (_, i) in union.iter(){
         s += i.0;
     }
     s
 }
-
-fn intersection2_iter(array1: &CompactArray, array2: &CompactArray) -> u64 {
-    use hi_sparse_array::ops2::intersection2::intersection2;
-    use hi_sparse_array::sparse_hierarchy2::SparseHierarchy2;
-    
-    let intersection = intersection2(array1, array2, |d1, d2| DataBlock(d1.0 & d2.0));
-    
-    let mut s = 0;
-    for (_, i) in intersection.iter(){
-        s += i.0;
-    }
-    s
-}
-
 
 
 pub fn bench_iter(c: &mut Criterion) {
@@ -228,12 +230,10 @@ pub fn bench_iter(c: &mut Criterion) {
     }
     let arrays = [block_array1, block_array2/*, block_array3*/];
 
-    c.bench_function("fold", |b| b.iter(|| fold_iter(black_box(&arrays))));
+    //c.bench_function("fold", |b| b.iter(|| fold_iter(black_box(&arrays))));
     c.bench_function("apply", |b| b.iter(|| apply_iter(black_box(&arrays[0]), black_box(&arrays[1]))));
-    
     c.bench_function("apply_small", |b| b.iter(|| apply_small_iter(black_box(&small_block_array1), black_box(&small_block_array2))));
-    
-    c.bench_function("intersection2", |b| b.iter(|| intersection2_iter(black_box(&compact_array1), black_box(&compact_array2))));
+    c.bench_function("union2", |b| b.iter(|| union2_iter(black_box(&compact_array1), black_box(&compact_array2))));
     //c.bench_function("fold_w_empty", |b| b.iter(|| fold_w_empty_iter(black_box(&arrays))));
 }
 
