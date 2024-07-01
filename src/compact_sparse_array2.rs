@@ -32,37 +32,15 @@ struct EmptyNode{
 }
 unsafe impl Sync for EmptyNode{}
 
-// TODO: We don't need this!
-static EMPTY_NODE: EmptyNode = EmptyNode{
-    mask: 0,
-    capacity: 1,
-    len: 1,
-    children_placeholder: [&EMPTY_NODE as *const EmptyNode as _],
-};
-/*const */fn empty_node() -> &'static Node {
-    unsafe{
-        mem::transmute(&EMPTY_NODE)
-    }
-} 
-
-static EMPTY_TERMINAL_NODE: EmptyNode = EmptyNode{
-    mask: 0,
-    capacity: 1,
-    len: 1,
-    children_placeholder: [null()],
-};
-/*const */fn empty_terminal_node() -> &'static Node {
-    unsafe{
-        mem::transmute(&EMPTY_TERMINAL_NODE)
-    }
-} 
-
-/*static EMPTY_BRANCH: Node = Node{
-    mask: 0,
-    capacity: 0,
-    len: 0,
-    children_placeholder: [],
-};*/
+const fn empty_node() -> &'static Node {
+    const EMPTY_NODE: EmptyNode = EmptyNode{
+        mask: 0,
+        capacity: 1,
+        len: 1,
+        children_placeholder: [null()], // null for node, 0 - for terminal node
+    };
+    unsafe{ mem::transmute(&EMPTY_NODE) }
+}
 
 #[repr(C)]
 struct Node{
@@ -407,10 +385,7 @@ where
         let contains = prev_node.contains(level_index); 
         let node: *const Node = prev_node.get_child::<NonNull<Node>>(level_index).as_ptr();
         
-        /*const*/ let last_level_n = <Self::This as SparseHierarchy2>::LevelCount::VALUE - 1;
-        /*const*/ let empty_node: *const Node = if N::VALUE == last_level_n { empty_terminal_node() } else{ empty_node() };
-        
-        let node = if contains{ node } else { empty_node };
+        let node = if contains{ node } else { empty_node() };
         
         *self.level_nodes.as_mut().get_unchecked_mut(level_node_index) = node;
         (*node).mask()
