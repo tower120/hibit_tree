@@ -14,6 +14,7 @@ use crate::Empty;
 use crate::utils::primitive::Primitive;
 use crate::utils::array::{Array};
 use crate::sparse_array_levels::{FoldMutVisitor, FoldVisitor, MutVisitor, SparseArrayLevels, Visitor};
+use crate::sparse_hierarchy2::{SparseHierarchy2, SparseHierarchyState2};
 
 // TODO: make public
 // Compile-time loop inside. Ends up with N (AND + SHR)s.
@@ -674,4 +675,172 @@ where
 
 impl<Levels, Data> Borrowable for SparseArray<Levels, Data>{
     type Borrowed = SparseArray<Levels, Data>; 
+}
+
+
+// Experimental
+impl<Levels, Data> SparseHierarchy2 for SparseArray<Levels, Data>
+where
+    Levels: SparseArrayLevels,
+    Data: Empty
+{
+    type LevelCount = Levels::LevelCount;
+    type LevelMaskType = Levels::Mask;
+    
+    type LevelMask<'a>
+    where
+        Self: 'a
+    = &'a Levels::Mask;
+    
+    type DataType = Data;
+    type Data<'a>
+    where
+        Self: 'a
+    = &'a Data;
+
+    unsafe fn data<I>(&self, level_indices: I) -> Option<Self::Data<'_>>
+    where
+        I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
+    {
+        todo!()
+    }
+
+    unsafe fn data_unchecked<I>(&self, level_indices: I) -> Self::Data<'_>
+    where
+        I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
+    {
+        todo!()
+    }
+
+    type State = SparseArrayState<Levels, Data>;
+}
+
+impl<Levels, Data> SparseHierarchyState2 for SparseArrayState<Levels, Data>
+where
+    Levels: SparseArrayLevels,
+    Data: Empty,
+{
+    type This = SparseArray<Levels, Data>;
+
+    #[inline]
+    fn new(_: &Self::This) -> Self {
+        Self{
+            level_block_ptrs: Array::from_fn(|_|null()),
+            phantom_data: Default::default(),
+        }
+    }
+
+    #[inline(always)]
+    unsafe fn select_level_node_unchecked<'a, N: ConstInteger>(
+        &mut self, this: &'a Self::This, level_n: N, level_index: usize
+    )
+        -> <Self::This as SparseHierarchy>::LevelMask<'a> 
+    {
+        if N::VALUE == 0{
+            assert_eq!(level_index, 0); // This act as compile-time check
+            let block_ptr = this.get_block_ptr(level_n, 0);
+            return this.get_block_mask(level_n, block_ptr);
+        }
+        
+        // We do not store the root level's block.
+        let level_block_ptrs_index = level_n.dec().value();
+        
+        // 1. get level_block_index from prev level. 
+        let level_block_index = {
+            let prev_level_block_ptr = 
+                if N::VALUE == 1 {
+                    // get directly from root
+                    this.get_block_ptr(ConstUsize::<0>, 0)
+                } else {
+                    *self.level_block_ptrs.as_ref().get_unchecked(level_block_ptrs_index-1)
+                };
+            this.get_block_index(level_n.dec(), prev_level_block_ptr, level_index)
+        };
+        
+        // 2. get block mask from level.
+        let block_ptr = this.get_block_ptr(level_n, level_block_index);
+        *self.level_block_ptrs.as_mut().get_unchecked_mut(level_block_ptrs_index) = block_ptr;
+        this.get_block_mask(level_n, block_ptr)
+    }
+    
+    #[inline(always)]
+    unsafe fn select_level_node<'a, N: ConstInteger>(
+        &mut self, this: &'a Self::This, level_n: N, level_index: usize
+    )
+        -> <Self::This as SparseHierarchy>::LevelMask<'a> 
+    {
+        if N::VALUE == 0{
+            assert_eq!(level_index, 0); // This act as compile-time check
+            let block_ptr = this.get_block_ptr(level_n, 0);
+            return this.get_block_mask(level_n, block_ptr);
+        }
+        
+        // We do not store the root level's block.
+        let level_block_ptrs_index = level_n.dec().value();
+        
+        // 1. get level_block_index from prev level. 
+        let level_block_index = {
+            let prev_level_block_ptr = 
+                if N::VALUE == 1 {
+                    // get directly from root
+                    this.get_block_ptr(ConstUsize::<0>, 0)
+                } else {
+                    *self.level_block_ptrs.as_ref().get_unchecked(level_block_ptrs_index-1)
+                };
+            this.get_block_index(level_n.dec(), prev_level_block_ptr, level_index)
+        };
+        
+        // 2. get block mask from level.
+        let block_ptr = this.get_block_ptr(level_n, level_block_index);
+        *self.level_block_ptrs.as_mut().get_unchecked_mut(level_block_ptrs_index) = block_ptr;
+        this.get_block_mask(level_n, block_ptr)
+    }
+    
+
+    #[inline(always)]
+    unsafe fn data_unchecked<'a>(&self, this: &'a Self::This, level_index: usize)
+        -> <Self::This as SparseHierarchy>::Data<'a> 
+    {
+        let last_level_index = Levels::LevelCount::default().dec();
+        
+        let level_block_ptr = 
+            if Levels::LevelCount::VALUE == 1{
+                this.get_block_ptr(ConstUsize::<0>, 0)
+            } else {
+                // We do not store the root level's block.
+                let level_block_ptrs_index = last_level_index.dec();
+                let level_block_ptr = *self.level_block_ptrs.as_ref()
+                                      .get_unchecked(level_block_ptrs_index.value());
+                level_block_ptr
+            };
+        
+        let data_block_index = this.get_block_index(last_level_index, level_block_ptr, level_index);
+        this.values.get_unchecked(data_block_index)
+    }
+    
+    #[inline(always)]
+    unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize)
+        -> Option<<Self::This as SparseHierarchy>::Data<'a>> 
+    {
+        let last_level_index = Levels::LevelCount::default().dec();
+        
+        let level_block_ptr = 
+            if Levels::LevelCount::VALUE == 1{
+                this.get_block_ptr(ConstUsize::<0>, 0)
+            } else {
+                // We do not store the root level's block.
+                let level_block_ptrs_index = last_level_index.dec();
+                let level_block_ptr = *self.level_block_ptrs.as_ref()
+                                      .get_unchecked(level_block_ptrs_index.value());
+                level_block_ptr
+            };
+        
+        let data_block_index = this.get_block_index(last_level_index, level_block_ptr, level_index);
+        /*Some(this.values.get_unchecked(data_block_index))*/
+        if data_block_index == 0{
+            None
+        } else {
+            Some(this.values.get_unchecked(data_block_index))
+        }
+    }    
 }

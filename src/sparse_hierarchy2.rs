@@ -40,14 +40,13 @@ pub trait SparseHierarchyState2 {
     
     fn new(this: &Self::This) -> Self;
     
-    /*/// Will return None, if block not exists;
-    /// no further selects are allowed.
-    unsafe fn select_level_bock<'a, N: ConstInteger>(
+    /// Item at index may not exist. Will return empty mask in such case.
+    unsafe fn select_level_node<'a, N: ConstInteger>(
         &mut self,
         this: &'a Self::This,
         level_n: N, 
-        level_index: usize
-    ) -> Option<<Self::This as SparseHierarchy>::LevelMask<'a>>;*/        
+        level_index: usize,
+    ) -> <Self::This as SparseHierarchy2>::LevelMask<'a>;
     
     /// Pointed node must exists
     unsafe fn select_level_node_unchecked<'a, N: ConstInteger>(
@@ -55,7 +54,14 @@ pub trait SparseHierarchyState2 {
         this: &'a Self::This,
         level_n: N, 
         level_index: usize
-    ) -> <Self::This as SparseHierarchy2>::LevelMask<'a>;        
+    ) -> <Self::This as SparseHierarchy2>::LevelMask<'a>;
+    
+    /// Item at index may not exist.
+    unsafe fn data<'a>(
+        &self,
+        this: &'a Self::This,
+        level_index: usize
+    ) -> Option<<Self::This as SparseHierarchy2>::Data<'a>>;      
  
     /// Pointed data must exists
     unsafe fn data_unchecked<'a>(

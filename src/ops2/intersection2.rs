@@ -92,6 +92,10 @@ where
         }
     }
 
+    unsafe fn select_level_node<'a, N: ConstInteger>(&mut self, this: &'a Self::This, level_n: N, level_index: usize) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
+        todo!()
+    }
+
     #[inline]
     unsafe fn select_level_node_unchecked<'a, N: ConstInteger> (
         &mut self, this: &'a Self::This, level_n: N, level_index: usize
@@ -104,6 +108,10 @@ where
         );
         
         mask1.borrow() & mask2.borrow()
+    }
+
+    unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize) -> Option<<Self::This as SparseHierarchy2>::Data<'a>> {
+        todo!()
     }
 
     #[inline]

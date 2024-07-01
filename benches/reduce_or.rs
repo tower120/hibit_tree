@@ -3,6 +3,7 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, BitOr, Mul};
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
+use rand::{Rng, SeedableRng};
 use hi_sparse_array::{apply, BitBlock, Empty, fold, SparseArray};
 use hi_sparse_array::level_block::{Block, SmallBlock};
 use hi_sparse_array::Iter;
@@ -11,6 +12,8 @@ use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
 use hi_sparse_array::BinaryOp;
 use hi_sparse_array::compact_sparse_array2::CompactSparseArray2;
 use hi_sparse_array::ops2::union2::union2;
+use hi_sparse_array::ops2::union3::union3;
+use hi_sparse_array::sparse_hierarchy2::{SparseHierarchy2, SparseHierarchyState2};
 use hi_sparse_array::utils::Take;
 
 type Lvl0Block = Block<u64, [u8;64]>;
@@ -187,10 +190,12 @@ fn apply_iter(array1: &BlockArray, array2: &BlockArray) -> u64 {
     s
 }
 
-fn union2_iter(array1: &CompactArray, array2: &CompactArray) -> u64 {
-     use hi_sparse_array::sparse_hierarchy2::SparseHierarchy2;
-    
-    let union = union2(array1, array2, |v0, v1|{
+fn union2_iter<A1, A2>(array1: &A1, array2: &A2) -> u64
+where
+    A1: SparseHierarchy2<DataType = DataBlock>,
+    A2: SparseHierarchy2<DataType = DataBlock, LevelCount = A1::LevelCount, LevelMaskType = A1::LevelMaskType>
+{
+    let union = union3(array1, array2, |v0, v1|{
         let v0 = v0.map_or(0, |v|v.0);
         let v1 = v1.map_or(0, |v|v.0);
         DataBlock(v0 + v1)
@@ -215,24 +220,34 @@ pub fn bench_iter(c: &mut Criterion) {
     
     let mut compact_array1 = CompactArray::default();
     let mut compact_array2 = CompactArray::default();
+    
+    let mut rng = rand::rngs::StdRng::seed_from_u64(0xe15bb9db3dee3a0f);
 
-    for i in 0..100{
-        *block_array1.get_mut(i*20) = DataBlock(i as u64);
-        *block_array2.get_mut(i*20) = DataBlock(i as u64);
-        *block_array3.get_mut(i*20) = DataBlock(i as u64);
-        *block_array4.get_mut(i*20) = DataBlock(i as u64);
+    for _ in 0..100{
+        let i1 = rng.gen_range(0..100);
+        let i2 = rng.gen_range(0..100);
+        let i3 = rng.gen_range(0..100);
+        let i4 = rng.gen_range(0..100);
         
-        *small_block_array1.get_mut(i*20) = DataBlock(i as u64);
-        *small_block_array2.get_mut(i*20) = DataBlock(i as u64);
+        *block_array1.get_mut(i1*20) = DataBlock(i1 as u64);
+        *block_array2.get_mut(i2*20) = DataBlock(i2 as u64);
+        *block_array3.get_mut(i3*20) = DataBlock(i3 as u64);
+        *block_array4.get_mut(i4*20) = DataBlock(i4 as u64);
         
-        *compact_array1.get_or_insert(i*20) = DataBlock(i as u64);
-        *compact_array2.get_or_insert(i*20) = DataBlock(i as u64);
+        *small_block_array1.get_mut(i1*20) = DataBlock(i1 as u64);
+        *small_block_array2.get_mut(i2*20) = DataBlock(i2 as u64);
+        
+        *compact_array1.get_or_insert(i1*20) = DataBlock(i1 as u64);
+        *compact_array2.get_or_insert(i2*20) = DataBlock(i2 as u64);
     }
     let arrays = [block_array1, block_array2/*, block_array3*/];
 
     //c.bench_function("fold", |b| b.iter(|| fold_iter(black_box(&arrays))));
     c.bench_function("apply", |b| b.iter(|| apply_iter(black_box(&arrays[0]), black_box(&arrays[1]))));
-    c.bench_function("apply_small", |b| b.iter(|| apply_small_iter(black_box(&small_block_array1), black_box(&small_block_array2))));
+    c.bench_function("array union2", |b| b.iter(|| union2_iter(black_box(&arrays[0]), black_box(&arrays[1]))));
+    //return;
+    
+    //c.bench_function("apply_small", |b| b.iter(|| apply_small_iter(black_box(&small_block_array1), black_box(&small_block_array2))));
     c.bench_function("union2", |b| b.iter(|| union2_iter(black_box(&compact_array1), black_box(&compact_array2))));
     //c.bench_function("fold_w_empty", |b| b.iter(|| fold_w_empty_iter(black_box(&arrays))));
 }

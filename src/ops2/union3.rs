@@ -1,7 +1,6 @@
-//! TODO: remove
-
 use std::marker::PhantomData;
 use std::borrow::Borrow;
+use std::hint::unreachable_unchecked;
 use std::mem::MaybeUninit;
 use std::ops::{BitAnd, BitOr};
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
@@ -9,6 +8,22 @@ use crate::sparse_hierarchy2::{SparseHierarchy2, SparseHierarchyState2};
 use crate::{BitBlock, SparseHierarchy, SparseHierarchyState};
 use crate::bit_queue::BitQueue;
 use crate::utils::{Array, Borrowable, FnRR, Take};
+
+
+trait OptionBorrow<T>{
+    fn option_borrow(&self) -> Option<&T>; 
+}
+impl<T> OptionBorrow<T> for Option<&T>{
+    fn option_borrow(&self) -> Option<&T> {
+        *self
+    }
+}
+impl<T> OptionBorrow<T> for Option<T>{
+    fn option_borrow(&self) -> Option<&T> {
+        self.as_ref()
+    }
+}
+
 
 pub trait UnionResolve<T0, T1>
     : Fn(Option<&T0>, Option<&T1>) -> Self::Out
@@ -24,13 +39,13 @@ where
 }
 
 
-pub struct Union2<S0, S1, F>{
+pub struct Union3<S0, S1, F>{
     s0: S0,
     s1: S1,
     f: F
 }
 
-impl<S0, S1, F> SparseHierarchy2 for Union2<S0, S1, F>
+impl<S0, S1, F> SparseHierarchy2 for Union3<S0, S1, F>
 where
     S0: Borrowable<Borrowed: SparseHierarchy2<DataType: Clone>>,
     S1: Borrowable<Borrowed: SparseHierarchy2<
@@ -95,8 +110,8 @@ where
     s0: <S0::Borrowed as SparseHierarchy2>::State, 
     s1: <S1::Borrowed as SparseHierarchy2>::State,
     
-    masks0: Masks<S0>,
-    masks1: Masks<S1>,
+    /*masks0: Masks<S0>,
+    masks1: Masks<S1>,*/
     
     phantom_data: PhantomData<(S0, S1, F)>
 }
@@ -127,7 +142,7 @@ where
     // &Mask & &Mask
     //for<'a> &'a <S0::Borrowed as SparseHierarchy2>::LevelMaskType: BitOr<&'a <S0::Borrowed as SparseHierarchy2>::LevelMaskType, Output = <S0::Borrowed as SparseHierarchy2>::LevelMaskType>,
 {
-    type This = Union2<S0, S1, F>;
+    type This = Union3<S0, S1, F>;
 
     #[inline]
     fn new(this: &Self::This) -> Self {
@@ -135,23 +150,27 @@ where
             s0: SparseHierarchyState2::new(this.s0.borrow()), 
             s1: SparseHierarchyState2::new(this.s1.borrow()),
             
-            // Just MaybeEmpty, instead?
+            /*// Just MaybeEmpty, instead?
             masks0: Array::from_fn(|_| BitBlock::zero()), 
-            masks1: Array::from_fn(|_| BitBlock::zero()),
+            masks1: Array::from_fn(|_| BitBlock::zero()),*/
             
             phantom_data: PhantomData
         }
     }
 
-    unsafe fn select_level_node<'a, N: ConstInteger>(&mut self, this: &'a Self::This, level_n: N, level_index: usize) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
-        todo!()
+    #[inline]
+    unsafe fn select_level_node<'a, N: ConstInteger>(
+        &mut self, this: &'a Self::This, level_n: N, level_index: usize
+    ) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
+        // unchecked version already deal with non-existent elements
+        self.select_level_node_unchecked(this, level_n, level_index)
     }
 
     #[inline]
     unsafe fn select_level_node_unchecked<'a, N: ConstInteger> (
         &mut self, this: &'a Self::This, level_n: N, level_index: usize
     ) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
-        // v1
+        /*// v1
         // s0
         let contains0 = if N::VALUE == 0 { true } else {
             let parent_level_n = level_n.dec().value();
@@ -180,7 +199,7 @@ where
         } else {
             BitBlock::zero()
         };
-        *self.masks1.as_mut().get_unchecked_mut(level_n.value()) = mask1.clone();
+        *self.masks1.as_mut().get_unchecked_mut(level_n.value()) = mask1.clone();*/
         
 /*        // v1.1
         // s0
@@ -207,45 +226,99 @@ where
         ).take_or_clone();
         //let mask1 = if contains1 { mask1 } else { BitBlock::zero() };
         //mask1.as_array_mut().as_mut()[0] *= contains1 as u64;
-        *self.masks1.as_mut().get_unchecked_mut(level_n.value()) = mask1.clone();  */  
+        *self.masks1.as_mut().get_unchecked_mut(level_n.value()) = mask1.clone();   */ 
         
-        /*// v2
+        // v2
         let mask0 =
-            self.s0.select_level_node_unchecked(
+            self.s0.select_level_node(
                 this.s0.borrow(), level_n, level_index
             ).take_or_clone();
             
         let mask1 =
-            self.s1.select_level_node_unchecked(
+            self.s1.select_level_node(
                 this.s1.borrow(), level_n, level_index
-            ).take_or_clone();*/
+            ).take_or_clone();
 
         mask0 | mask1
     }
 
-    unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize) -> Option<<Self::This as SparseHierarchy2>::Data<'a>> {
-        todo!()
+    #[inline]
+    unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize) 
+        -> Option<<Self::This as SparseHierarchy2>::Data<'a>> 
+    {
+        let d0 = self.s0.data(this.s0.borrow(), level_index);
+        let d1 = self.s1.data(this.s1.borrow(), level_index);
+        
+        if d0.is_none() & d1.is_none(){
+            return None;
+        }
+        
+        // Looks like compiler optimize away these re-borrow transformations.
+        let o0;
+        let o1;
+        if d0.is_none(){
+            o0 = None;
+            
+            // we know that d1 exists.
+            o1 = if let Some(d) = &d1 {
+                Some(d.borrow())
+            } else { unreachable_unchecked() };
+        } else if d1.is_none(){
+            // we know that d0 exists.
+            o0 = if let Some(d) = &d0 {
+                Some(d.borrow())
+            } else { unreachable_unchecked() };
+            
+            o1 = None;
+        } else {
+            // both exists
+            o0 = if let Some(d) = &d0 {
+                Some(d.borrow())
+            } else { unreachable_unchecked() };
+            
+            o1 = if let Some(d) = &d1 {
+                Some(d.borrow())
+            } else { unreachable_unchecked() };
+        }
+        
+        return Some((this.f)(o0, o1));
     }
 
     #[inline]
     unsafe fn data_unchecked<'a>(&self, this: &'a Self::This, level_index: usize) 
         -> <Self::This as SparseHierarchy2>::Data<'a> 
     {
+        self.data(this, level_index).unwrap_unchecked()
         
 /*        {
-            let d0 = self.s0.data_unchecked(this.s0.borrow(), level_index);
-            let d1 = self.s1.data_unchecked(this.s1.borrow(), level_index) ;
-            return (this.f)(Some(d0.borrow()), Some(d1.borrow()));         
-        }*/
-
+            let d0 = self.s0.data(this.s0.borrow(), level_index);
+            let d1 = self.s1.data(this.s1.borrow(), level_index) ;
+            
+            // Looks like compiler optimize away these transformations.
+            let o0 = if let Some(d) = &d0 {
+                Some(d.borrow())
+            } else {
+                None
+            };
+            
+            let o1 = if let Some(d) = &d1 {
+                Some(d.borrow())
+            } else {
+                None
+            };            
+            
+            //return (this.f)(Some(d0.borrow()), Some(d1.borrow()));         
+            return (this.f)(o0, o1);
+        }
+*/
         
-        let parent_mask0 = self.masks0.as_ref().last().unwrap_unchecked().borrow();
+        /*let parent_mask0 = self.masks0.as_ref().last().unwrap_unchecked().borrow();
         let contains0 = parent_mask0.get_bit(level_index);
         
         let parent_mask1 = self.masks1.as_ref().last().unwrap_unchecked().borrow();
         let contains1 = parent_mask1.get_bit(level_index);
         
-        // v1
+        /*// v1
         {
             let mut v0 = MaybeUninit::uninit();
             let d0 = if contains0 {
@@ -269,9 +342,9 @@ where
             MaybeUninit::assume_init(v1);
             
             mask
-        }
+        }*/
 
-        /*// v2
+        // v2
         {
             if contains0 & contains1 {
                 let d0 = self.s0.data_unchecked(
@@ -294,10 +367,10 @@ where
     }
 }
 
-impl<S0, S1, F> Borrowable for Union2<S0, S1, F>{ type Borrowed = Self; }
+impl<S0, S1, F> Borrowable for Union3<S0, S1, F>{ type Borrowed = Self; }
 
 #[inline]
-pub fn union2<S0, S1, F>(s0: S0, s1: S1, f: F) -> Union2<S0, S1, F>
+pub fn union3<S0, S1, F>(s0: S0, s1: S1, f: F) -> Union3<S0, S1, F>
 where
     // bounds needed here for F's arguments auto-deduction
     S0: Borrowable<Borrowed: SparseHierarchy2>,
@@ -311,7 +384,7 @@ where
         <S1::Borrowed as SparseHierarchy2>::DataType,
     >,
 {
-    Union2 { s0, s1, f }
+    Union3 { s0, s1, f }
 } 
 
 #[cfg(test)]

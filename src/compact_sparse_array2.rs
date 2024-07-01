@@ -22,6 +22,49 @@ impl NodeChild for NonNull<Node>{}
 impl NodeChild for u32{}
 
 #[repr(C)]
+struct EmptyNode{
+    mask: Mask,
+    
+    capacity: u8,
+    len: u8,
+    
+    children_placeholder: [*const u8; 1]
+}
+unsafe impl Sync for EmptyNode{}
+
+// TODO: We don't need this!
+static EMPTY_NODE: EmptyNode = EmptyNode{
+    mask: 0,
+    capacity: 1,
+    len: 1,
+    children_placeholder: [&EMPTY_NODE as *const EmptyNode as _],
+};
+/*const */fn empty_node() -> &'static Node {
+    unsafe{
+        mem::transmute(&EMPTY_NODE)
+    }
+} 
+
+static EMPTY_TERMINAL_NODE: EmptyNode = EmptyNode{
+    mask: 0,
+    capacity: 1,
+    len: 1,
+    children_placeholder: [null()],
+};
+/*const */fn empty_terminal_node() -> &'static Node {
+    unsafe{
+        mem::transmute(&EMPTY_TERMINAL_NODE)
+    }
+} 
+
+/*static EMPTY_BRANCH: Node = Node{
+    mask: 0,
+    capacity: 0,
+    len: 0,
+    children_placeholder: [],
+};*/
+
+#[repr(C)]
 struct Node{
     mask: Mask,
     
@@ -338,6 +381,40 @@ where
             phantom_data: Default::default(),
         }
     }
+    
+    #[inline]
+    unsafe fn select_level_node<'a, N: ConstInteger>(
+        &mut self, 
+        this: &'a Self::This, 
+        level_n: N, 
+        level_index: usize
+    ) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
+        if N::VALUE == 0 {
+            return this.root.as_ref().mask();
+        }
+        
+        // We do not store the root level's node.
+        let level_node_index = level_n.dec().value();
+        
+        // 1. get &Node from prev level.
+        let prev_node = if N::VALUE == 1 {
+            this.root.as_ref()
+        } else {
+            &**self.level_nodes.as_ref().get_unchecked(level_node_index - 1)
+        };
+        
+        // 2. store *node in state cache
+        let contains = prev_node.contains(level_index); 
+        let node: *const Node = prev_node.get_child::<NonNull<Node>>(level_index).as_ptr();
+        
+        /*const*/ let last_level_n = <Self::This as SparseHierarchy2>::LevelCount::VALUE - 1;
+        /*const*/ let empty_node: *const Node = if N::VALUE == last_level_n { empty_terminal_node() } else{ empty_node() };
+        
+        let node = if contains{ node } else { empty_node };
+        
+        *self.level_nodes.as_mut().get_unchecked_mut(level_node_index) = node;
+        (*node).mask()
+    }
 
     #[inline]
     unsafe fn select_level_node_unchecked<'a, N: ConstInteger>(
@@ -363,8 +440,32 @@ where
         // 2. store *node in state cache
         let node = prev_node.get_child::<NonNull<Node>>(level_index);
         *self.level_nodes.as_mut().get_unchecked_mut(level_node_index) = node.as_ptr();
-        
         node.as_ref().mask()
+    }
+    
+    // TODO: data_or_default possible too.
+    
+    #[inline]
+    unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize) 
+        -> Option<<Self::This as SparseHierarchy2>::Data<'a>> 
+    {
+        let node = if DEPTH == 1{
+            // We do not store the root level's block.
+            this.root.as_ref()
+        } else {
+            &**self.level_nodes.as_ref().last().unwrap_unchecked()
+        };
+        
+        /*// default
+        let data_index = node.get_child::<DataIndex>(level_index).as_usize() * node.contains(level_index) as usize;
+        Some(this.data.get_unchecked(data_index))*/
+
+        if node.contains(level_index){
+            let data_index = node.get_child::<DataIndex>(level_index).as_usize();
+            Some(this.data.get_unchecked(data_index))
+        } else {
+            None
+        }
     }
 
     #[inline]
