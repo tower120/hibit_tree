@@ -51,21 +51,12 @@ where
     S1: Borrowable<Borrowed: SparseHierarchy2<
         LevelCount    = <S0::Borrowed as SparseHierarchy2>::LevelCount,
         LevelMaskType = <S0::Borrowed as SparseHierarchy2>::LevelMaskType,
-        
-        //v2
-        DataType = <S0::Borrowed as SparseHierarchy2>::DataType,
     >>,
     
     F: UnionResolve<
         // v1
-        /*<S0::Borrowed as SparseHierarchy2>::DataType, 
-        <S1::Borrowed as SparseHierarchy2>::DataType,*/
-        
-        // v2
-        <S0::Borrowed as SparseHierarchy2>::DataType,
-        <S0::Borrowed as SparseHierarchy2>::DataType,
-        Out = <S0::Borrowed as SparseHierarchy2>::DataType,
-
+        <S0::Borrowed as SparseHierarchy2>::DataType, 
+        <S1::Borrowed as SparseHierarchy2>::DataType,
     >,
     
     // &Mask & &Mask
@@ -110,9 +101,6 @@ where
     s0: <S0::Borrowed as SparseHierarchy2>::State, 
     s1: <S1::Borrowed as SparseHierarchy2>::State,
     
-    /*masks0: Masks<S0>,
-    masks1: Masks<S1>,*/
-    
     phantom_data: PhantomData<(S0, S1, F)>
 }
 
@@ -122,20 +110,12 @@ where
     S1: Borrowable<Borrowed: SparseHierarchy2<
         LevelCount    = <S0::Borrowed as SparseHierarchy2>::LevelCount,
         LevelMaskType = <S0::Borrowed as SparseHierarchy2>::LevelMaskType,
-        
-        //v2
-        DataType = <S0::Borrowed as SparseHierarchy2>::DataType,
     >>,
     
     F: UnionResolve<
         // v1
-        /*<S0::Borrowed as SparseHierarchy2>::DataType, 
-        <S1::Borrowed as SparseHierarchy2>::DataType,*/
-        
-        // v2
-        <S0::Borrowed as SparseHierarchy2>::DataType,
-        <S0::Borrowed as SparseHierarchy2>::DataType,
-        Out = <S0::Borrowed as SparseHierarchy2>::DataType,
+        <S0::Borrowed as SparseHierarchy2>::DataType, 
+        <S1::Borrowed as SparseHierarchy2>::DataType,
     >,
     
     // Actually, we can just use Take here, since as for now, masks always SIMD values.
@@ -149,10 +129,6 @@ where
         Self{
             s0: SparseHierarchyState2::new(this.s0.borrow()), 
             s1: SparseHierarchyState2::new(this.s1.borrow()),
-            
-            /*// Just MaybeEmpty, instead?
-            masks0: Array::from_fn(|_| BitBlock::zero()), 
-            masks1: Array::from_fn(|_| BitBlock::zero()),*/
             
             phantom_data: PhantomData
         }
@@ -170,70 +146,11 @@ where
     unsafe fn select_level_node_unchecked<'a, N: ConstInteger> (
         &mut self, this: &'a Self::This, level_n: N, level_index: usize
     ) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
-        /*// v1
-        // s0
-        let contains0 = if N::VALUE == 0 { true } else {
-            let parent_level_n = level_n.dec().value();
-            let parent_mask0 = self.masks0.as_ref().get_unchecked(parent_level_n).borrow();
-            parent_mask0.get_bit(level_index)
-        };
-        let mask0 = if contains0 {
-            self.s0.select_level_node_unchecked(
-                this.s0.borrow(), level_n, level_index
-            ).take_or_clone()
-        } else {
-            BitBlock::zero()
-        };
-        *self.masks0.as_mut().get_unchecked_mut(level_n.value()) = mask0.clone();
-        
-        // s1
-        let contains1 = if N::VALUE == 0 { true } else {
-            let parent_level_n = level_n.dec().value();
-            let parent_mask1 = self.masks1.as_ref().get_unchecked(parent_level_n).borrow();
-            parent_mask1.get_bit(level_index)
-        };
-        let mask1 = if contains1 {
-            self.s1.select_level_node_unchecked(
-                this.s1.borrow(), level_n, level_index
-            ).take_or_clone()
-        } else {
-            BitBlock::zero()
-        };
-        *self.masks1.as_mut().get_unchecked_mut(level_n.value()) = mask1.clone();*/
-        
-/*        // v1.1
-        // s0
-        let contains0 = if N::VALUE == 0 { true } else {
-            let parent_level_n = level_n.dec().value();
-            let parent_mask0 = self.masks0.as_ref().get_unchecked(parent_level_n).borrow();
-            parent_mask0.get_bit(level_index)
-        };
-        let mut mask0 = self.s0.select_level_node_unchecked(
-            this.s0.borrow(), level_n, level_index
-        ).take_or_clone();
-        //let mask0 = if contains0 { mask0 } else {BitBlock::zero()};
-        //mask0.as_array_mut().as_mut()[0] *= contains0 as u64; 
-        *self.masks0.as_mut().get_unchecked_mut(level_n.value()) = mask0.clone();
-        
-        // s1
-        let contains1 = if N::VALUE == 0 { true } else {
-            let parent_level_n = level_n.dec().value();
-            let parent_mask1 = self.masks1.as_ref().get_unchecked(parent_level_n).borrow();
-            parent_mask1.get_bit(level_index)
-        };
-        let mut mask1 = self.s1.select_level_node_unchecked(
-            this.s1.borrow(), level_n, level_index
-        ).take_or_clone();
-        //let mask1 = if contains1 { mask1 } else { BitBlock::zero() };
-        //mask1.as_array_mut().as_mut()[0] *= contains1 as u64;
-        *self.masks1.as_mut().get_unchecked_mut(level_n.value()) = mask1.clone();   */ 
-        
-        // v2
         let mask0 =
             self.s0.select_level_node(
                 this.s0.borrow(), level_n, level_index
             ).take_or_clone();
-            
+        
         let mask1 =
             self.s1.select_level_node(
                 this.s1.borrow(), level_n, level_index
@@ -289,81 +206,6 @@ where
         -> <Self::This as SparseHierarchy2>::Data<'a> 
     {
         self.data(this, level_index).unwrap_unchecked()
-        
-/*        {
-            let d0 = self.s0.data(this.s0.borrow(), level_index);
-            let d1 = self.s1.data(this.s1.borrow(), level_index) ;
-            
-            // Looks like compiler optimize away these transformations.
-            let o0 = if let Some(d) = &d0 {
-                Some(d.borrow())
-            } else {
-                None
-            };
-            
-            let o1 = if let Some(d) = &d1 {
-                Some(d.borrow())
-            } else {
-                None
-            };            
-            
-            //return (this.f)(Some(d0.borrow()), Some(d1.borrow()));         
-            return (this.f)(o0, o1);
-        }
-*/
-        
-        /*let parent_mask0 = self.masks0.as_ref().last().unwrap_unchecked().borrow();
-        let contains0 = parent_mask0.get_bit(level_index);
-        
-        let parent_mask1 = self.masks1.as_ref().last().unwrap_unchecked().borrow();
-        let contains1 = parent_mask1.get_bit(level_index);
-        
-        /*// v1
-        {
-            let mut v0 = MaybeUninit::uninit();
-            let d0 = if contains0 {
-                v0.write( self.s0.data_unchecked(this.s0.borrow(), level_index) ); 
-                Some(v0.assume_init_ref().borrow())
-            } else {
-                None
-            };
-            
-            let mut v1 = MaybeUninit::uninit();
-            let d1 = if contains1 {
-                v1.write( self.s1.data_unchecked(this.s1.borrow(), level_index) ); 
-                Some(v1.assume_init_ref().borrow())
-            } else {
-                None
-            };
-            
-            let mask = (this.f)(d0, d1);
-            
-            MaybeUninit::assume_init(v0);
-            MaybeUninit::assume_init(v1);
-            
-            mask
-        }*/
-
-        // v2
-        {
-            if contains0 & contains1 {
-                let d0 = self.s0.data_unchecked(
-                    this.s0.borrow(), level_index
-                );
-                let d1 = self.s1.data_unchecked(
-                    this.s1.borrow(), level_index
-                );
-                (this.f)(Some(d0.borrow()), Some(d1.borrow()))
-            } else if contains0 {
-                self.s0.data_unchecked(
-                    this.s0.borrow(), level_index
-                ).take_or_clone()      
-            } else {
-                self.s1.data_unchecked(
-                    this.s1.borrow(), level_index
-                ).take_or_clone()
-            }
-        }*/
     }
 }
 
