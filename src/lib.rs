@@ -88,7 +88,6 @@
 
 mod sparse_array;
 mod sparse_array_levels;
-mod compact_sparse_array;
 mod bit_utils;
 mod bit_block;
 mod apply;
@@ -115,7 +114,6 @@ pub mod ops2;
 //pub use ref_or_val::*;
 pub use bit_block::BitBlock;
 pub use sparse_array::SparseArray;
-pub use compact_sparse_array::CompactSparseArray;
 pub use sparse_array_levels::SparseArrayLevels;
 pub use apply::Apply;
 pub use fold::Fold;

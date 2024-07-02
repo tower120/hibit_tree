@@ -10,6 +10,7 @@ use crate::bit_queue::BitQueue;
 use crate::utils::{Array, Borrowable, FnRR, Take};
 
 
+// Not used now
 trait OptionBorrow<T>{
     fn option_borrow(&self) -> Option<&T>; 
 }
