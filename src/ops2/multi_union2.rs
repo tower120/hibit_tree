@@ -106,7 +106,8 @@ where
     unsafe fn select_level_node<'a, N: ConstInteger>(
         &mut self, this: &'a Self::This, level_n: N, level_index: usize
     ) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
-        todo!()
+        // unchecked version already deal with non-existent elements
+        self.select_level_node_unchecked(this, level_n, level_index)
     }
 
     #[inline]
@@ -143,24 +144,31 @@ where
         acc_mask
     }
 
-    unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize) -> Option<<Self::This as SparseHierarchy2>::Data<'a>> {
-        todo!()
-    }
-
     #[inline]
-    unsafe fn data_unchecked<'a>(&self, this: &'a Self::This, level_index: usize) 
-        -> <Self::This as SparseHierarchy2>::Data<'a> 
+    unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize) 
+        -> Option<<Self::This as SparseHierarchy2>::Data<'a>> 
     {
-        let mut acc = this.init_value.clone();
         let lvl_non_empty_states = self.lvls_non_empty_states.as_ref()
                                    .last().unwrap_unchecked();
+        if lvl_non_empty_states.is_empty(){
+            return None;
+        }        
+        
+        let mut acc = this.init_value.clone();
         for &i in lvl_non_empty_states {
             let (array, array_state) = self.states.get_unchecked(i as usize);
             if let Some(data) = array_state.data(array.borrow(), level_index){
                 acc = (this.f)(acc, data.borrow());    
             }
         }
-        acc
+        Some(acc)        
+    }
+
+    #[inline]
+    unsafe fn data_unchecked<'a>(&self, this: &'a Self::This, level_index: usize) 
+        -> <Self::This as SparseHierarchy2>::Data<'a> 
+    {
+        self.data(this, level_index).unwrap_unchecked()
     }
 }
 
