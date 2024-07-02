@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 use std::borrow::Borrow;
+use std::hint::unreachable_unchecked;
 use std::ops::BitAnd;
 use crate::const_utils::{ConstArray, ConstInteger};
 use crate::sparse_hierarchy2::{SparseHierarchy2, SparseHierarchyState2};
@@ -24,9 +25,6 @@ where
         <S0::Borrowed as SparseHierarchy2>::DataType, 
         <S1::Borrowed as SparseHierarchy2>::DataType
     >,
-    
-    // &Mask & &Mask
-    for<'a> &'a <S0::Borrowed as SparseHierarchy2>::LevelMaskType: BitAnd<&'a <S0::Borrowed as SparseHierarchy2>::LevelMaskType, Output = <S0::Borrowed as SparseHierarchy2>::LevelMaskType>,
 {
     type LevelCount = <S0::Borrowed as SparseHierarchy2>::LevelCount;
     
@@ -76,10 +74,6 @@ where
         <S0::Borrowed as SparseHierarchy2>::DataType, 
         <S1::Borrowed as SparseHierarchy2>::DataType,
     >,
-    
-    // Actually, we can just use Take here, since as for now, masks always SIMD values.
-    // &Mask & &Mask
-    for<'a> &'a <S0::Borrowed as SparseHierarchy2>::LevelMaskType: BitAnd<&'a <S0::Borrowed as SparseHierarchy2>::LevelMaskType, Output = <S0::Borrowed as SparseHierarchy2>::LevelMaskType>,
 {
     type This = Intersection2<S0, S1, F>;
 
@@ -92,26 +86,65 @@ where
         }
     }
 
-    unsafe fn select_level_node<'a, N: ConstInteger>(&mut self, this: &'a Self::This, level_n: N, level_index: usize) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
-        todo!()
+    #[inline]
+    unsafe fn select_level_node<'a, N: ConstInteger>(
+        &mut self, this: &'a Self::This, level_n: N, level_index: usize
+    ) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
+        // Putting if here is not justified for general case. 
+        
+        let mask0 = self.s0.select_level_node(
+            this.s0.borrow(), level_n, level_index
+        );
+        let mask1 = self.s1.select_level_node(
+            this.s1.borrow(), level_n, level_index
+        );
+       
+        // mask0.take_or_clone() &= mask1.borrow()
+        {
+            let mut mask = mask0.take_or_clone();
+            mask &= mask1.borrow();
+            mask
+        }
     }
 
     #[inline]
     unsafe fn select_level_node_unchecked<'a, N: ConstInteger> (
         &mut self, this: &'a Self::This, level_n: N, level_index: usize
     ) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
-        let mask1 = self.s0.select_level_node_unchecked(
+        let mask0 = self.s0.select_level_node_unchecked(
             this.s0.borrow(), level_n, level_index
         );
-        let mask2 = self.s1.select_level_node_unchecked(
+        let mask1 = self.s1.select_level_node_unchecked(
             this.s1.borrow(), level_n, level_index
         );
         
-        mask1.borrow() & mask2.borrow()
+        // mask0.take_or_clone() &= mask1.borrow()
+        {
+            let mut mask = mask0.take_or_clone();
+            mask &= mask1.borrow();
+            mask
+        }
     }
 
-    unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize) -> Option<<Self::This as SparseHierarchy2>::Data<'a>> {
-        todo!()
+    #[inline]
+    unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize) 
+        -> Option<<Self::This as SparseHierarchy2>::Data<'a>> 
+    {
+        let d0 = self.s0.data(this.s0.borrow(), level_index);
+        if d0.is_none(){
+            return None;
+        }
+        let d1 = self.s1.data(this.s1.borrow(), level_index);
+        
+        let o0 = if let Some(d) = &d0 {
+            d.borrow()
+        } else { unreachable_unchecked() };
+        
+        let o1 = if let Some(d) = &d1 {
+            d.borrow()
+        } else { unreachable_unchecked() };
+        
+        return Some((this.f)(o0, o1));
     }
 
     #[inline]

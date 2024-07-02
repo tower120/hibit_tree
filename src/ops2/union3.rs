@@ -58,9 +58,6 @@ where
         <S0::Borrowed as SparseHierarchy2>::DataType, 
         <S1::Borrowed as SparseHierarchy2>::DataType,
     >,
-    
-    // &Mask & &Mask
-    //for<'a> &'a <S0::Borrowed as SparseHierarchy2>::LevelMaskType: BitOr<&'a <S0::Borrowed as SparseHierarchy2>::LevelMaskType, Output = <S0::Borrowed as SparseHierarchy2>::LevelMaskType>,
 {
     type LevelCount = <S0::Borrowed as SparseHierarchy2>::LevelCount;
     
@@ -117,10 +114,6 @@ where
         <S0::Borrowed as SparseHierarchy2>::DataType, 
         <S1::Borrowed as SparseHierarchy2>::DataType,
     >,
-    
-    // Actually, we can just use Take here, since as for now, masks always SIMD values.
-    // &Mask & &Mask
-    //for<'a> &'a <S0::Borrowed as SparseHierarchy2>::LevelMaskType: BitOr<&'a <S0::Borrowed as SparseHierarchy2>::LevelMaskType, Output = <S0::Borrowed as SparseHierarchy2>::LevelMaskType>,
 {
     type This = Union3<S0, S1, F>;
 
@@ -146,17 +139,20 @@ where
     unsafe fn select_level_node_unchecked<'a, N: ConstInteger> (
         &mut self, this: &'a Self::This, level_n: N, level_index: usize
     ) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
-        let mask0 =
-            self.s0.select_level_node(
-                this.s0.borrow(), level_n, level_index
-            ).take_or_clone();
-        
-        let mask1 =
-            self.s1.select_level_node(
-                this.s1.borrow(), level_n, level_index
-            ).take_or_clone();
+        let mask0 = self.s0.select_level_node(
+            this.s0.borrow(), level_n, level_index,
+        );
 
-        mask0 | mask1
+        let mask1 = self.s1.select_level_node(
+            this.s1.borrow(), level_n, level_index,
+        );
+
+        // mask0.take_or_clone() |= mask1.borrow() 
+        {
+            let mut mask = mask0.take_or_clone();
+            mask |= mask1.borrow();
+            mask
+        }
     }
 
     #[inline]
@@ -166,21 +162,23 @@ where
         let d0 = self.s0.data(this.s0.borrow(), level_index);
         let d1 = self.s1.data(this.s1.borrow(), level_index);
         
-        if d0.is_none() & d1.is_none(){
+        let d0_is_none = d0.is_none(); 
+        let d1_is_none = d1.is_none();
+        if d0_is_none & d1_is_none{
             return None;
         }
         
         // Looks like compiler optimize away these re-borrow transformations.
         let o0;
         let o1;
-        if d0.is_none(){
+        if d0_is_none {
             o0 = None;
             
             // we know that d1 exists.
             o1 = if let Some(d) = &d1 {
                 Some(d.borrow())
             } else { unreachable_unchecked() };
-        } else if d1.is_none(){
+        } else if d1_is_none {
             // we know that d0 exists.
             o0 = if let Some(d) = &d0 {
                 Some(d.borrow())

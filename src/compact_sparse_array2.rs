@@ -3,7 +3,7 @@
 use std::alloc::{alloc, Layout, realloc};
 use std::{mem, ptr};
 use std::marker::PhantomData;
-use std::mem::{align_of, ManuallyDrop, MaybeUninit, size_of};
+use std::mem::{align_of, size_of};
 use std::ptr::{addr_of_mut, NonNull, null};
 use crate::bit_utils::{get_bit_unchecked, set_bit_unchecked};
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger, ConstUsize};
@@ -49,7 +49,6 @@ struct Node{
     capacity: u8,
     len: u8,
     
-    // TODO: calculate programmatically
     /// NonNull<Node> / u32
     children_placeholder: [*const u8; 0]
 }
