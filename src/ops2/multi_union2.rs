@@ -14,17 +14,17 @@ pub struct MultiUnion2<ArrayIter, Init, F> {
     f: F,
 }
 
-type ArrayItem<ArrayIter> = <<ArrayIter as Iterator>::Item as Borrowable>::Borrowed;
+type IterItem<Iter> = <<Iter as Iterator>::Item as Borrowable>::Borrowed;
 
 impl<ArrayIter, Init, F> SparseHierarchy2 for MultiUnion2<ArrayIter, Init, F>
 where
     ArrayIter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>> + Clone,
     Init: Clone,
-    F: Fn(Init, &<ArrayItem<ArrayIter> as SparseHierarchy2>::DataType) -> Init
+    F: Fn(Init, &<IterItem<ArrayIter> as SparseHierarchy2>::DataType) -> Init
 {
-    type LevelCount = <ArrayItem<ArrayIter> as SparseHierarchy2>::LevelCount;
+    type LevelCount = <IterItem<ArrayIter> as SparseHierarchy2>::LevelCount;
 
-    type LevelMaskType = <ArrayItem<ArrayIter> as SparseHierarchy2>::LevelMaskType;
+    type LevelMaskType = <IterItem<ArrayIter> as SparseHierarchy2>::LevelMaskType;
     type LevelMask<'a> = Self::LevelMaskType where Self: 'a;
     
     type DataType = Init;
@@ -62,14 +62,14 @@ where
     ArrayIter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>>,
 {
     states: ArrayVec<
-        (<ArrayIter as Iterator>::Item, <ArrayItem<ArrayIter> as SparseHierarchy2>::State),
+        (<ArrayIter as Iterator>::Item, <IterItem<ArrayIter> as SparseHierarchy2>::State),
         N
     >,
     
     /// [ArrayVec<usize, N>; Array::LevelCount - 1]
     lvls_non_empty_states: ConstArrayType<
         ArrayVec<StateIndex, N>,
-        <<ArrayItem<ArrayIter> as SparseHierarchy2>::LevelCount as ConstInteger>::Dec,
+        <<IterItem<ArrayIter> as SparseHierarchy2>::LevelCount as ConstInteger>::Dec,
     >,
     
     phantom_data: PhantomData<(ArrayIter, Init, F)>
@@ -81,7 +81,7 @@ for
 where
     ArrayIter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>> + Clone,
     Init: Clone,
-    F: Fn(Init, &<ArrayItem<ArrayIter> as SparseHierarchy2>::DataType) -> Init
+    F: Fn(Init, &<IterItem<ArrayIter> as SparseHierarchy2>::DataType) -> Init
 {
     type This = MultiUnion2<ArrayIter, Init, F>;
 
@@ -148,6 +148,8 @@ where
     unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize) 
         -> Option<<Self::This as SparseHierarchy2>::Data<'a>> 
     {
+        // TODO: compile-time special case for 1-level SparseHierarchy.
+        
         let lvl_non_empty_states = self.lvls_non_empty_states.as_ref()
                                    .last().unwrap_unchecked();
         if lvl_non_empty_states.is_empty(){
@@ -180,7 +182,7 @@ pub fn multi_union<Iter, Init, F>(array_iter: Iter, init_value: Init, f: F)
 where
     Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>> + Clone,
     Init: Clone,
-    F: Fn(Init, &<ArrayItem<Iter> as SparseHierarchy2>::DataType) -> Init
+    F: Fn(Init, &<IterItem<Iter> as SparseHierarchy2>::DataType) -> Init
 {
     MultiUnion2 { array_iter, init_value, f }
 }
