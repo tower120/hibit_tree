@@ -57,6 +57,7 @@ where
         N
     >,    
     empty_below_n: usize,
+    terminal_node_mask: <IterItem<Iter> as SparseHierarchy2>::LevelMaskType,
     phantom_data: PhantomData<(Iter, F, T)>
 }
 
@@ -80,6 +81,7 @@ where
         Self {
             states,
             empty_below_n: usize::MAX,
+            terminal_node_mask: BitBlock::zero(),
             phantom_data: PhantomData,
         }        
     }
@@ -117,6 +119,10 @@ where
             usize::MAX
         };
         
+        /*const*/ if N::VALUE == <Self::This as SparseHierarchy2>::LevelCount::VALUE - 1 {
+            self.terminal_node_mask = acc_mask.clone(); 
+        }
+        
         acc_mask
     }
 
@@ -148,11 +154,11 @@ where
     unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize) 
         -> Option<<Self::This as SparseHierarchy2>::Data<'a>> 
     {
-        if N > self.empty_below_n {
-            return None; 
+        if !self.terminal_node_mask.get_bit(level_index){
+            return None;
         }
         
-        todo!("Unimplementable without generic configurable DataIter")
+        Some(self.data_unchecked(this, level_index))
     }
 
     #[inline]
@@ -188,7 +194,31 @@ where
                 array_state.data_unchecked(array.borrow(), self.level_index)
             })
     }
+
+    #[inline]
+    fn fold<B, F>(self, mut init: B, mut f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        let level_index = self.level_index;
+        for (array, array_state) in self.states_iter {
+            let data = unsafe{ array_state.data_unchecked(array.borrow(), level_index) };
+            init = f(init, data);
+        }
+        init
+    }
+    
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.states_iter.size_hint()
+    }
 }
+
+impl<'a, I> ExactSizeIterator for DataIter<'a, I>
+where
+    I: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>>
+{}
 
 impl<Iter, Init, F> Borrowable for MultiIntersection<Iter, Init, F>{ type Borrowed = Self; }
 

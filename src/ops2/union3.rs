@@ -10,7 +10,7 @@ use crate::bit_queue::BitQueue;
 use crate::utils::{Array, Borrowable, FnRR, Take};
 
 
-// Not used now
+/*// Not used now
 trait OptionBorrow<T>{
     fn option_borrow(&self) -> Option<&T>; 
 }
@@ -23,8 +23,7 @@ impl<T> OptionBorrow<T> for Option<T>{
     fn option_borrow(&self) -> Option<&T> {
         self.as_ref()
     }
-}
-
+}*/
 
 pub trait UnionResolve<T0, T1>
     : Fn(Option<&T0>, Option<&T1>) -> Self::Out
@@ -232,7 +231,7 @@ where
 mod test{
     use itertools::assert_equal;
     use crate::compact_sparse_array2::CompactSparseArray2;
-    use crate::ops2::union2::union2;
+    use crate::ops2::union3::union3;
     use crate::sparse_hierarchy2::SparseHierarchy2;
 
     #[test]
@@ -249,36 +248,10 @@ mod test{
         *a2.get_or_insert(15)  = 15;
         *a2.get_or_insert(200) = 200;        
         
-        let union = union2(&a1, &a2, |i0, i1| {
+        let union = union3(&a1, &a2, |i0, i1| {
             i0.unwrap_or(&0) + i1.unwrap_or(&0)
         });
         
         assert_equal(union.iter(), [(10, 10), (15, 30), (100, 100), (200, 400)]);
-    }
-    
-    // TODO: remove
-    #[test]
-    fn regression_test(){
-        type Array = CompactSparseArray2<usize, 2>;
-        let mut compact_array1 = Array::default();
-        let mut compact_array2 = Array::default();
-        for i in 0..100{
-            *compact_array1.get_or_insert(i*20) = i;
-            *compact_array2.get_or_insert(i*20) = i;
-        }
-
-        {
-            let union = union2(compact_array1, compact_array2, |v0, v1|{
-                let v0 = v0.map_or(0, |v|*v);
-                let v1 = v1.map_or(0, |v|*v);
-                v0 + v1
-            });
-            
-            let mut s = 0;
-            for (_, i) in union.iter(){
-                s += i;
-            }
-            //s
-        }
     }
 }
