@@ -5,7 +5,7 @@ use std::mem::MaybeUninit;
 use std::ops::{BitAnd, BitOr};
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
 use crate::sparse_hierarchy2::{SparseHierarchy2, SparseHierarchyState2};
-use crate::{BitBlock, SparseHierarchy, SparseHierarchyState};
+use crate::BitBlock;
 use crate::bit_queue::BitQueue;
 use crate::utils::{Array, Borrowable, FnRR, Take};
 
@@ -39,13 +39,13 @@ where
 }
 
 
-pub struct Union3<S0, S1, F>{
+pub struct Union<S0, S1, F>{
     s0: S0,
     s1: S1,
     f: F
 }
 
-impl<S0, S1, F> SparseHierarchy2 for Union3<S0, S1, F>
+impl<S0, S1, F> SparseHierarchy2 for Union<S0, S1, F>
 where
     S0: Borrowable<Borrowed: SparseHierarchy2<DataType: Clone>>,
     S1: Borrowable<Borrowed: SparseHierarchy2<
@@ -59,6 +59,10 @@ where
         <S1::Borrowed as SparseHierarchy2>::DataType,
     >,
 {
+    /// true if S0 & S1 are EXACT_HIERARCHY.
+    const EXACT_HIERARCHY: bool = <S0::Borrowed as SparseHierarchy2>::EXACT_HIERARCHY 
+                                & <S1::Borrowed as SparseHierarchy2>::EXACT_HIERARCHY;
+    
     type LevelCount = <S0::Borrowed as SparseHierarchy2>::LevelCount;
     
     type LevelMaskType = <S0::Borrowed as SparseHierarchy2>::LevelMaskType;
@@ -115,7 +119,7 @@ where
         <S1::Borrowed as SparseHierarchy2>::DataType,
     >,
 {
-    type This = Union3<S0, S1, F>;
+    type This = Union<S0, S1, F>;
 
     #[inline]
     fn new(this: &Self::This) -> Self {
@@ -207,10 +211,10 @@ where
     }
 }
 
-impl<S0, S1, F> Borrowable for Union3<S0, S1, F>{ type Borrowed = Self; }
+impl<S0, S1, F> Borrowable for Union<S0, S1, F>{ type Borrowed = Self; }
 
 #[inline]
-pub fn union3<S0, S1, F>(s0: S0, s1: S1, f: F) -> Union3<S0, S1, F>
+pub fn union<S0, S1, F>(s0: S0, s1: S1, f: F) -> Union<S0, S1, F>
 where
     // bounds needed here for F's arguments auto-deduction
     S0: Borrowable<Borrowed: SparseHierarchy2>,
@@ -224,19 +228,19 @@ where
         <S1::Borrowed as SparseHierarchy2>::DataType,
     >,
 {
-    Union3 { s0, s1, f }
+    Union { s0, s1, f }
 } 
 
 #[cfg(test)]
 mod test{
     use itertools::assert_equal;
-    use crate::compact_sparse_array2::CompactSparseArray2;
-    use crate::ops2::union3::union3;
+    use crate::compact_sparse_array2::CompactSparseArray;
+    use crate::ops2::union3::union;
     use crate::sparse_hierarchy2::SparseHierarchy2;
 
     #[test]
     fn smoke_test(){
-        type Array = CompactSparseArray2<usize, 3>;
+        type Array = CompactSparseArray<usize, 3>;
         let mut a1= Array::default();
         let mut a2= Array::default();
         
@@ -248,7 +252,7 @@ mod test{
         *a2.get_or_insert(15)  = 15;
         *a2.get_or_insert(200) = 200;        
         
-        let union = union3(&a1, &a2, |i0, i1| {
+        let union = union(&a1, &a2, |i0, i1| {
             i0.unwrap_or(&0) + i1.unwrap_or(&0)
         });
         

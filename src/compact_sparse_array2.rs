@@ -1,5 +1,3 @@
-//! Use compact_sparse_array2 instead. 
-
 use std::alloc::{alloc, Layout, realloc};
 use std::{mem, ptr};
 use std::marker::PhantomData;
@@ -177,7 +175,7 @@ impl Node{
     } 
 }
 
-pub struct CompactSparseArray2<T, const DEPTH: usize>{
+pub struct CompactSparseArray<T, const DEPTH: usize>{
     root: NonNull<Node>,
     
     // TODO: store keys with data?
@@ -185,7 +183,7 @@ pub struct CompactSparseArray2<T, const DEPTH: usize>{
     keys: Vec<usize>,
 }
 
-impl<T, const DEPTH: usize> Default for CompactSparseArray2<T, DEPTH>{
+impl<T, const DEPTH: usize> Default for CompactSparseArray<T, DEPTH>{
     #[inline]
     fn default() -> Self {
         Self{
@@ -196,7 +194,7 @@ impl<T, const DEPTH: usize> Default for CompactSparseArray2<T, DEPTH>{
     }
 }
 
-impl<T, const DEPTH: usize> CompactSparseArray2<T, DEPTH>
+impl<T, const DEPTH: usize> CompactSparseArray<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger    
 {
@@ -301,10 +299,12 @@ where
     }
 }
 
-impl<T, const DEPTH: usize> SparseHierarchy2 for CompactSparseArray2<T, DEPTH>
+impl<T, const DEPTH: usize> SparseHierarchy2 for CompactSparseArray<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger
 {
+    const EXACT_HIERARCHY: bool = true;
+    
     type LevelCount = ConstUsize<DEPTH>;
     
     type LevelMaskType = Mask;
@@ -349,7 +349,7 @@ impl<T, const DEPTH: usize> SparseHierarchyState2 for State<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger
 {
-    type This = CompactSparseArray2<T, DEPTH>;
+    type This = CompactSparseArray<T, DEPTH>;
 
     #[inline]
     fn new(_: &Self::This) -> Self {
@@ -458,7 +458,7 @@ where
     }
 }
 
-impl<T, const DEPTH: usize> Borrowable for CompactSparseArray2<T, DEPTH>{ type Borrowed = Self; }
+impl<T, const DEPTH: usize> Borrowable for CompactSparseArray<T, DEPTH>{ type Borrowed = Self; }
 
 #[cfg(test)]
 mod test{
@@ -467,11 +467,11 @@ mod test{
     use itertools::assert_equal;
     use crate::sparse_hierarchy2::SparseHierarchy2;
     use crate::utils::Primitive;
-    use super::{CompactSparseArray2, Node};
+    use super::{CompactSparseArray, Node};
     
     #[test]
     fn test(){
-        let mut a: CompactSparseArray2<usize, 3> = Default::default();
+        let mut a: CompactSparseArray<usize, 3> = Default::default();
         *a.get_or_insert(15) = 89;
         assert_eq!(*a.get(15).unwrap(), 89);
 

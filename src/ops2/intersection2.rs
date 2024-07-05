@@ -4,16 +4,15 @@ use std::hint::unreachable_unchecked;
 use std::ops::BitAnd;
 use crate::const_utils::{ConstArray, ConstInteger};
 use crate::sparse_hierarchy2::{SparseHierarchy2, SparseHierarchyState2};
-use crate::{SparseHierarchy, SparseHierarchyState};
 use crate::utils::{Borrowable, FnRR, Take};
 
-pub struct Intersection2<S0, S1, F>{
+pub struct Intersection<S0, S1, F>{
     s0: S0,
     s1: S1,
     f: F
 }
 
-impl<S0, S1, F> SparseHierarchy2 for Intersection2<S0, S1, F>
+impl<S0, S1, F> SparseHierarchy2 for Intersection<S0, S1, F>
 where
     S0: Borrowable<Borrowed: SparseHierarchy2>,
     S1: Borrowable<Borrowed: SparseHierarchy2<
@@ -26,6 +25,8 @@ where
         <S1::Borrowed as SparseHierarchy2>::DataType
     >,
 {
+    const EXACT_HIERARCHY: bool = false;
+    
     type LevelCount = <S0::Borrowed as SparseHierarchy2>::LevelCount;
     
     type LevelMaskType = <S0::Borrowed as SparseHierarchy2>::LevelMaskType;
@@ -75,7 +76,7 @@ where
         <S1::Borrowed as SparseHierarchy2>::DataType,
     >,
 {
-    type This = Intersection2<S0, S1, F>;
+    type This = Intersection<S0, S1, F>;
 
     #[inline]
     fn new(this: &Self::This) -> Self {
@@ -162,10 +163,10 @@ where
     }
 }
 
-impl<S0, S1, F> Borrowable for Intersection2<S0, S1, F>{ type Borrowed = Self; }
+impl<S0, S1, F> Borrowable for Intersection<S0, S1, F>{ type Borrowed = Self; }
 
 #[inline]
-pub fn intersection2<S0, S1, F>(s0: S0, s1: S1, f: F) -> Intersection2<S0, S1, F>
+pub fn intersection<S0, S1, F>(s0: S0, s1: S1, f: F) -> Intersection<S0, S1, F>
 where
     // bounds needed here for F's arguments auto-deduction
     S0: Borrowable<Borrowed: SparseHierarchy2>,
@@ -179,19 +180,19 @@ where
         <S1::Borrowed as SparseHierarchy2>::DataType,
     >,
 {
-    Intersection2{ s0, s1, f }
+    Intersection { s0, s1, f }
 } 
 
 #[cfg(test)]
 mod test{
     use itertools::assert_equal;
-    use crate::compact_sparse_array2::CompactSparseArray2;
-    use crate::ops2::intersection2::intersection2;
+    use crate::compact_sparse_array2::CompactSparseArray;
+    use crate::ops2::intersection2::intersection;
     use crate::sparse_hierarchy2::SparseHierarchy2;
 
     #[test]
     fn smoke_test(){
-        type Array = CompactSparseArray2<usize, 3>;
+        type Array = CompactSparseArray<usize, 3>;
         let mut a1= Array::default();
         let mut a2= Array::default();
         
@@ -203,7 +204,7 @@ mod test{
         *a2.get_or_insert(15)  = 15;
         *a2.get_or_insert(200) = 200;        
         
-        let i = intersection2(&a1, &a2, |i0, i1| i0+i1);
+        let i = intersection(&a1, &a2, |i0, i1| i0+i1);
         
         assert_equal(i.iter(), [(15,30), (200, 400)]);
     }

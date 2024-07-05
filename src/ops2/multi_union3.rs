@@ -4,10 +4,10 @@ use std::slice;
 use arrayvec::ArrayVec;
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
 use crate::sparse_hierarchy2::{SparseHierarchy2, SparseHierarchyState2};
-use crate::{BitBlock, SparseHierarchy, SparseHierarchyState};
+use crate::BitBlock;
 use crate::utils::{Array, Borrowable};
 
-pub struct MultiUnion3<Iter, F, T> {
+pub struct MultiUnion<Iter, F, T> {
     array_iter: Iter,
     f: F,
     phantom_data: PhantomData<T>
@@ -15,11 +15,13 @@ pub struct MultiUnion3<Iter, F, T> {
 
 type IterItem<Iter> = <<Iter as Iterator>::Item as Borrowable>::Borrowed;
 
-impl<Iter, F, T> SparseHierarchy2 for MultiUnion3<Iter, F, T>
+impl<Iter, F, T> SparseHierarchy2 for MultiUnion<Iter, F, T>
 where
     Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>> + Clone,
-    for<'a> F: Fn(DataIter<'a, Iter>) -> T,
+    for<'a> F: Fn(MultiUnionResolveIter<'a, Iter>) -> T,
 {
+    const EXACT_HIERARCHY: bool = <IterItem<Iter> as SparseHierarchy2>::EXACT_HIERARCHY;
+    
     type LevelCount = <IterItem<Iter> as SparseHierarchy2>::LevelCount;
 
     type LevelMaskType = <IterItem<Iter> as SparseHierarchy2>::LevelMaskType;
@@ -79,9 +81,9 @@ for
     MultiUnion2State<Iter, F, T>
 where
     Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>> + Clone,
-    for<'a> F: Fn(DataIter<'a, Iter>) -> T
+    for<'a> F: Fn(MultiUnionResolveIter<'a, Iter>) -> T
 {
-    type This = MultiUnion3<Iter, F, T>;
+    type This = MultiUnion<Iter, F, T>;
 
     #[inline]
     fn new(this: &Self::This) -> Self {
@@ -157,7 +159,7 @@ where
         }
         
         Some(
-            (this.f)(DataIter{
+            (this.f)(MultiUnionResolveIter {
                 lvl_non_empty_states: lvl_non_empty_states.iter(),
                 states: &self.states,
                 level_index,
@@ -173,7 +175,7 @@ where
     }
 }
 
-impl<ArrayIter, Init, F> Borrowable for MultiUnion3<ArrayIter, Init, F>{ type Borrowed = Self; }
+impl<ArrayIter, Init, F> Borrowable for MultiUnion<ArrayIter, Init, F>{ type Borrowed = Self; }
 
 /// This iterator is **GUARANTEED** to be initially non-empty. 
 /// 
@@ -182,7 +184,7 @@ impl<ArrayIter, Init, F> Borrowable for MultiUnion3<ArrayIter, Init, F>{ type Bo
 /// 
 /// [^1]: All [Iterator] operations that redirect to `fold` under the hood: 
 /// [for_each], [sum], etc.
-pub struct DataIter<'a, I>
+pub struct MultiUnionResolveIter<'a, I>
 where
     I: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>>
 {
@@ -191,7 +193,7 @@ where
     level_index: usize,
 }
 
-impl<'a, I> Iterator for DataIter<'a, I>
+impl<'a, I> Iterator for MultiUnionResolveIter<'a, I>
 where
     I: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>>
 {
@@ -236,25 +238,25 @@ where
 }
 
 #[inline]
-pub fn multi_union<Iter, F, T>(array_iter: Iter, f: F) 
-    -> MultiUnion3<Iter, F, T>
+pub fn multi_union<Iter, F, T>(array_iter: Iter, resolve: F) 
+    -> MultiUnion<Iter, F, T>
 where
     Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>> + Clone,
-    for<'a> F: Fn(DataIter<'a, Iter>) -> T
+    for<'a> F: Fn(MultiUnionResolveIter<'a, Iter>) -> T
 {
-    MultiUnion3 { array_iter, f, phantom_data: PhantomData }
+    MultiUnion { array_iter, f: resolve, phantom_data: PhantomData }
 }
 
 #[cfg(test)]
 mod test{
     use itertools::assert_equal;
-    use crate::compact_sparse_array2::CompactSparseArray2;
+    use crate::compact_sparse_array2::CompactSparseArray;
     use crate::sparse_hierarchy2::SparseHierarchy2;
     use crate::ops2::multi_union3::multi_union;
 
     #[test]
     fn smoke_test(){
-        type Array = CompactSparseArray2<usize, 3>;
+        type Array = CompactSparseArray<usize, 3>;
         let mut a1 = Array::default();
         let mut a2 = Array::default();
         let mut a3 = Array::default();

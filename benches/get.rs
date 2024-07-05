@@ -2,7 +2,7 @@ use criterion::{black_box, Criterion, criterion_group, criterion_main};
 use rand::{Rng, SeedableRng};
 use rand::seq::SliceRandom;
 use hi_sparse_array::{CompactSparseArray, config, Empty, SparseArray};
-use hi_sparse_array::compact_sparse_array2::CompactSparseArray2;
+use hi_sparse_array::compact_sparse_array2::CompactSparseArray;
 use hi_sparse_array::level_block::{Block, ClusterBlock, SmallBlock};
 use hi_sparse_array::Iter;
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
@@ -34,7 +34,7 @@ impl Empty for DataBlock{
 
 type Map = nohash_hasher::IntMap<u64, DataBlock>;
 
-type CompactArray = CompactSparseArray2<DataBlock, 6>;
+type CompactArray = CompactSparseArray<DataBlock, 6>;
 
 //type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>, IntrusiveListLevel<Lvl2Block>), DataBlock>;
 type BlockArray = SparseArray<config::width_64::depth_6, DataBlock>;

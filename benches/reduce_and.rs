@@ -9,7 +9,7 @@ use hi_sparse_array::Iter;
 use hi_sparse_array::const_utils::ConstFalse;
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
 use hi_sparse_array::BinaryOp;
-use hi_sparse_array::compact_sparse_array2::CompactSparseArray2;
+use hi_sparse_array::compact_sparse_array2::CompactSparseArray;
 use hi_sparse_array::utils::Take;
 
 type Lvl0Block = Block<u64, [u8;64]>;
@@ -59,7 +59,7 @@ impl Empty for DataBlock{
 
 type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), /*IntrusiveListLevel<*/DataBlock/*>*/>;
 type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<SmallLvl1Block>), DataBlock>;
-type CompactArray = CompactSparseArray2<DataBlock, 2>;
+type CompactArray = CompactSparseArray<DataBlock, 2>;
 
 pub struct AndOp<M, LD>(PhantomData<(M, LD)>);
 impl<M, LD> Default for AndOp<M, LD>{
@@ -188,10 +188,10 @@ fn apply_small_iter(array1: &SmallBlockArray, array2: &SmallBlockArray) -> u64 {
 }
 
 fn intersection2_iter(array1: &CompactArray, array2: &CompactArray) -> u64 {
-    use hi_sparse_array::ops2::intersection2::intersection2;
+    use hi_sparse_array::ops2::intersection2::intersection;
     use hi_sparse_array::sparse_hierarchy2::SparseHierarchy2;
     
-    let intersection = intersection2(array1, array2, |d1, d2| DataBlock(d1.0 & d2.0));
+    let intersection = intersection(array1, array2, |d1, d2| DataBlock(d1.0 & d2.0));
     
     let mut s = 0;
     for (_, i) in intersection.iter(){

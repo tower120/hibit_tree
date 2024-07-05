@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
 use hi_sparse_array::{Empty, SparseArray};
-use hi_sparse_array::compact_sparse_array2::CompactSparseArray2;
+use hi_sparse_array::compact_sparse_array2::CompactSparseArray;
 use hi_sparse_array::level_block::{Block, ClusterBlock, SmallBlock};
 use hi_sparse_array::Iter;
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
@@ -27,7 +27,7 @@ impl Empty for DataBlock{
 type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), DataBlock>;
 type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<CompactLvl1Block>), DataBlock>;
 type ClusterBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<ClusterLvl1Block>), DataBlock>;
-type CompactArray = CompactSparseArray2<DataBlock, 2>;
+type CompactArray = CompactSparseArray<DataBlock, 2>;
 
 fn compact_array_iter(array: &CompactArray) -> u64 {
     use hi_sparse_array::sparse_hierarchy2::SparseHierarchy2;

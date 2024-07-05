@@ -10,9 +10,9 @@ use hi_sparse_array::Iter;
 use hi_sparse_array::const_utils::{ConstFalse, ConstTrue};
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
 use hi_sparse_array::BinaryOp;
-use hi_sparse_array::compact_sparse_array2::CompactSparseArray2;
+use hi_sparse_array::compact_sparse_array2::CompactSparseArray;
 use hi_sparse_array::ops2::union2::union2;
-use hi_sparse_array::ops2::union3::union3;
+use hi_sparse_array::ops2::union3::union;
 use hi_sparse_array::sparse_hierarchy2::{SparseHierarchy2, SparseHierarchyState2};
 use hi_sparse_array::utils::Take;
 
@@ -63,7 +63,7 @@ impl Empty for DataBlock{
 
 type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), /*IntrusiveListLevel<*/DataBlock/*>*/>;
 type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<SmallLvl1Block>), DataBlock>;
-type CompactArray = CompactSparseArray2<DataBlock, 2>;
+type CompactArray = CompactSparseArray<DataBlock, 2>;
 
 pub struct AndOp<M, LD>(PhantomData<(M, LD)>);
 impl<M, LD> Default for AndOp<M, LD>{
@@ -195,7 +195,7 @@ where
     A1: SparseHierarchy2<DataType = DataBlock>,
     A2: SparseHierarchy2<DataType = DataBlock, LevelCount = A1::LevelCount, LevelMaskType = A1::LevelMaskType>
 {
-    let union = union3(array1, array2, |v0, v1|{
+    let union = union(array1, array2, |v0, v1|{
         let v0 = v0.map_or(0, |v|v.0);
         let v1 = v1.map_or(0, |v|v.0);
         DataBlock(v0 + v1)

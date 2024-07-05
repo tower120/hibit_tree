@@ -18,8 +18,10 @@ type IterItem<Iter> = <<Iter as Iterator>::Item as Borrowable>::Borrowed;
 impl<Iter, F, T> SparseHierarchy2 for MultiIntersection<Iter, F, T>
 where
     Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>> + Clone,
-    for<'a> F: Fn(DataIter<'a, Iter>) -> T
+    for<'a> F: Fn(MultiIntersectionResolveIter<'a, Iter>) -> T
 {
+    const EXACT_HIERARCHY: bool = false;
+    
     type LevelCount = <IterItem<Iter> as SparseHierarchy2>::LevelCount;
 
     type LevelMaskType = <IterItem<Iter> as SparseHierarchy2>::LevelMaskType;
@@ -64,7 +66,7 @@ where
 impl<Iter, F, T> SparseHierarchyState2 for MultiIntersectionState<Iter, F, T>
 where
     Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>> + Clone,
-    for<'a> F: Fn(DataIter<'a, Iter>) -> T
+    for<'a> F: Fn(MultiIntersectionResolveIter<'a, Iter>) -> T
 {
     type This = MultiIntersection<Iter, F, T>;
 
@@ -165,12 +167,12 @@ where
     unsafe fn data_unchecked<'a>(
         &self, this: &'a Self::This, level_index: usize
     ) -> <Self::This as SparseHierarchy2>::Data<'a> {
-        (this.f)(DataIter{ level_index, states_iter: self.states.iter() })
+        (this.f)(MultiIntersectionResolveIter { level_index, states_iter: self.states.iter() })
     }
 }
 
 // States slice to Data iterator adapter.
-pub struct DataIter<'a, I>
+pub struct MultiIntersectionResolveIter<'a, I>
 where
     I: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>>
 {
@@ -178,7 +180,7 @@ where
     states_iter: slice::Iter<'a, StatesItem<I>>
 }
 
-impl<'a, I> Iterator for DataIter<'a, I>
+impl<'a, I> Iterator for MultiIntersectionResolveIter<'a, I>
 where
     I: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>>
 {
@@ -215,7 +217,7 @@ where
     }
 }
 
-impl<'a, I> ExactSizeIterator for DataIter<'a, I>
+impl<'a, I> ExactSizeIterator for MultiIntersectionResolveIter<'a, I>
 where
     I: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>>
 {}
@@ -223,25 +225,25 @@ where
 impl<Iter, Init, F> Borrowable for MultiIntersection<Iter, Init, F>{ type Borrowed = Self; }
 
 #[inline]
-pub fn multi_intersection2<Iter, F, T>(iter: Iter, f: F) 
+pub fn multi_intersection<Iter, F, T>(iter: Iter, resolve: F) 
     -> MultiIntersection<Iter, F, T>
 where
     Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>> + Clone,
-    for<'a> F: Fn(DataIter<'a, Iter>) -> T
+    for<'a> F: Fn(MultiIntersectionResolveIter<'a, Iter>) -> T
 {
-    MultiIntersection{ iter, f, phantom_data: Default::default() }
+    MultiIntersection{ iter, f: resolve, phantom_data: Default::default() }
 }
 
 #[cfg(test)]
 mod test{
     use itertools::assert_equal;
-    use crate::compact_sparse_array2::CompactSparseArray2;
-    use crate::ops2::multi_intersection2::multi_intersection2;
+    use crate::compact_sparse_array2::CompactSparseArray;
+    use crate::ops2::multi_intersection2::multi_intersection;
     use crate::sparse_hierarchy2::SparseHierarchy2;
 
     #[test]
     fn smoke_test(){
-        type Array = CompactSparseArray2<usize, 3>;
+        type Array = CompactSparseArray<usize, 3>;
         let mut a1 = Array::default();
         let mut a2 = Array::default();
         let mut a3 = Array::default();
@@ -259,7 +261,7 @@ mod test{
         
         let arrays = [a1, a2, a3];
         
-        let intersection = multi_intersection2(arrays.iter(), |vs| vs.sum() ); 
+        let intersection = multi_intersection(arrays.iter(), |vs| vs.sum() ); 
         
         assert_equal(intersection.iter(), [(15, 45)]);
     }
