@@ -81,7 +81,8 @@
 
 mod sparse_array;
 mod sparse_array_levels;
-mod compact_sparse_array2;
+pub mod compact_sparse_array2;
+pub mod compact_sparse_array3;
 mod bit_utils;
 mod bit_block;
 //mod sparse_hierarchy;

@@ -92,14 +92,14 @@ impl<Levels, Data> Default for
     SparseArray<Levels, Data>
 where
     Levels: SparseArrayLevels,
-    Data: Empty,
+    Data: Default,
 {
     #[inline]
     fn default() -> Self {        
         Self{
             levels: Levels::default(),
             
-            values: vec![Data::empty()], 
+            values: vec![Data::default()], 
             keys  : vec![usize::MAX /*doesn't matter*/],
             last_level_block_indices: vec![(0,0)]
         }
@@ -109,7 +109,7 @@ where
 impl<Levels, Data> SparseArray<Levels, Data>
 where
     Levels: SparseArrayLevels,
-    Data: Empty,
+    Data: Default,
 {
     #[inline(always)]
     fn check_index_range(index: usize) {
@@ -317,7 +317,7 @@ where
         Some(value)
     }
     
-    /// Returns mutable reference to item at `index`, if exists.
+    /*/// Returns mutable reference to item at `index`, if exists.
     /// Inserts and return [empty] level_block, otherwise.
     /// 
     /// # Panics
@@ -330,7 +330,7 @@ where
     /// with a value in empty state - consider calling [remove()].
     pub fn get_mut(&mut self, index: usize) -> &mut Data {
         self.get_or_insert(index, ConstFalse, ||Data::empty())
-    }
+    }*/
 
     /// Inserts `value` at `index`.
     /// If there was a value - it will be replaced.
@@ -375,7 +375,7 @@ where
         impl<Levels, Data, LevelIndices, M> FoldMutVisitor<M> for V<Levels, Data, LevelIndices>
         where
             Levels: SparseArrayLevels,
-            Data: Empty,
+            Data: Default,
             LevelIndices: Array<Item=usize>
         {
             type Acc = usize;
@@ -681,7 +681,7 @@ impl<Levels, Data> Borrowable for SparseArray<Levels, Data>{
 impl<Levels, Data> SparseHierarchy2 for SparseArray<Levels, Data>
 where
     Levels: SparseArrayLevels,
-    Data: Empty
+    Data: Default
 {
     const EXACT_HIERARCHY: bool = true;
     
@@ -730,7 +730,7 @@ where
 impl<Levels, Data> SparseHierarchyState2 for SparseArrayState<Levels, Data>
 where
     Levels: SparseArrayLevels,
-    Data: Empty,
+    Data: Default,
 {
     type This = SparseArray<Levels, Data>;
 

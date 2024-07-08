@@ -36,7 +36,7 @@ where
     /// [T::LevelMaskType::BitsIter; T::LevelCount]
     level_iters: LevelIterators<T>,
     
-    /// [usize; T::LevelCount::N - 1]
+    /// [usize; T::LevelCount - 1]
     level_indices: LevelIndices<T>,
 
     state: T::State,

@@ -166,5 +166,27 @@ where
             None
         }
     }
+
+    #[inline]
+    fn fold<B, F>(mut self, mut init: B, mut f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        // from https://lemire.me/blog/2018/03/08/iterating-over-set-bits-quickly-simd-edition/
+        // https://github.com/lemire/Code-used-on-Daniel-Lemire-s-blog/blob/master/2018/03/07/simdbitmapdecode.c#L45
+        while !self.element.is_zero() {
+            let index = self.element.trailing_zeros() as usize;
+    
+            init = f(init, index);
+    
+            // Returns an integer having just the least significant bit of
+            // bitset turned on, all other bits are off.
+            let t: P = self.element & self.element.wrapping_neg();
+    
+            self.element ^= t;
+        }
+        init
+    }
 }
 
