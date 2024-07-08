@@ -45,7 +45,8 @@ struct NodeHeaderN<const N: usize> {
 type NodeHeader = NodeHeaderN<0>;
 
 impl NodeHeader{
-    /// `index` must be set.
+    /// `index` must be set. Otherwise return unspecified number that is
+    /// less or equal to mask population.
     #[inline]
     unsafe fn get_dense_index(&self, index: usize) -> usize {
         let mask = !(u64::MAX << index);
@@ -315,14 +316,16 @@ where
     
     #[inline]
     pub fn get(&self, index: usize) -> Option<&T> {
-        let indices = level_indices::<u64, ConstUsize<DEPTH>>(index);
+        let indices = level_indices::<Mask, ConstUsize<DEPTH>>(index);
         
+        // As long as container not empty - this loop will always point to some valid element.
         let mut node_ptr = self.root;
         for n in 0..DEPTH-1 {
             let inner_index = indices.as_ref()[n];
             node_ptr = unsafe{ *node_ptr.get_child(inner_index) };
         }
         
+        // The element may be wrong thou, so we check its index.
         unsafe{
             let inner_index = *indices.as_ref().last().unwrap_unchecked();
             let data_index = node_ptr.get_child::<DataIndex>(inner_index).as_usize();
