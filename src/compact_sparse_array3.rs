@@ -242,7 +242,6 @@ impl NodePtr {
 pub struct CompactSparseArray<T, const DEPTH: usize>{
     root: NodePtr,
     
-    // TODO: store keys with data?
     data: Vec<T>,
     keys: Vec<usize>,
 }
@@ -316,6 +315,11 @@ where
     
     #[inline]
     pub fn get(&self, index: usize) -> Option<&T> {
+        // Almost always false. Have no measurable performance hit.
+        if self.data.is_empty(){
+            return None;
+        }
+        
         let indices = level_indices::<Mask, ConstUsize<DEPTH>>(index);
         
         // As long as container not empty - this loop will always point to some valid element.
@@ -334,12 +338,6 @@ where
             } else {
                 None
             }
-            /*let data_index = if *self.keys.get_unchecked(data_index) != index{
-                0
-            } else {
-                data_index
-            };
-            self.data.get_unchecked(data_index)*/
         }        
     }
     
@@ -348,30 +346,7 @@ where
         unsafe{
             self.get(index).unwrap_unchecked()
         }
-    }    
-
-    // ReMake like get
-/*    /// experimental
-    #[inline]
-    pub fn get_or_default(&self, index: usize) -> &T {
-        let indices = level_indices::<u64, ConstUsize<DEPTH>>(index);
-        let mut node = &self.root;
-        for n in 0..DEPTH-1 {
-            let inner_index = indices.as_ref()[n];
-            node = unsafe{ node.get_child(inner_index) };
-        }
-        
-        unsafe{
-            let inner_index = *indices.as_ref().last().unwrap_unchecked();
-            let data_index = node.get_child::<DataIndex>(inner_index).as_usize();
-            let data_index = if *self.keys.get_unchecked(data_index) == index{
-                data_index
-            } else {
-                0
-            };
-            self.data.get_unchecked(data_index)
-        }        
-    }*/
+    }
 }
 
 impl<T, const DEPTH: usize> Drop for CompactSparseArray<T, DEPTH> {
@@ -557,6 +532,7 @@ mod test{
     #[test]
     fn test(){
         let mut a: CompactSparseArray<usize, 3> = Default::default();
+        assert_eq!(a.get(15), None);
         *a.get_or_insert(15) = 89;
         assert_eq!(*a.get(15).unwrap(), 89);
 
