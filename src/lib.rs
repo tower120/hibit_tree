@@ -81,7 +81,6 @@
 
 mod sparse_array;
 mod sparse_array_levels;
-pub mod compact_sparse_array2;
 pub mod compact_sparse_array3;
 mod bit_utils;
 mod bit_block;
@@ -102,7 +101,7 @@ pub mod config;
 //pub use ref_or_val::*;
 pub use bit_block::BitBlock;
 pub use sparse_array::SparseArray;
-pub use compact_sparse_array2::CompactSparseArray;
+pub use compact_sparse_array3::CompactSparseArray;
 //pub use sparse_array_levels::SparseArrayLevels;
 //pub use sparse_hierarchy::*;
 pub use sparse_hierarchy2::*;

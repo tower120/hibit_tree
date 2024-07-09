@@ -250,7 +250,7 @@ where
 #[cfg(test)]
 mod test{
     use itertools::assert_equal;
-    use crate::compact_sparse_array2::CompactSparseArray;
+    use crate::compact_sparse_array3::CompactSparseArray;
     use crate::sparse_hierarchy2::SparseHierarchy2;
     use crate::ops2::multi_union3::multi_union;
 
