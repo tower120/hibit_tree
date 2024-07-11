@@ -478,7 +478,7 @@ where
         }  
     }
     
-    /// Returns `Some`, if an element with `index` exists in container.
+/*    /// Returns `Some`, if an element with `index` exists in container.
     /// `None` - otherwise.
     /// 
     /// # Panics
@@ -495,7 +495,7 @@ where
         } else {
             None
         }
-    }    
+    }*/    
     
     /// Returns `Some`, if element with `index` exists in container.
     /// `None` - otherwise.
@@ -530,7 +530,7 @@ where
         self.values.get_unchecked_mut(data_block_index)
     }
     
-    // TODO: mut version
+    /* // TODO: mut version
     // TODO: concrete type in return
     /// Return keys and values as contiguous array iterator. 
     #[inline]
@@ -538,22 +538,44 @@ where
         self.keys[1..].iter().copied().zip(
             self.values[1..].iter()
         )
+    } */
+
+
+    // TODO: index_values?
+    // TODO: KeyValues type
+    /// Returns (keys_slice, values_slice). Key-values in arbitrary order.
+    #[inline]
+    pub fn key_values(&self) -> (&[usize], &[Data]) {
+        // TODO: use raw
+        (&self.keys[1..], &self.values[1..])
     }
-    
-    /*#[inline]
-    pub fn keys(&self) -> &[usize]{
+
+    // Key-values in arbitrary order.
+    #[inline]
+    pub fn key_values_mut(&mut self) -> (&[usize], &mut [Data]) {
+        // TODO: use raw
+        (&self.keys[1..], &mut self.values[1..])
+    }
+
+
+/*     
+    /// Keys in arbitrary order.
+    #[inline]
+    pub fn keys(&self) -> &[usize] {
         &self.keys[1..]
     }
     
+    /// Values in arbitrary order, but same as [keys()].
     #[inline]
-    pub fn values(&self) -> &[Data]{
+    pub fn values(&self) -> &[Data] {
         &self.values[1..]
     }
     
+    /// Mutable values in arbitrary order, but same as [keys()].
     #[inline]
-    pub fn values_mut(&self) -> &mut [Data]{
+    pub fn values_mut(&mut self) -> &mut [Data] {
         &mut self.values[1..]
-    }*/    
+    } */
 }
 
 
@@ -701,7 +723,7 @@ where
     }*/    
 
     #[inline]
-    unsafe fn data<I>(&self, level_indices: I) -> Option<Self::Data<'_>>
+    unsafe fn data<I>(&self, index: usize, level_indices: I) -> Option<Self::Data<'_>>
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
     {

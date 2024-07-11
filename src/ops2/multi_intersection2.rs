@@ -30,7 +30,7 @@ where
     type DataType = T;
     type Data<'a> = T where Self: 'a;
 
-    unsafe fn data<I>(&self, level_indices: I) -> Option<Self::Data<'_>>
+    unsafe fn data<I>(&self, index: usize, level_indices: I) -> Option<Self::Data<'_>>
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
     {

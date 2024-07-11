@@ -25,8 +25,9 @@ pub trait SparseHierarchy2: Sized + Borrowable<Borrowed=Self> {
     type Data<'a>: Borrow<Self::DataType> + Take<Self::DataType>
         where Self: 'a;
  
-    /// Element may not exists, but `level_indices` must be in range.
-    unsafe fn data<I>(&self, level_indices: I) -> Option<Self::Data<'_>>
+    /// Element may not exists, but `index` must be in range, and `level_indices` must
+    /// corresponds to `index`.
+    unsafe fn data<I>(&self, index: usize, level_indices: I) -> Option<Self::Data<'_>>
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy;
  
@@ -41,17 +42,15 @@ pub trait SparseHierarchy2: Sized + Borrowable<Borrowed=Self> {
     fn iter(&self) -> Iter2<Self>{
         Iter2::new(self)
     }
-    
+
     /// # Panics
     /// 
-    /// Will panic if `index` is outside [max_range()].
+    /// Will panic if item at `index` does not exists.
     #[inline]
-    fn get(&self, index: usize) -> Option<Self::Data<'_>> {
-        assert!(index <= Self::max_range(), "index out of range!");
-        let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
-        unsafe{ self.data(indices) }
+    fn get(&self, index: usize) -> Self::Data<'_> {
+        self.try_get(index).unwrap()
     }
-    
+
     /// # Safety
     ///
     /// Item at `index` must exist.
@@ -60,6 +59,24 @@ pub trait SparseHierarchy2: Sized + Borrowable<Borrowed=Self> {
         let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
         self.data_unchecked(indices)
     }    
+    
+    /// # Panics
+    /// 
+    /// Will panic if `index` is outside [max_range()].
+    #[inline]
+    fn try_get(&self, index: usize) -> Option<Self::Data<'_>> {
+        assert!(index <= Self::max_range(), "index out of range!");
+        unsafe{ self.try_get_unchecked(index) }
+    }  
+
+    /// # Safety
+    /// 
+    /// `index` must be within [max_range()].
+    #[inline]
+    unsafe fn try_get_unchecked(&self, index: usize) -> Option<Self::Data<'_>> {
+        let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
+        unsafe{ self.data(index, indices) }
+    }
     
     /// Max index this SparseHierarchy can contain.
     /// 

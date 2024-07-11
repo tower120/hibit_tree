@@ -395,8 +395,8 @@ where
 
     /// As long as container not empty - will always point to some valid (node, in-node-index).
     #[inline(always)]
-    unsafe fn get_terminal_node(&self, index: usize) -> (NodePtr, usize) {
-        let indices = level_indices::<Mask, ConstUsize<DEPTH>>(index);
+    unsafe fn get_terminal_node(&self, indices: impl ConstArray<Item=usize>) -> (NodePtr, usize) {
+        //let indices = level_indices::<Mask, ConstUsize<DEPTH>>(index);
         let mut node_ptr = self.root;
         for n in 0..DEPTH-1 {
             let inner_index = *indices.as_ref().get_unchecked(n);
@@ -449,7 +449,8 @@ where
                 let last_key = *self.keys.last().unwrap_unchecked();
                 if last_key != index {
                     // TODO: this can be get from `terminal_node_positions` as well.
-                    let (node, inner_index) = self.get_terminal_node(last_key);                    
+                    let indices = level_indices::<Mask, ConstUsize<DEPTH>>(index);
+                    let (node, inner_index) = self.get_terminal_node(indices);                    
                     *node.get_child_mut::<DataIndex>(inner_index) = data_index as DataIndex; 
                 }
                 
@@ -463,36 +464,19 @@ where
             }
         }   
     }
-    
-    #[inline]
-    pub fn get(&self, index: usize) -> Option<&T> {
-        // TODO: bench this
-        Self::check_index_range(index);
-        
-        // Almost always false. Have no measurable performance hit.
-        if self.data.is_empty(){
-            return None;
-        }
-        
-        unsafe{
-            // The element may be wrong thou, so we check its index.
-            let (node, inner_index) = self.get_terminal_node(index);
-            let data_index = node.get_child::<DataIndex>(inner_index).as_usize();
 
-            if *self.keys.get_unchecked(data_index) == index{
-                Some(self.data.get_unchecked(data_index))
-            } else {
-                None
-            }
-        }        
-    }
-    
+    /// Key-values in arbitrary order.
     #[inline]
-    pub unsafe fn get_unchecked(&self, index: usize) -> &T {
-        unsafe{
-            self.get(index).unwrap_unchecked()
-        }
+    pub fn key_values(&self) -> (&[usize], &[T]) {
+        (self.keys.as_slice(), self.data.as_slice())
     }
+
+    // Key-values in arbitrary order.
+    #[inline]
+    pub fn key_values_mut(&mut self) -> (&[usize], &mut [T]) {
+        (self.keys.as_slice(), self.data.as_mut_slice())
+    }
+
 }
 
 impl<T, const DEPTH: usize> Drop for CompactSparseArray<T, DEPTH> {
@@ -519,11 +503,27 @@ where
     type Data<'a> = &'a T where Self: 'a;
 
     #[inline]
-    unsafe fn data<I>(&self, level_indices: I) -> Option<Self::Data<'_>>
+    unsafe fn data<I>(&self, index: usize, level_indices: I) -> Option<Self::Data<'_>>
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
     {
-        todo!()
+        // super rare
+        if self.data.is_empty(){
+            return None;
+        }
+        
+        unsafe{            
+            let (node, inner_index) = self.get_terminal_node(level_indices);
+            // point to SOME valid item
+            let data_index = node.get_child::<DataIndex>(inner_index).as_usize();
+
+            // The element may be wrong thou, so we check its index.
+            if *self.keys.get_unchecked(data_index) == index {
+                Some(self.data.get_unchecked(data_index))
+            } else {
+                None
+            }
+        }        
     }
 
     #[inline]
@@ -531,7 +531,12 @@ where
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
     {
-        todo!()
+        self.data(0, level_indices).unwrap_unchecked()
+        /*{
+            let (node, inner_index) = self.get_terminal_node2(level_indices);
+            let data_index = node.get_child::<DataIndex>(inner_index).as_usize();
+            self.data.get_unchecked(data_index)            
+        }*/
     }
     
     type State = State<T, DEPTH>;
@@ -678,9 +683,9 @@ mod test{
     #[test]
     fn test(){
         let mut a: CompactSparseArray<usize, 3> = Default::default();
-        assert_eq!(a.get(15), None);
+        assert_eq!(a.try_get(15), None);
         *a.get_or_insert(15) = 89;
-        assert_eq!(*a.get(15).unwrap(), 89);
+        assert_eq!(*a.try_get(15).unwrap(), 89);
 
         /*for (_, v) in a.iter() {
             println!("{:?}", *v);
@@ -701,7 +706,7 @@ mod test{
         }
         
         for i in 0..200_000{
-            let v = *a.get(i).unwrap();
+            let v = *a.try_get(i).unwrap();
             assert_eq!(i, v);
         }
     }
