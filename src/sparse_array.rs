@@ -183,7 +183,6 @@ where
     
     #[inline]
     unsafe fn fetch_block_indices<I: ConstArray<Item=usize>>(&self, level_indices: I)
-        // TODO: compiler should be able to optimize even without explicit last block index
         -> (I, usize)
     {
         let mut out = I::from_fn(|_|0);
@@ -748,6 +747,8 @@ where
     )
         -> <Self::This as SparseHierarchy2>::LevelMask<'a> 
     {
+        // TODO: identical to "select_level_node"
+        
         if N::VALUE == 0{
             assert_eq!(level_index, 0); // This act as compile-time check
             let block_ptr = this.get_block_ptr(level_n, 0);

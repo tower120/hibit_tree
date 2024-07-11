@@ -1,3 +1,8 @@
+// Having masks wider, then 64 bit is not viable, 
+// since get_dense_index becomes more complex for SIMD registers.
+// Performance drops significantly, and it is cheaper to add more
+// depth to a tree, instead.
+
 use std::alloc::{alloc, dealloc, Layout, realloc};
 use std::{mem, ptr};
 use std::marker::PhantomData;
@@ -11,6 +16,9 @@ use crate::sparse_hierarchy2::{SparseHierarchy2, SparseHierarchyState2};
 use crate::utils::{Array, Borrowable, Primitive};
 
 type Mask = u64;
+
+// TODO: On insert check that capacity does not exceeds DataIndex capacity. 
+//       Can be usize as well.
 type DataIndex = u32;
 
 const DEFAULT_CAP: u8 = 2;
@@ -38,7 +46,7 @@ struct NodeHeaderN<const N: usize> {
     capacity: u8,
     len: u8,
     
-    /// NonNull<Node> / u32
+    /// NonNull<Node> / DataIndex
     children_placeholder: [*const u8; N]
 }
 
@@ -49,14 +57,13 @@ impl NodeHeader{
     /// less or equal to mask population.
     #[inline]
     unsafe fn get_dense_index(&self, index: usize) -> usize {
-        let mask = !(u64::MAX << index);
-        let block = (self.mask /*| self.mask_disabler*/) & mask;
+        let block = if cfg!(target_feature = "bmi2") {
+            core::arch::x86_64::_bzhi_u64(self.mask, index as u32)
+        } else {
+            let mask = !(u64::MAX << index);
+            self.mask & mask
+        };
         block.count_ones() as usize
-        
-        /*
-        // This cause shift overflow if index == 0
-        (self.mask << (u64::BITS as usize - index))
-            .count_ones() as usize*/
     }        
 }
 
@@ -211,6 +218,19 @@ impl NodePtr {
         (NonNull::new_unchecked(p), self)
     }
     
+    #[inline]
+    pub unsafe fn remove<T: NodeChild>(mut self, index: usize){
+        let (header, children_ptr) = self.header_and_children_mut::<T>();
+        let dense_index = header.get_dense_index(index);
+        set_bit_unchecked::<false, _>(&mut header.mask, index);        
+
+        /* move left */
+        let p: *mut _ = children_ptr.add(dense_index);
+        ptr::copy(p.offset(1), p, header.len as usize - dense_index - 1);
+        
+        header.len -= 1;
+    }
+    
     /// Deallocate node WITHOUT deallocating child objects.
     #[inline]
     pub unsafe fn drop_node<T: NodeChild>(self){
@@ -239,11 +259,44 @@ impl NodePtr {
     }
 }
 
+/// TODO: Description
+/// 
+/// Only 64bit wide version available[^64bit_only].
+/// 
+/// [^64bit_only]: TODO explain why
+/// 
+/// # Performance
+/// 
+/// With `bmi2` enabled, access operations almost identical to [SparseArray].
+/// Insert and remove operations are slower, since they need to keep child nodes 
+/// in order. TODO: swap to non-compressed after certain threshold to amortize this.
+///
+/// # `target-feature`s
+/// 
+/// ## x86
+/// `popcnt`, `bmi1`, `bmi2`
+/// 
+/// ## arm
+/// `neon`
+/// 
+/// ## risc-v
+/// ???
+/// 
+/// In addition, to lib's `popcnt` and `bmi1` requirement, on x86 arch
+/// CompactSparseArray also benefits from `bmi2`'s [bzhi] instruction.
 pub struct CompactSparseArray<T, const DEPTH: usize>{
     root: NodePtr,
     
     data: Vec<T>,
     keys: Vec<usize>,
+    
+    /*// TODO: Make this technique optional? Since it consumes additional mem.
+    /// Position in terminal node, that points to `data` with this vec's index.
+    ///
+    /// Used by remove(). Speedup getting of item that is swapped with.
+    /// Without this - we would have to traverse to its terminal node through the tree, 
+    /// to get by index.
+    terminal_node_positions: Vec<(NodePtr/*terminal_node*/, usize/*in-node index*/)>,*/
 }
 
 impl<T, const DEPTH: usize> Default for CompactSparseArray<T, DEPTH>{
@@ -261,12 +314,19 @@ impl<T, const DEPTH: usize> CompactSparseArray<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger    
 {
+    #[inline(always)]
+    fn check_index_range(index: usize) {
+        assert!(index <= <Self as SparseHierarchy2>::max_range(), "index out of range!");
+    }
+    
     #[inline]
     pub fn get_or_insert(&mut self, index: usize) -> &mut T
     where
         T: Default
     {
-        let indices = level_indices::<u64, ConstUsize<DEPTH>>(index);
+        Self::check_index_range(index);
+        
+        let indices = level_indices::<Mask, ConstUsize<DEPTH>>(index);
         
         // TODO: const for
         // get terminal node pointing to data
@@ -281,10 +341,11 @@ where
                     // TODO: insert node with already inserted ONE element 
                     //       all down below. And immediately exit loop?
                     //       BENCHMARK change.
+
                     // update a child pointer with a (possibly) new address
                     let (mut inserted_ptr, new_node) =
                         if n == DEPTH-2{
-                            node_ptr.insert( inner_index, NodePtr::new::<u32>(DEFAULT_CAP) )
+                            node_ptr.insert( inner_index, NodePtr::new::<DataIndex>(DEFAULT_CAP) )
                         } else {
                             node_ptr.insert( inner_index, NodePtr::new::<NodePtr>(DEFAULT_CAP) )
                         };
@@ -313,26 +374,111 @@ where
         }
     }
     
+    /// As long as container not empty - will always point to some valid nodes.
+    #[inline]
+    unsafe fn get_branch(&self, level_indices: &impl ConstArray<Item=usize>) 
+        -> ConstArrayType<NodePtr, <ConstUsize<DEPTH> as ConstInteger>::Dec> 
+    {
+         // TODO: Do better? Good as is?
+        let mut out: ConstArrayType<NodePtr, <ConstUsize<DEPTH> as ConstInteger>::Dec> = 
+            Array::from_fn(|_|empty_node());
+        
+        let mut node_ptr = self.root;
+        for n in 0..DEPTH-1 {
+            let inner_index = level_indices.as_ref()[n];
+            node_ptr = unsafe{ *node_ptr.get_child(inner_index) };
+            out.as_mut()[n] = node_ptr;
+        }
+        
+        out
+    }
+
+    /// As long as container not empty - will always point to some valid (node, in-node-index).
+    #[inline(always)]
+    unsafe fn get_terminal_node(&self, index: usize) -> (NodePtr, usize) {
+        let indices = level_indices::<Mask, ConstUsize<DEPTH>>(index);
+        let mut node_ptr = self.root;
+        for n in 0..DEPTH-1 {
+            let inner_index = *indices.as_ref().get_unchecked(n);
+            node_ptr = unsafe{ *node_ptr.get_child(inner_index) };
+        }
+        let terminal_inner_index = *indices.as_ref().last().unwrap_unchecked();
+        (node_ptr, terminal_inner_index)
+    }      
+    
+    /// # Panic
+    /// 
+    /// Panics if `index` is out of range.
+    #[inline]
+    pub fn remove(&mut self, index: usize) -> Option<T>{
+        Self::check_index_range(index);
+        
+        if self.data.is_empty(){
+            return None;
+        }
+        
+        unsafe{
+            let indices = level_indices::<Mask, ConstUsize<DEPTH>>(index);
+            let branch = self.get_branch(&indices);
+
+            let terminal_node = branch.as_ref().last().unwrap_unchecked();
+            let terminal_inner_index = *indices.as_ref().last().unwrap_unchecked();
+
+            let data_index = terminal_node.get_child::<DataIndex>(terminal_inner_index).as_usize();
+            
+            if *self.keys.get_unchecked(data_index) == index {
+                terminal_node.remove::<DataIndex>(terminal_inner_index);
+                if terminal_node.header().len == 0 /* TODO: unlikely */ {
+                    terminal_node.drop_node::<DataIndex>();
+                    
+                    // TODO: const loop
+                    for level_n in (0..DEPTH-2).rev() {
+                        let node = branch.as_ref()[level_n];
+                        node.remove::<NodePtr>(indices.as_ref()[level_n]);
+                        if node.header().len != 0 {
+                            break;
+                        } 
+                        
+                        /*const*/ if level_n != 0 /*don't touch root*/ {
+                            node.drop_node::<NodePtr>();
+                        }
+                    }
+                }
+
+                // 2. Update swapped's terminal node
+                let last_key = *self.keys.last().unwrap_unchecked();
+                if last_key != index {
+                    // TODO: this can be get from `terminal_node_positions` as well.
+                    let (node, inner_index) = self.get_terminal_node(last_key);                    
+                    *node.get_child_mut::<DataIndex>(inner_index) = data_index as DataIndex; 
+                }
+                
+                // 3. Remove data        
+                self.keys.swap_remove(data_index);
+                let value = self.data.swap_remove(data_index);
+                
+                Some(value)                
+            } else {
+                None
+            }
+        }   
+    }
+    
     #[inline]
     pub fn get(&self, index: usize) -> Option<&T> {
+        // TODO: bench this
+        Self::check_index_range(index);
+        
         // Almost always false. Have no measurable performance hit.
         if self.data.is_empty(){
             return None;
         }
         
-        let indices = level_indices::<Mask, ConstUsize<DEPTH>>(index);
-        
-        // As long as container not empty - this loop will always point to some valid element.
-        let mut node_ptr = self.root;
-        for n in 0..DEPTH-1 {
-            let inner_index = indices.as_ref()[n];
-            node_ptr = unsafe{ *node_ptr.get_child(inner_index) };
-        }
-        
-        // The element may be wrong thou, so we check its index.
         unsafe{
-            let inner_index = *indices.as_ref().last().unwrap_unchecked();
-            let data_index = node_ptr.get_child::<DataIndex>(inner_index).as_usize();
+            // The element may be wrong thou, so we check its index.
+            let (node, inner_index) = self.get_terminal_node(index);
+            let data_index = node.get_child::<DataIndex>(inner_index).as_usize();
+
             if *self.keys.get_unchecked(data_index) == index{
                 Some(self.data.get_unchecked(data_index))
             } else {
@@ -544,4 +690,30 @@ mod test{
         assert_eq!(*a.get_or_insert(0), 0);
         assert_eq!(*a.get_or_insert(100), 0);
     }
+    
+    #[cfg(not(miri))]
+    #[test]
+    fn test2(){
+        let mut a: CompactSparseArray<usize, 3> = Default::default();
+        
+        for i in 0..200_000{
+            *a.get_or_insert(i) = i;
+        }
+        
+        for i in 0..200_000{
+            let v = *a.get(i).unwrap();
+            assert_eq!(i, v);
+        }
+    }
+    
+    #[test]
+    fn test_remove(){
+        let mut a: CompactSparseArray<usize, 4> = Default::default();
+        *a.get_or_insert(10) = 10;
+        *a.get_or_insert(11) = 11;
+        //*a.get_or_insert(12) = 12;
+        
+        a.remove(11);
+        a.remove(10);
+    }    
 }
