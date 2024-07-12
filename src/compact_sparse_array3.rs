@@ -357,7 +357,7 @@ where
      
         // now fetch data
         unsafe{
-            let mut node_ptr = *node;
+            let node_ptr = *node;
             let inner_index = *indices.as_ref().last().unwrap_unchecked();
             
             let data_index = if node_ptr.contains(inner_index) {
@@ -527,16 +527,11 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked<I>(&self, level_indices: I) -> Self::Data<'_>
+    unsafe fn data_unchecked<I>(&self, index: usize, level_indices: I) -> Self::Data<'_>
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
     {
-        self.data(0, level_indices).unwrap_unchecked()
-        /*{
-            let (node, inner_index) = self.get_terminal_node2(level_indices);
-            let data_index = node.get_child::<DataIndex>(inner_index).as_usize();
-            self.data.get_unchecked(data_index)            
-        }*/
+        self.data(index, level_indices).unwrap_unchecked()
     }
     
     type State = State<T, DEPTH>;

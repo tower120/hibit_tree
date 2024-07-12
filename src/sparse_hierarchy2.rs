@@ -31,8 +31,9 @@ pub trait SparseHierarchy2: Sized + Borrowable<Borrowed=Self> {
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy;
  
-    /// pointed element must exists
-    unsafe fn data_unchecked<I>(&self, level_indices: I) -> Self::Data<'_>
+    /// pointed element must exists,  and `level_indices` must
+    /// corresponds to `index`.
+    unsafe fn data_unchecked<I>(&self, index: usize, level_indices: I) -> Self::Data<'_>
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy;
     
@@ -57,7 +58,7 @@ pub trait SparseHierarchy2: Sized + Borrowable<Borrowed=Self> {
     #[inline]
     unsafe fn get_unchecked(&self, index: usize) -> Self::Data<'_> {
         let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
-        self.data_unchecked(indices)
+        self.data_unchecked(index, indices)
     }    
     
     /// # Panics

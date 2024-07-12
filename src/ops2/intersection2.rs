@@ -42,7 +42,7 @@ where
         todo!()
     }
 
-    unsafe fn data_unchecked<I>(&self, level_indices: I) -> Self::Data<'_>
+    unsafe fn data_unchecked<I>(&self, index: usize, level_indices: I) -> Self::Data<'_>
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
     {
