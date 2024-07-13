@@ -1,9 +1,84 @@
 use std::borrow::Borrow;
+use std::marker::PhantomData;
+use std::ops::RangeTo;
 use crate::BitBlock;
 use crate::const_utils::{ConstArray, ConstInteger};
 use crate::iter2::Iter2;
 use crate::sparse_array::level_indices;
 use crate::utils::{Borrowable, Take};
+
+// Should be just <const WIDTH: usize, const DEPTH: usize>, but RUST not yet
+// support that for our case.
+/// Range checked index. 
+/// 
+/// Known to be in range for `SparseHierarchy<LevelMaskType, LevelCount>`.
+/// 
+/// Whenever you see `impl Into<Index<_, _>>` - you can just use your `usize` index
+/// as usual.
+///  
+/// Index range check is very cheap, and is just one assert_eq with constant value.
+/// But in tight loops you may want to get rid of that check - and that's the sole
+/// purpose of `Index`.  
+///
+/// ```
+/// #use hi_sparse_array::Index;
+///  
+/// // use it just as usize
+/// array.get(12);
+/// 
+/// // zero-cost unsafe construction
+/// array.get(unsafe{ Index::new_unchecked(12) });
+/// 
+/// // safe construct once, then reuse
+/// {
+///     let i = Index::from(12);
+///     array.get(i);
+///     array2.get(i);
+/// }
+/// ``` 
+#[derive(Copy, Clone)]
+pub struct Index<LevelMaskType: BitBlock, LevelCount: ConstInteger>(
+    usize, PhantomData<(LevelMaskType, LevelCount)>
+);
+
+impl<LevelMaskType: BitBlock, LevelCount: ConstInteger> 
+    Index<LevelMaskType, LevelCount>
+{
+    /// # Safety
+    ///
+    /// You must guarantee that index is in SparseHierarchy<LevelMaskType, LevelCount> range.
+    #[inline]
+    pub unsafe fn new_unchecked(index: usize) -> Self {
+        Self(index, Default::default())
+    }
+}
+
+/// usize -> SparseHierarchyIndex
+impl<LevelMaskType: BitBlock, LevelCount: ConstInteger> From<usize>
+for
+    Index<LevelMaskType, LevelCount>
+{
+    /// # Panic
+    ///
+    /// Panics if index is not in SparseHierarchy<LevelMaskType, LevelCount> range.
+    #[inline]
+    fn from(index: usize) -> Self {
+        let range_end = LevelMaskType::SIZE.pow(LevelCount::VALUE as _);
+        assert!(index < range_end);
+        unsafe{ Self::new_unchecked(index) }
+    }
+}
+
+/// SparseHierarchyIndex -> usize 
+impl<LevelMaskType: BitBlock, LevelCount: ConstInteger> 
+    From<Index<LevelMaskType, LevelCount>>
+for usize
+{
+    #[inline]
+    fn from(value: Index<LevelMaskType, LevelCount>) -> Self {
+        value.0
+    }
+}
 
 /// 
 /// TODO: Change description
@@ -44,12 +119,14 @@ pub trait SparseHierarchy2: Sized + Borrowable<Borrowed=Self> {
         Iter2::new(self)
     }
 
-    /// # Panics
-    /// 
-    /// Will panic if item at `index` does not exists.
+    /// You can use `usize` or [Index] for `index`.
     #[inline]
-    fn get(&self, index: usize) -> Self::Data<'_> {
-        self.try_get(index).unwrap()
+    fn get(&self, index: impl Into<Index<Self::LevelMaskType, Self::LevelCount>>) 
+        -> Option<Self::Data<'_>> 
+    {
+        let index: usize = index.into().into();
+        let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
+        unsafe{ self.data(index, indices) }
     }
 
     /// # Safety
@@ -59,33 +136,17 @@ pub trait SparseHierarchy2: Sized + Borrowable<Borrowed=Self> {
     unsafe fn get_unchecked(&self, index: usize) -> Self::Data<'_> {
         let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
         self.data_unchecked(index, indices)
-    }    
-    
-    /// # Panics
-    /// 
-    /// Will panic if `index` is outside [max_range()].
-    #[inline]
-    fn try_get(&self, index: usize) -> Option<Self::Data<'_>> {
-        assert!(index <= Self::max_range(), "index out of range!");
-        unsafe{ self.try_get_unchecked(index) }
-    }  
-
-    /// # Safety
-    /// 
-    /// `index` must be within [max_range()].
-    #[inline]
-    unsafe fn try_get_unchecked(&self, index: usize) -> Option<Self::Data<'_>> {
-        let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
-        unsafe{ self.data(index, indices) }
     }
     
-    /// Max index this SparseHierarchy can contain.
+    /// Index range this SparseHierarchy can handle - `0..width^depth`.
     /// 
-    /// Act as `const` - noop.
+    /// Indices outside of this range considered to be invalid.
+    /// 
+    /// Act as `const`.
     #[inline]
-    /*const*/ fn max_range() -> usize {
-        Self::LevelMaskType::SIZE.pow(Self::LevelCount::VALUE as _) - 1 
-    }    
+    /*const*/ fn index_range() -> RangeTo<usize> {
+        RangeTo{ end: Self::LevelMaskType::SIZE.pow(Self::LevelCount::VALUE as _) }
+    }
 }
 
 /// Stateful [SparseHierarchy2] interface.

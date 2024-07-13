@@ -113,7 +113,7 @@ where
 {
     #[inline(always)]
     fn check_index_range(index: usize) {
-        assert!(index <= <Self as SparseHierarchy2>::max_range(), "index out of range!");
+        assert!(!<Self as SparseHierarchy2>::index_range().contains(&index), "index out of range!");
     }
     
     #[inline(always)]

@@ -1,7 +1,7 @@
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
 use rand::{Rng, SeedableRng};
 use rand::seq::SliceRandom;
-use hi_sparse_array::{config, SparseArray};
+use hi_sparse_array::{config, SparseArray, Index};
 use hi_sparse_array::compact_sparse_array3::CompactSparseArray;
 //use hi_sparse_array::level_block::{Block, ClusterBlock, SmallBlock};
 //use hi_sparse_array::Iter;
@@ -55,7 +55,7 @@ fn compact_array_get(array: &CompactArray, indices: &[usize]) -> u64 {
     let mut s = 0;
     for &i in indices{
         //s += unsafe{ array.get_unchecked(i) }.0;
-        s += unsafe{ array.try_get_unchecked(i) }.unwrap_or(&DataBlock(0)).0;
+        s += unsafe{ array.get(Index::new_unchecked(i)) }.unwrap_or(&DataBlock(0)).0;
         //s += array.get_or_default(i).0;
     }
     s
@@ -73,7 +73,7 @@ fn array_get(array: &BlockArray, indices: &[usize]) -> u64 {
     let mut s = 0;
     for &i in indices{
         unsafe{
-        s += array.try_get_unchecked(i)
+        s += array.get(Index::new_unchecked(i))
             //.unwrap_unchecked().0;
             .unwrap_or(&DataBlock(0)).0;
         }

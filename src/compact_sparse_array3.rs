@@ -9,7 +9,7 @@ use std::marker::PhantomData;
 use std::mem::{align_of, size_of};
 use std::ptr::{addr_of, addr_of_mut, NonNull, null};
 use crate::bit_utils::{get_bit_unchecked, set_bit_unchecked};
-use crate::BitBlock;
+use crate::{BitBlock, Index};
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger, ConstUsize};
 use crate::sparse_array::level_indices;
 use crate::sparse_hierarchy2::{SparseHierarchy2, SparseHierarchyState2};
@@ -314,17 +314,12 @@ impl<T, const DEPTH: usize> CompactSparseArray<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger    
 {
-    #[inline(always)]
-    fn check_index_range(index: usize) {
-        assert!(index <= <Self as SparseHierarchy2>::max_range(), "index out of range!");
-    }
-    
     #[inline]
-    pub fn get_or_insert(&mut self, index: usize) -> &mut T
+    pub fn get_or_insert(&mut self, index: impl Into<Index<Mask, ConstUsize<DEPTH>>>) -> &mut T
     where
         T: Default
     {
-        Self::check_index_range(index);
+        let index: usize = index.into().into();
         
         let indices = level_indices::<Mask, ConstUsize<DEPTH>>(index);
         
@@ -406,12 +401,9 @@ where
         (node_ptr, terminal_inner_index)
     }      
     
-    /// # Panic
-    /// 
-    /// Panics if `index` is out of range.
     #[inline]
-    pub fn remove(&mut self, index: usize) -> Option<T>{
-        Self::check_index_range(index);
+    pub fn remove(&mut self, index: impl Into<Index<Mask, ConstUsize<DEPTH>>>) -> Option<T>{
+        let index: usize = index.into().into();
         
         if self.data.is_empty(){
             return None;
@@ -678,9 +670,9 @@ mod test{
     #[test]
     fn test(){
         let mut a: CompactSparseArray<usize, 3> = Default::default();
-        assert_eq!(a.try_get(15), None);
+        assert_eq!(a.get(15), None);
         *a.get_or_insert(15) = 89;
-        assert_eq!(*a.try_get(15).unwrap(), 89);
+        assert_eq!(*a.get(15).unwrap(), 89);
 
         /*for (_, v) in a.iter() {
             println!("{:?}", *v);
@@ -701,7 +693,7 @@ mod test{
         }
         
         for i in 0..200_000{
-            let v = *a.try_get(i).unwrap();
+            let v = *a.get(i).unwrap();
             assert_eq!(i, v);
         }
     }
