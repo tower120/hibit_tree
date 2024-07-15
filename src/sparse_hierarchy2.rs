@@ -64,7 +64,7 @@ for
     #[inline]
     fn from(index: usize) -> Self {
         let range_end = LevelMaskType::SIZE.pow(LevelCount::VALUE as _);
-        assert!(index < range_end);
+        assert!(index < range_end, "Index {index} is out of SparseHierarchy range.");
         unsafe{ Self::new_unchecked(index) }
     }
 }
