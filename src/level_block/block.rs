@@ -95,6 +95,16 @@ where
     }
 
     #[inline]
+    unsafe fn insert(
+        &mut self,
+        index: usize,
+        item: Self::Item
+    ) {
+        self.mask.set_bit::<true>(index);
+        *self.block_indices.as_mut().get_unchecked_mut(index) = item; 
+    }
+
+    #[inline]
     unsafe fn remove_unchecked(&mut self, index: usize) {
         self.mask.set_bit::<false>(index);
         *self.block_indices.as_mut().get_unchecked_mut(index) = Primitive::ZERO;

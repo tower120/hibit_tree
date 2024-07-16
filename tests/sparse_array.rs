@@ -2,14 +2,27 @@
 
 mod common;
 
+use itertools::assert_equal;
 use rand::{Rng, SeedableRng};
 use rand::prelude::SliceRandom;
-use hi_sparse_array::SparseHierarchy2;
+use hi_sparse_array::{config, SparseHierarchy2};
 
 #[derive(Default, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 struct Data(usize);
 
 type Array = common::Array<Data>;
+
+/*#[test]
+fn smoke_test(){
+    {
+        let mut array = hi_sparse_array::SparseArray::<config::width_64::depth_2, Data>::default();
+        array.insert(10, Data(10));
+    }
+    
+    let mut array = Array::default();
+    //array.insert(143231, Data(143231));
+    //array.insert(175928, Data(175928));
+}*/
 
 #[test]
 fn insert_test(){
@@ -24,6 +37,26 @@ fn insert_test(){
         array.insert(v, Data(v));
         //*array.get_or_insert(v) = Data(v);
     }
+}
+
+#[test]
+fn insert_test2(){
+    #[cfg(miri)]
+    const COUNT: usize = 2000;
+    #[cfg(not(miri))]
+    const COUNT: usize = 200_000;
+    
+    let mut a = Array::default();
+    for i in 0..COUNT{
+        *a.get_or_insert(i) = Data(i);
+    }
+    
+    for i in 0..COUNT{
+        let v = a.get(i).unwrap();
+        assert_eq!(v, &Data(i));
+    }    
+    
+    assert_equal(a.iter().map(|(key, value)| value.0), 0..COUNT);
 }
 
 #[test]

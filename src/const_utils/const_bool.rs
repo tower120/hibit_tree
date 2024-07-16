@@ -3,12 +3,16 @@ use crate::BitBlock;
 use crate::const_utils::cond_type::Either;
 use crate::const_utils::const_int::ConstInteger;
 
-pub trait ConstBool: Default + Copy{
+pub trait ConstBool: Default + Copy {
     const VALUE: bool;
     /// T if true, F otherwise.
     type Conditional<T, F>;
     /// Same as [Conditional] but with [ConstInteger] bounds.
     type ConditionalInt<T: ConstInteger, F: ConstInteger>: ConstInteger;
+    
+    fn value(self) -> bool {
+        Self::VALUE
+    }
 }
 
 #[derive(Default, Clone, Copy)]

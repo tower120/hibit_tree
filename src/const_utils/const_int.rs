@@ -71,7 +71,7 @@ trait ConstIntegerPrivate{
 /// 
 /// We need this machinery to fight against Rust's half-baked const evaluation. 
 /// With this, we can do const {Self::N+1} in stable rust. 
-pub trait ConstInteger: ConstIntegerPrivate + Default + Copy + Eq + Debug {
+pub trait ConstInteger: ConstIntegerPrivate + Default + Copy + Eq + Debug + 'static {
     const VALUE: usize;
     const DEFAULT: Self;
     
@@ -261,5 +261,5 @@ mod test{
                 Continue(())
             }
         }
-    }    
+    }
 }

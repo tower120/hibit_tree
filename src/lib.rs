@@ -153,7 +153,7 @@ pub(crate) fn data_block_index<LevelCount: ConstInteger, LevelMaskType: BitBlock
 ) -> usize {
     let level_count = LevelCount::VALUE;
     let mut acc = data_index;
-    for N in 0..level_count - 1{
+    for N in 0..level_count - 1 {
         acc += level_indices.as_ref()[N] << (LevelMaskType::SIZE.ilog2() as usize * (level_count - N - 1));
     }
     acc

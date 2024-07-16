@@ -34,14 +34,24 @@ pub trait HiBlock: MaybeEmptyIntrusive {
     /// index is not checked for out-of-bounds.
     unsafe fn get_or_zero(&self, index: usize) -> Self::Item;
     
+    // TODO: consider removing this
     /// # Safety
     ///
     /// `index` is not checked.
+    #[deprecated = "use get() + insert()"]
     unsafe fn get_or_insert(
         &mut self,
         index: usize,
         f: impl FnOnce() -> Self::Item
     ) -> (Self::Item, bool/*inserted*/);
+    
+    unsafe fn insert(
+        &mut self,
+        index: usize,
+        item: Self::Item
+    ) {
+        todo!()
+    }
     
     /// # Safety
     ///
