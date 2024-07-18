@@ -11,9 +11,9 @@ use hi_sparse_array::const_utils::{ConstFalse, ConstTrue};
 use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
 use hi_sparse_array::BinaryOp;
 use hi_sparse_array::compact_sparse_array2::CompactSparseArray;
-use hi_sparse_array::ops2::union2::union2;
-use hi_sparse_array::ops2::union3::union;
-use hi_sparse_array::sparse_hierarchy2::{SparseHierarchy2, SparseHierarchyState2};
+use hi_sparse_array::ops::union2::union2;
+use hi_sparse_array::ops::union3::union;
+use hi_sparse_array::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use hi_sparse_array::utils::Take;
 
 type Lvl0Block = Block<u64, [u8;64]>;
@@ -192,8 +192,8 @@ fn apply_iter(array1: &BlockArray, array2: &BlockArray) -> u64 {
 
 fn union2_iter<A1, A2>(array1: &A1, array2: &A2) -> u64
 where
-    A1: SparseHierarchy2<DataType = DataBlock>,
-    A2: SparseHierarchy2<DataType = DataBlock, LevelCount = A1::LevelCount, LevelMaskType = A1::LevelMaskType>
+    A1: SparseHierarchy<DataType = DataBlock>,
+    A2: SparseHierarchy<DataType = DataBlock, LevelCount = A1::LevelCount, LevelMaskType = A1::LevelMaskType>
 {
     let union = union(array1, array2, |v0, v1|{
         let v0 = v0.map_or(0, |v|v.0);

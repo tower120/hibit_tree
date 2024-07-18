@@ -1,17 +1,90 @@
 use std::borrow::Borrow;
-use crate::{Array, BitBlock};
+use std::marker::PhantomData;
+use std::ops::RangeTo;
+use crate::BitBlock;
+use crate::const_utils::{ConstArray, ConstInteger};
 use crate::iter::Iter;
 use crate::sparse_array::level_indices;
-use crate::const_utils::const_int::ConstInteger;
-use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
-use crate::Empty;
 use crate::utils::{Borrowable, Take};
+
+// Should be just <const WIDTH: usize, const DEPTH: usize>, but RUST not yet
+// support that for our case.
+/// Range checked index. 
+/// 
+/// Known to be in range for `SparseHierarchy<LevelMaskType, LevelCount>`.
+/// 
+/// Whenever you see `impl Into<Index<_, _>>` - you can just use your `usize` index
+/// as usual.
+///  
+/// Index range check is very cheap, and is just one assert_eq with constant value.
+/// But in tight loops you may want to get rid of that check - and that's the sole
+/// purpose of `Index`.  
+///
+/// ```
+/// #use hi_sparse_array::Index;
+///  
+/// // use it just as usize
+/// array.get(12);
+/// 
+/// // zero-cost unsafe construction
+/// array.get(unsafe{ Index::new_unchecked(12) });
+/// 
+/// // safe construct once, then reuse
+/// {
+///     let i = Index::from(12);
+///     array.get(i);
+///     array2.get(i);
+/// }
+/// ``` 
+#[derive(Copy, Clone)]
+pub struct Index<LevelMaskType: BitBlock, LevelCount: ConstInteger>(
+    usize, PhantomData<(LevelMaskType, LevelCount)>
+);
+
+impl<LevelMaskType: BitBlock, LevelCount: ConstInteger> 
+    Index<LevelMaskType, LevelCount>
+{
+    /// # Safety
+    ///
+    /// You must guarantee that index is in SparseHierarchy<LevelMaskType, LevelCount> range.
+    #[inline]
+    pub unsafe fn new_unchecked(index: usize) -> Self {
+        Self(index, Default::default())
+    }
+}
+
+/// usize -> SparseHierarchyIndex
+impl<LevelMaskType: BitBlock, LevelCount: ConstInteger> From<usize>
+for
+    Index<LevelMaskType, LevelCount>
+{
+    /// # Panic
+    ///
+    /// Panics if index is not in SparseHierarchy<LevelMaskType, LevelCount> range.
+    #[inline]
+    fn from(index: usize) -> Self {
+        let range_end = LevelMaskType::SIZE.pow(LevelCount::VALUE as _);
+        assert!(index < range_end, "Index {index} is out of SparseHierarchy range.");
+        unsafe{ Self::new_unchecked(index) }
+    }
+}
+
+/// SparseHierarchyIndex -> usize 
+impl<LevelMaskType: BitBlock, LevelCount: ConstInteger> 
+    From<Index<LevelMaskType, LevelCount>>
+for usize
+{
+    #[inline]
+    fn from(value: Index<LevelMaskType, LevelCount>) -> Self {
+        value.0
+    }
+}
 
 /// 
 /// TODO: Change description
 ///
 // We need xxxxType for each concrete level_block/mask type to avoid the need for use `for<'a>`,
-// which is still not working (at Rust level) in cases, where we need it most. 
+// which is still not working (at Rust level) in cases, where we need it most.
 pub trait SparseHierarchy: Sized + Borrowable<Borrowed=Self> {
     /// TODO: Decription form hi_sparse_bitset TRUSTED_HIERARCHY
     const EXACT_HIERARCHY: bool;
@@ -22,129 +95,57 @@ pub trait SparseHierarchy: Sized + Borrowable<Borrowed=Self> {
     type LevelMaskType: BitBlock;
     type LevelMask<'a>: Borrow<Self::LevelMaskType> + Take<Self::LevelMaskType>
         where Self: 'a;
-    
-    /// Returns bitmask for level `I::CAP`. 
-    /// 
-    /// Each `level_indices` array elements corresponds to each level, skipping root.
-    /// Root level skipped, for performance reasons, since root block is always one.
-    /// 
-    /// # Exapmle
-    /// 
-    /// ```
-    /// // 2 level 64 bit hierarchy.
-    /// let array;
-    /// // Root node corresponds to range 0..4095
-    /// let root_mask = array.level_mask();
-    /// // Mask of root node's child node with index 10.
-    /// // This node corresponds to range 640..703
-    /// let lvl1_mask = array.level_mask([10]);
-    /// ```
-    /// 
-    /// # Safety
-    ///
-    /// `level_indices` are not checked.
-    unsafe fn level_mask<I>(&self, level_indices: I) -> Self::LevelMask<'_>
-    where
-        I: ConstArray<Item=usize> + Copy;
-    
-    type DataType: Empty;
+ 
+    type DataType;
     type Data<'a>: Borrow<Self::DataType> + Take<Self::DataType>
         where Self: 'a;
-    /// # Safety
-    ///
-    /// indices are not checked.
-    unsafe fn data_block<I>(&self, level_indices: I) -> Self::Data<'_>
+ 
+    /// Element may not exists, but `index` must be in range, and `level_indices` must
+    /// corresponds to `index`.
+    unsafe fn data<I>(&self, index: usize, level_indices: I) -> Option<Self::Data<'_>>
+    where
+        I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy;
+ 
+    /// pointed element must exists,  and `level_indices` must
+    /// corresponds to `index`.
+    unsafe fn data_unchecked<I>(&self, index: usize, level_indices: I) -> Self::Data<'_>
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy;
     
-    /// Same as [may_contain], but without range checks.
-    /// 
-    /// # Safety
-    ///
-    /// `index` must be in [max_range].
-    #[inline]
-    unsafe fn may_contain_unchecked(&self, index: usize) -> bool {
-        let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
-        let (level_indices, mask_index) = indices.split_last();
-        let mask = self.level_mask(level_indices);
-        mask.borrow().get_bit(mask_index)
-    }
-    
-    /// Returns true if element at `index` is non-empty.
-    /// 
-    /// Faster than [get] + [is_empty], since output is based on hierarchy data only.
-    /// May return false positives with non-[EXACT_HIERARCHY].
-    /// 
-    /// # Panics
-    /// 
-    /// Will panic if `index` is outside [max_range()].
-    #[inline]
-    fn may_contain(&self, index: usize) -> bool {
-        assert!(index <= Self::max_range(), "index out of range!");
-        unsafe{ self.may_contain_unchecked(index) }
-    }
-    
-    /// Same as [contains], but without range checks.
-    ///
-    /// # Safety
-    ///
-    /// `index` must be in [max_range].
-    #[inline]
-    unsafe fn contains_unchecked(&self, index: usize) -> bool {
-        if Self::EXACT_HIERARCHY {
-            self.may_contain_unchecked(index)
-        } else {
-            self.get_unchecked(index).borrow().is_empty()
-        }
-    }
-    
-    /// Returns true if element at `index` is non-empty.
-    /// 
-    /// If [EXACT_HIERARCHY] - faster than [get] + [is_empty].
-    /// Otherwise - just do the job.
-    /// 
-    /// # Panics
-    /// 
-    /// Will panic if `index` is outside [max_range()].
-    #[inline]
-    fn contains(&self, index: usize) -> bool {
-        assert!(index <= Self::max_range(), "index out of range!");
-        unsafe{ self.contains_unchecked(index) }
-    }
-    
-    /// # Safety
-    ///
-    /// `index` must be in [max_range].
-    #[inline]
-    unsafe fn get_unchecked(&self, index: usize) -> Self::Data<'_> {
-        let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
-        self.data_block(indices)
-    }
-    
-    /// # Panics
-    /// 
-    /// Will panic if `index` is outside [max_range()].
-    #[inline]
-    fn get(&self, index: usize) -> Self::Data<'_>{
-        assert!(index <= Self::max_range(), "index out of range!");
-        unsafe{ self.get_unchecked(index) }
-    }    
+    type State: SparseHierarchyState<This = Self>; 
     
     #[inline]
     fn iter(&self) -> Iter<Self>{
         Iter::new(self)
     }
-    
-    /// Use [DefaultHierarchyState] as default, if you don't want to implement 
-    /// stateful SparseHierarchy.
-    type State: SparseHierarchyState<This = Self>;
-    
-    /// Max index this SparseHierarchy can contain.
-    /// 
-    /// Act as `const` - noop.
+
+    /// You can use `usize` or [Index] for `index`.
     #[inline]
-    /*const*/ fn max_range() -> usize {
-        Self::LevelMaskType::SIZE.pow(Self::LevelCount::VALUE as _) - 1 
+    fn get(&self, index: impl Into<Index<Self::LevelMaskType, Self::LevelCount>>) 
+        -> Option<Self::Data<'_>> 
+    {
+        let index: usize = index.into().into();
+        let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
+        unsafe{ self.data(index, indices) }
+    }
+
+    /// # Safety
+    ///
+    /// Item at `index` must exist.
+    #[inline]
+    unsafe fn get_unchecked(&self, index: usize) -> Self::Data<'_> {
+        let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
+        self.data_unchecked(index, indices)
+    }
+    
+    /// Index range this SparseHierarchy can handle - `0..width^depth`.
+    /// 
+    /// Indices outside of this range considered to be invalid.
+    /// 
+    /// Act as `const`.
+    #[inline]
+    /*const*/ fn index_range() -> RangeTo<usize> {
+        RangeTo{ end: Self::LevelMaskType::SIZE.pow(Self::LevelCount::VALUE as _) }
     }
 }
 
@@ -155,7 +156,7 @@ pub trait SparseHierarchy: Sized + Borrowable<Borrowed=Self> {
 /// this can get a significant performance boost, especially in generative [SparseHierarchy]'ies.
 /// 
 /// Block levels must be selected top(0) to bottom(last N) level.
-/// When you [select_level_bock], all levels below considered **not** selected.
+/// When you [select_level_node], all levels below considered **not** selected.
 /// For example, for 3-level hierarchy you select level 0, 1, 2 and then you can
 /// access data level. But if after that, you change/select level 1 block - 
 /// you should select level 2 block too, before accessing data level again. 
@@ -166,101 +167,44 @@ pub trait SparseHierarchy: Sized + Borrowable<Borrowed=Self> {
 /// For 2-level 64bit hierarchy:
 /// ```
 /// // Select the only level0 block (corresponds to array indices [0..4096))
-/// let mask0 = state.select_level_bock(array, ConstInt::<0>, 0);
+/// let mask0 = state.select_level_node(array, ConstInt::<0>, 0);
 /// // Select 4th level1 block (corresponds to array indices [192..256))
-/// let mask1 = state.select_level_bock(array, ConstInt::<1>, 3);
+/// let mask1 = state.select_level_node(array, ConstInt::<1>, 3);
 /// // Select 9th data block (array index 201)
-/// let data = state.data_block(array, 9);
+/// let data = state.data(array, 9);
 /// ``` 
-pub trait SparseHierarchyState{
+pub trait SparseHierarchyState {
     type This: SparseHierarchy;
     
     fn new(this: &Self::This) -> Self;
     
-    /// Select block at `level_n` with `level_index`. Where `level_index` is index
-    /// in block pointing to `level_n` (which was previously selected). 
-    /// 
-    /// Returns `level_mask`.
-    /// 
-    /// All levels below, considered **not** selected.
-    /// 
-    /// # Safety
-    /// 
-    /// - `level_index` is not checked.
-    /// - All previous levels must be selected. 
-    unsafe fn select_level_bock<'a, N: ConstInteger>(
+    /// Item at index may not exist. Will return empty mask in such case.
+    unsafe fn select_level_node<'a, N: ConstInteger>(
+        &mut self,
+        this: &'a Self::This,
+        level_n: N, 
+        level_index: usize,
+    ) -> <Self::This as SparseHierarchy>::LevelMask<'a>;
+    
+    /// Pointed node must exists
+    unsafe fn select_level_node_unchecked<'a, N: ConstInteger>(
         &mut self,
         this: &'a Self::This,
         level_n: N, 
         level_index: usize
-    ) -> <Self::This as SparseHierarchy>::LevelMask<'a>;        
+    ) -> <Self::This as SparseHierarchy>::LevelMask<'a>;
     
-    /// # Safety
-    /// 
-    /// - `level_index` is not checked.
-    /// - All hierarchy levels must be selected.
-    unsafe fn data_block<'a>(
+    /// Item at index may not exist.
+    unsafe fn data<'a>(
         &self,
         this: &'a Self::This,
         level_index: usize
-    ) -> <Self::This as SparseHierarchy>::Data<'a>;    
-}
-
-/// [SparseHierarchyState] that use [SparseHierarchy] stateless methods.
-pub struct DefaultHierarchyState<This>
-where
-    This: SparseHierarchy
-{
-    /// [usize; This::LevelCount - 1]
-    level_indices: ConstArrayType<
-        usize,
-        <This::LevelCount as ConstInteger>::Dec   
-    >
-}
-
-impl<This: SparseHierarchy> SparseHierarchyState for DefaultHierarchyState<This>{
-    type This = This;
-
-    #[inline]
-    fn new(_: &Self::This) -> Self {
-        Self{
-            level_indices: Array::from_fn(|_| 0)
-        }
-    }
-
-    #[inline]
-    unsafe fn select_level_bock<'a, N: ConstInteger>(
-        &mut self, this: &'a Self::This, level_n: N, level_index: usize
-    ) -> <Self::This as SparseHierarchy>::LevelMask<'a> {
-        if /*const*/ level_n.value() == 0 {
-            debug_assert!(level_index == 0);
-        } else {
-            self.level_indices.as_mut()[level_n.dec().value()] = level_index;
-        }
-        
-        let indices: ConstCopyArrayType<usize, N> 
-            = Array::from_fn(|/*const*/ i| {
-                if /*const*/ N::VALUE-1 == i {
-                    level_index
-                } else {
-                    self.level_indices.as_ref()[i]    
-                }
-            });
-        this.level_mask(indices)
-    }
-
-    #[inline]
-    unsafe fn data_block<'a>(&self, this: &'a Self::This, level_index: usize) 
-        -> <Self::This as SparseHierarchy>::Data<'a> 
-    {
-        let indices: ConstCopyArrayType<usize, This::LevelCount> 
-            = Array::from_fn(|/*const*/ i| {
-                if /*const*/ This::LevelCount::VALUE-1 == i {
-                    level_index
-                } else {
-                    self.level_indices.as_ref()[i]    
-                }
-            });
-        this.data_block(indices)
-    }
+    ) -> Option<<Self::This as SparseHierarchy>::Data<'a>>;      
+ 
+    /// Pointed data must exists
+    unsafe fn data_unchecked<'a>(
+        &self,
+        this: &'a Self::This,
+        level_index: usize
+    ) -> <Self::This as SparseHierarchy>::Data<'a>;        
 }

@@ -7,7 +7,7 @@ use crate::const_utils::const_array::ConstArrayType;
 use crate::utils::Take;
 use crate::utils::array::Array;
 
-// TODO: could be u32's
+// TODO: could be u8's
 /// [usize; T::LevelCount::N - 1]
 type LevelIndices<T: SparseHierarchy> =
     ConstArrayType<
@@ -36,7 +36,7 @@ where
     /// [T::LevelMaskType::BitsIter; T::LevelCount]
     level_iters: LevelIterators<T>,
     
-    /// [usize; T::LevelCount::N - 1]
+    /// [usize; T::LevelCount - 1]
     level_indices: LevelIndices<T>,
 
     state: T::State,
@@ -53,7 +53,7 @@ where
         let mut state = T::State::new(container);
         
         let root_mask = unsafe{
-            state.select_level_bock(container, ConstUsize::<0>, 0)
+            state.select_level_node_unchecked(container, ConstUsize::<0>, 0)
         };
         let level0_iter = root_mask.take_or_clone().into_bits_iter();
         
@@ -83,8 +83,8 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let level_index = loop {
             // We're driven by top-level iterator.
-            let top_level_iter = self.level_iters.as_mut().last_mut().unwrap();
-            if let Some(index) = top_level_iter.next() {
+            let last_level_iter = self.level_iters.as_mut().last_mut().unwrap();
+            if let Some(index) = last_level_iter.next() {
                 break index;
             } else {
                 let ctrl = const_for_rev(ConstUsize::<0>, T::LevelCount::DEFAULT.dec(), V(self)); 
@@ -110,7 +110,7 @@ where
                             // 2. update level_iter from mask
                             let level_depth = i.inc();                            
                             let level_mask = unsafe{
-                                self.0.state.select_level_bock(
+                                self.0.state.select_level_node_unchecked(
                                     &self.0.container,
                                     level_depth,
                                     index
@@ -137,9 +137,9 @@ where
         };
 
         let data_block = unsafe {
-            self.state.data_block(&self.container, level_index)
+            self.state.data_unchecked(&self.container, level_index)
         };
-        let block_index = data_block_index::<T>(&self.level_indices, level_index);
+        let block_index = data_block_index::<T::LevelCount, T::LevelMaskType>(&self.level_indices, level_index);
         Some((block_index, data_block))
     }    
 }

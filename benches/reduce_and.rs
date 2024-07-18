@@ -188,8 +188,8 @@ fn apply_small_iter(array1: &SmallBlockArray, array2: &SmallBlockArray) -> u64 {
 }
 
 fn intersection2_iter(array1: &CompactArray, array2: &CompactArray) -> u64 {
-    use hi_sparse_array::ops2::intersection2::intersection;
-    use hi_sparse_array::sparse_hierarchy2::SparseHierarchy2;
+    use hi_sparse_array::ops::intersection::intersection;
+    use hi_sparse_array::sparse_hierarchy::SparseHierarchy;
     
     let intersection = intersection(array1, array2, |d1, d2| DataBlock(d1.0 & d2.0));
     

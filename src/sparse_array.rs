@@ -14,7 +14,7 @@ use crate::{Empty, Index};
 use crate::utils::primitive::Primitive;
 use crate::utils::array::{Array};
 use crate::sparse_array_levels::{FoldMutVisitor, FoldVisitor, MutVisitor, SparseArrayLevels, TypeVisitor, Visitor};
-use crate::sparse_hierarchy2::{SparseHierarchy2, SparseHierarchyState2};
+use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 
 // TODO: make public
 // Compile-time loop inside. Ends up with N (AND + SHR)s.
@@ -443,7 +443,10 @@ where
                 
                 // 2. Insert new block index as a child
                 unsafe{
-                    // take block again, since it could move on "insert_empty_block".
+                    // Take **THE SAME** and **UNCHANGED** block again, now as mut, 
+                    // just because MIRI does not see that we work with different
+                    // level/tuple elements.
+                    // Let's hope that compiler does eliminate this inefficiency.
                     let block_ptr = self.get_block_mut(level_index, level_block_index);   
                     block_ptr.insert_child(inner_index, new_level_block_index);
                 }
@@ -558,7 +561,7 @@ impl<Levels, Data> Borrowable for SparseArray<Levels, Data>{
     type Borrowed = SparseArray<Levels, Data>; 
 }
 
-impl<Levels, Data> SparseHierarchy2 for SparseArray<Levels, Data>
+impl<Levels, Data> SparseHierarchy for SparseArray<Levels, Data>
 where
     Levels: SparseArrayLevels
 {
@@ -621,7 +624,7 @@ where
     phantom_data: PhantomData<SparseArray<Levels, Data>>
 }
 
-impl<Levels, Data> SparseHierarchyState2 for SparseArrayState<Levels, Data>
+impl<Levels, Data> SparseHierarchyState for SparseArrayState<Levels, Data>
 where
     Levels: SparseArrayLevels
 {
@@ -638,14 +641,14 @@ where
     #[inline(always)]
     unsafe fn select_level_node_unchecked<'a, N: ConstInteger>(
         &mut self, this: &'a Self::This, level_n: N, level_index: usize
-    ) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
+    ) -> <Self::This as SparseHierarchy>::LevelMask<'a> {
         self.select_level_node(this, level_n, level_index)
     }
     
     #[inline(always)]
     unsafe fn select_level_node<'a, N: ConstInteger>(
         &mut self, this: &'a Self::This, level_n: N, level_index: usize
-    ) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
+    ) -> <Self::This as SparseHierarchy>::LevelMask<'a> {
         if N::VALUE == 0 {
             assert_eq!(level_index, 0); // This act as compile-time check
             let block = this.get_block(level_n, 0);
@@ -676,14 +679,14 @@ where
 
     #[inline(always)]
     unsafe fn data_unchecked<'a>(&self, this: &'a Self::This, level_index: usize)
-        -> <Self::This as SparseHierarchy2>::Data<'a> 
+        -> <Self::This as SparseHierarchy>::Data<'a> 
     {
         self.data(this, level_index).unwrap_unchecked()
     }
     
     #[inline(always)]
     unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize)
-        -> Option<<Self::This as SparseHierarchy2>::Data<'a>> 
+        -> Option<<Self::This as SparseHierarchy>::Data<'a>> 
     {
         let last_level_index = Levels::LevelCount::VALUE - 1;
         

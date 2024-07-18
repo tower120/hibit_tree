@@ -30,7 +30,7 @@ type ClusterBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveList
 type CompactArray = CompactSparseArray<DataBlock, 2>;
 
 fn compact_array_iter(array: &CompactArray) -> u64 {
-    use hi_sparse_array::sparse_hierarchy2::SparseHierarchy2;
+    use hi_sparse_array::sparse_hierarchy::SparseHierarchy;
     
     let mut s = 0;
     for (_, i) in array.iter(){

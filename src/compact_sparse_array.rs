@@ -12,7 +12,7 @@ use crate::bit_utils::{get_bit_unchecked, set_bit_unchecked};
 use crate::{BitBlock, Index};
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger, ConstUsize};
 use crate::sparse_array::level_indices;
-use crate::sparse_hierarchy2::{SparseHierarchy2, SparseHierarchyState2};
+use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::utils::{Array, Borrowable, Primitive};
 
 type Mask = u64;
@@ -480,7 +480,7 @@ impl<T, const DEPTH: usize> Drop for CompactSparseArray<T, DEPTH> {
     }
 }
 
-impl<T, const DEPTH: usize> SparseHierarchy2 for CompactSparseArray<T, DEPTH>
+impl<T, const DEPTH: usize> SparseHierarchy for CompactSparseArray<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger
 {
@@ -543,7 +543,7 @@ where
     phantom_data: PhantomData<T>
 }
 
-impl<T, const DEPTH: usize> SparseHierarchyState2 for State<T, DEPTH>
+impl<T, const DEPTH: usize> SparseHierarchyState for State<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger
 {
@@ -563,7 +563,7 @@ where
         this: &'a Self::This, 
         level_n: N, 
         level_index: usize
-    ) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
+    ) -> <Self::This as SparseHierarchy>::LevelMask<'a> {
         if N::VALUE == 0 {
             return &this.root.header().mask;
         }
@@ -593,7 +593,7 @@ where
         this: &'a Self::This, 
         level_n: N, 
         level_index: usize
-    ) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
+    ) -> <Self::This as SparseHierarchy>::LevelMask<'a> {
         if N::VALUE == 0 {
             return &this.root.header().mask;
         }
@@ -619,7 +619,7 @@ where
     
     #[inline]
     unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize) 
-        -> Option<<Self::This as SparseHierarchy2>::Data<'a>> 
+        -> Option<<Self::This as SparseHierarchy>::Data<'a>> 
     {
         let node = if DEPTH == 1{
             // We do not store the root level's block.
@@ -642,7 +642,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked<'a>(&self, this: &'a Self::This, level_index: usize) 
-        -> <Self::This as SparseHierarchy2>::Data<'a> 
+        -> <Self::This as SparseHierarchy>::Data<'a> 
     {
         let node = if DEPTH == 1{
             // We do not store the root level's block.
@@ -663,7 +663,7 @@ mod test{
     use std::ptr::NonNull;
     use std::slice;
     use itertools::assert_equal;
-    use crate::sparse_hierarchy2::SparseHierarchy2;
+    use crate::sparse_hierarchy::SparseHierarchy;
     use crate::utils::Primitive;
     use super::{CompactSparseArray, NodeHeader};
     

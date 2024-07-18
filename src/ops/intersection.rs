@@ -3,7 +3,7 @@ use std::borrow::Borrow;
 use std::hint::unreachable_unchecked;
 use std::ops::BitAnd;
 use crate::const_utils::{ConstArray, ConstInteger};
-use crate::sparse_hierarchy2::{SparseHierarchy2, SparseHierarchyState2};
+use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::utils::{Borrowable, FnRR, Take};
 
 pub struct Intersection<S0, S1, F>{
@@ -12,24 +12,24 @@ pub struct Intersection<S0, S1, F>{
     f: F
 }
 
-impl<S0, S1, F> SparseHierarchy2 for Intersection<S0, S1, F>
+impl<S0, S1, F> SparseHierarchy for Intersection<S0, S1, F>
 where
-    S0: Borrowable<Borrowed: SparseHierarchy2>,
-    S1: Borrowable<Borrowed: SparseHierarchy2<
-        LevelCount    = <S0::Borrowed as SparseHierarchy2>::LevelCount,
-        LevelMaskType = <S0::Borrowed as SparseHierarchy2>::LevelMaskType,
+    S0: Borrowable<Borrowed: SparseHierarchy>,
+    S1: Borrowable<Borrowed: SparseHierarchy<
+        LevelCount    = <S0::Borrowed as SparseHierarchy>::LevelCount,
+        LevelMaskType = <S0::Borrowed as SparseHierarchy>::LevelMaskType,
     >>,
     
     F: FnRR<
-        <S0::Borrowed as SparseHierarchy2>::DataType, 
-        <S1::Borrowed as SparseHierarchy2>::DataType
+        <S0::Borrowed as SparseHierarchy>::DataType, 
+        <S1::Borrowed as SparseHierarchy>::DataType
     >,
 {
     const EXACT_HIERARCHY: bool = false;
     
-    type LevelCount = <S0::Borrowed as SparseHierarchy2>::LevelCount;
+    type LevelCount = <S0::Borrowed as SparseHierarchy>::LevelCount;
     
-    type LevelMaskType = <S0::Borrowed as SparseHierarchy2>::LevelMaskType;
+    type LevelMaskType = <S0::Borrowed as SparseHierarchy>::LevelMaskType;
     type LevelMask<'a> = Self::LevelMaskType where Self:'a;
     
     type DataType = F::Out;
@@ -54,26 +54,26 @@ where
 
 pub struct State<S0, S1, F>
 where
-    S0: Borrowable<Borrowed: SparseHierarchy2>,
-    S1: Borrowable<Borrowed: SparseHierarchy2>,
+    S0: Borrowable<Borrowed: SparseHierarchy>,
+    S1: Borrowable<Borrowed: SparseHierarchy>,
 {
-    s0: <S0::Borrowed as SparseHierarchy2>::State, 
-    s1: <S1::Borrowed as SparseHierarchy2>::State,
+    s0: <S0::Borrowed as SparseHierarchy>::State, 
+    s1: <S1::Borrowed as SparseHierarchy>::State,
     
     phantom_data: PhantomData<(S0, S1, F)>
 }
 
-impl<S0, S1, F> SparseHierarchyState2 for State<S0, S1, F>
+impl<S0, S1, F> SparseHierarchyState for State<S0, S1, F>
 where
-    S0: Borrowable<Borrowed: SparseHierarchy2>,
-    S1: Borrowable<Borrowed: SparseHierarchy2<
-        LevelCount    = <S0::Borrowed as SparseHierarchy2>::LevelCount,
-        LevelMaskType = <S0::Borrowed as SparseHierarchy2>::LevelMaskType,
+    S0: Borrowable<Borrowed: SparseHierarchy>,
+    S1: Borrowable<Borrowed: SparseHierarchy<
+        LevelCount    = <S0::Borrowed as SparseHierarchy>::LevelCount,
+        LevelMaskType = <S0::Borrowed as SparseHierarchy>::LevelMaskType,
     >>,
     
     F: FnRR<
-        <S0::Borrowed as SparseHierarchy2>::DataType, 
-        <S1::Borrowed as SparseHierarchy2>::DataType,
+        <S0::Borrowed as SparseHierarchy>::DataType, 
+        <S1::Borrowed as SparseHierarchy>::DataType,
     >,
 {
     type This = Intersection<S0, S1, F>;
@@ -81,8 +81,8 @@ where
     #[inline]
     fn new(this: &Self::This) -> Self {
         Self{
-            s0: SparseHierarchyState2::new(this.s0.borrow()), 
-            s1: SparseHierarchyState2::new(this.s1.borrow()),
+            s0: SparseHierarchyState::new(this.s0.borrow()), 
+            s1: SparseHierarchyState::new(this.s1.borrow()),
             phantom_data: PhantomData
         }
     }
@@ -90,7 +90,7 @@ where
     #[inline]
     unsafe fn select_level_node<'a, N: ConstInteger>(
         &mut self, this: &'a Self::This, level_n: N, level_index: usize
-    ) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
+    ) -> <Self::This as SparseHierarchy>::LevelMask<'a> {
         // Putting if here is not justified for general case. 
         
         let mask0 = self.s0.select_level_node(
@@ -111,7 +111,7 @@ where
     #[inline]
     unsafe fn select_level_node_unchecked<'a, N: ConstInteger> (
         &mut self, this: &'a Self::This, level_n: N, level_index: usize
-    ) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
+    ) -> <Self::This as SparseHierarchy>::LevelMask<'a> {
         let mask0 = self.s0.select_level_node_unchecked(
             this.s0.borrow(), level_n, level_index
         );
@@ -129,7 +129,7 @@ where
 
     #[inline]
     unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize) 
-        -> Option<<Self::This as SparseHierarchy2>::Data<'a>> 
+        -> Option<<Self::This as SparseHierarchy>::Data<'a>> 
     {
         let d0 = self.s0.data(this.s0.borrow(), level_index);
         if d0.is_none(){
@@ -150,7 +150,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked<'a>(&self, this: &'a Self::This, level_index: usize) 
-        -> <Self::This as SparseHierarchy2>::Data<'a> 
+        -> <Self::This as SparseHierarchy>::Data<'a> 
     {
         let d0 = self.s0.data_unchecked(
             this.s0.borrow(), level_index
@@ -169,15 +169,15 @@ impl<S0, S1, F> Borrowable for Intersection<S0, S1, F>{ type Borrowed = Self; }
 pub fn intersection<S0, S1, F>(s0: S0, s1: S1, f: F) -> Intersection<S0, S1, F>
 where
     // bounds needed here for F's arguments auto-deduction
-    S0: Borrowable<Borrowed: SparseHierarchy2>,
-    S1: Borrowable<Borrowed: SparseHierarchy2<
-        LevelCount    = <S0::Borrowed as SparseHierarchy2>::LevelCount,
-        LevelMaskType = <S0::Borrowed as SparseHierarchy2>::LevelMaskType,
+    S0: Borrowable<Borrowed: SparseHierarchy>,
+    S1: Borrowable<Borrowed: SparseHierarchy<
+        LevelCount    = <S0::Borrowed as SparseHierarchy>::LevelCount,
+        LevelMaskType = <S0::Borrowed as SparseHierarchy>::LevelMaskType,
     >>,
     
     F: FnRR<
-        <S0::Borrowed as SparseHierarchy2>::DataType, 
-        <S1::Borrowed as SparseHierarchy2>::DataType,
+        <S0::Borrowed as SparseHierarchy>::DataType, 
+        <S1::Borrowed as SparseHierarchy>::DataType,
     >,
 {
     Intersection { s0, s1, f }
@@ -186,9 +186,9 @@ where
 #[cfg(test)]
 mod test{
     use itertools::assert_equal;
-    use crate::compact_sparse_array3::CompactSparseArray;
-    use crate::ops2::intersection2::intersection;
-    use crate::sparse_hierarchy2::SparseHierarchy2;
+    use crate::compact_sparse_array::CompactSparseArray;
+    use crate::ops::intersection::intersection;
+    use crate::sparse_hierarchy::SparseHierarchy;
 
     #[test]
     fn smoke_test(){

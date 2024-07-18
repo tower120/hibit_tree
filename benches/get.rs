@@ -2,11 +2,11 @@ use criterion::{black_box, Criterion, criterion_group, criterion_main};
 use rand::{Rng, SeedableRng};
 use rand::seq::SliceRandom;
 use hi_sparse_array::{config, SparseArray, Index};
-use hi_sparse_array::compact_sparse_array3::CompactSparseArray;
+use hi_sparse_array::compact_sparse_array::CompactSparseArray;
 //use hi_sparse_array::level_block::{Block, ClusterBlock, SmallBlock};
 //use hi_sparse_array::Iter;
 //use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
-use hi_sparse_array::SparseHierarchy2;
+use hi_sparse_array::SparseHierarchy;
 
 const RANGE: usize = 260_000;
 const COUNT: usize = 4000;

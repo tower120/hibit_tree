@@ -5,7 +5,7 @@ mod common;
 use itertools::assert_equal;
 use rand::{Rng, SeedableRng};
 use rand::prelude::SliceRandom;
-use hi_sparse_array::{config, SparseHierarchy2};
+use hi_sparse_array::{config, SparseHierarchy};
 
 #[derive(Default, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 struct Data(usize);
