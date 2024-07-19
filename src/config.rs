@@ -75,7 +75,8 @@ pub type _64x8 = w64::d8;*/
 /// [^sbo]: small buffer optimization.
 /// [^slower]: depends on level count - the more => the slower. Looks like the worst case
 /// scenario is x3 slow-down for 8 level hierarchy. Best case is around x1.25-1.5 for 3 levels and less.
-pub mod sbo {
+#[deprecated = "Deprecated in CompactSparseArray favor."]
+pub(crate) mod sbo {
     use super::*;
     use crate::level_block::SmallBlock;
     

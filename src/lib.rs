@@ -84,32 +84,30 @@ mod sparse_array_levels;
 mod compact_sparse_array;
 mod bit_utils;
 mod bit_block;
-//mod sparse_hierarchy;
 mod sparse_hierarchy;
-//mod iter;
 mod iter;
 mod level;
 mod level_block;
-mod ops;
+mod req_default;
 
+pub mod ops;
 pub mod bit_queue;
 //mod ref_or_val;
 pub mod const_utils;
 pub mod utils;
 pub mod config;
-mod req_default;
 
 //pub use ref_or_val::*;
 pub use bit_block::BitBlock;
 pub use req_default::ReqDefault;
 pub use sparse_array::SparseArray;
 pub use compact_sparse_array::CompactSparseArray;
-//pub use sparse_array_levels::SparseArrayLevels;
-//pub use sparse_hierarchy::*;
 pub use sparse_hierarchy::*;
-//pub use iter::*;
 pub use iter::*;
-pub use ops::*;
+pub use ops::intersection::intersection;
+pub use ops::union3::union;
+pub use ops::multi_union3::multi_union;
+pub use ops::multi_intersection2::multi_intersection;
 
 use std::borrow::Borrow;
 use std::ops::BitAnd;

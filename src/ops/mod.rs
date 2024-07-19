@@ -1,17 +1,17 @@
-mod intersection;
+pub(crate) mod intersection;
 
 //pub mod union2;
-mod union3;
+pub(crate) mod union3;
 
 //mod multi_union2;
-mod multi_union3;
+pub(crate) mod multi_union3;
 
 //mod multi_intersection;
-mod multi_intersection2;
+pub(crate) mod multi_intersection2;
 //pub mod multi_intersection3;
 
-pub use intersection::{Intersection, intersection};
-pub use union3::{Union, UnionResolve, union};
+pub use intersection::{Intersection};
+pub use union3::{Union, UnionResolve};
 
-pub use multi_intersection2::{MultiIntersection, MultiIntersectionResolveIter, multi_intersection};
-pub use multi_union3::{MultiUnion, MultiUnionResolveIter, multi_union};
+pub use multi_intersection2::{MultiIntersection, MultiIntersectionResolveIter};
+pub use multi_union3::{MultiUnion, MultiUnionResolveIter};
