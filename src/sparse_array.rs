@@ -79,7 +79,7 @@ fn test_level_indices_new(){
 }
 
 ///
-/// # Universal set
+/// # Universal set (better naming?)
 /// 
 /// Pass [ReqDefault] as `R` argument, to unlock [get_or_default] operation[^1].
 /// This will require `Data` to be [Default] to construct container.
@@ -105,7 +105,7 @@ where
     
     // TODO: some kind of multi-vec, to reduce allocation count?
     
-    /// First item - is placeholder for a non-existent element.
+    /// First item - is a placeholder for non-existent/default element.
     values: Vec<Data>,
     keys  : Vec<usize>,
     

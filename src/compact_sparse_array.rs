@@ -10,7 +10,7 @@ use std::mem::{align_of, size_of};
 use std::ptr::{addr_of, addr_of_mut, NonNull, null};
 use crate::bit_utils::{get_bit_unchecked, set_bit_unchecked};
 use crate::{BitBlock, Index};
-use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger, ConstUsize};
+use crate::const_utils::{ConstArray, ConstArrayType, ConstBool, ConstFalse, ConstInteger, ConstTrue, ConstUsize};
 use crate::sparse_array::level_indices;
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::utils::{Array, Borrowable, Primitive};
@@ -315,12 +315,12 @@ where
     ConstUsize<DEPTH>: ConstInteger    
 {
     #[inline]
-    pub fn get_or_insert(&mut self, index: impl Into<Index<Mask, ConstUsize<DEPTH>>>) -> &mut T
-    where
-        T: Default
-    {
-        let index: usize = index.into().into();
-        
+    fn get_or_insert_impl(
+        &mut self, 
+        index: usize,
+        insert: impl ConstBool,
+        value_fn: impl FnOnce() -> T
+    ) -> &mut T {
         let indices = level_indices::<Mask, ConstUsize<DEPTH>>(index);
         
         // TODO: const for
@@ -356,10 +356,14 @@ where
             let inner_index = *indices.as_ref().last().unwrap_unchecked();
             
             let data_index = if node_ptr.contains(inner_index) {
-                node_ptr.get_child::<DataIndex>(inner_index).as_usize()
+                let data_index = node_ptr.get_child::<DataIndex>(inner_index).as_usize();
+                /*const*/ if insert.value(){
+                    *self.data.get_unchecked_mut(data_index) = value_fn();                     
+                }
+                data_index
             } else {
                 let i = self.data.len(); 
-                self.data.push(T::default());
+                self.data.push(value_fn());
                 self.keys.push(index);
                 let (_, new_node) = node_ptr.insert(inner_index, i as DataIndex);
                 *node = new_node;
@@ -367,6 +371,19 @@ where
             };
             self.data.get_unchecked_mut(data_index)
         }
+    }    
+    
+    pub fn get_or_insert(&mut self, index: impl Into<Index<Mask, ConstUsize<DEPTH>>>) -> &mut T
+    where
+        T: Default
+    {
+        let index: usize = index.into().into();
+        self.get_or_insert_impl(index, ConstFalse, || T::default())
+    }
+    
+    pub fn insert(&mut self, index: impl Into<Index<Mask, ConstUsize<DEPTH>>>, value: T) {
+        let index: usize = index.into().into();
+        self.get_or_insert_impl(index, ConstTrue, ||value);
     }
     
     /// As long as container not empty - will always point to some valid nodes.
