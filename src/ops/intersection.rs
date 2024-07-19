@@ -35,18 +35,27 @@ where
     type DataType = F::Out;
     type Data<'a> = F::Out where Self: 'a;
 
+    #[inline]
     unsafe fn data<I>(&self, index: usize, level_indices: I) -> Option<Self::Data<'_>>
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
     {
-        todo!()
+        let d0 = self.s0.borrow().data(index, level_indices);
+        let d1 = self.s1.borrow().data(index, level_indices);
+        if d0.is_none() | d1.is_none(){
+            return None;
+        }
+        Some((self.f)(d0.unwrap_unchecked().borrow(), d1.unwrap_unchecked().borrow()))
     }
 
+    #[inline]
     unsafe fn data_unchecked<I>(&self, index: usize, level_indices: I) -> Self::Data<'_>
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
     {
-        todo!()
+        let d0 = self.s0.borrow().data_unchecked(index, level_indices);
+        let d1 = self.s1.borrow().data_unchecked(index, level_indices);
+        (self.f)(d0.borrow(), d1.borrow())
     }
 
     type State = State<S0, S1, F>;
@@ -132,33 +141,22 @@ where
         -> Option<<Self::This as SparseHierarchy>::Data<'a>> 
     {
         let d0 = self.s0.data(this.s0.borrow(), level_index);
-        if d0.is_none(){
+        let d1 = self.s1.data(this.s1.borrow(), level_index);
+        // TODO: Probably there is a case, where we can prove that 
+        //       d0_exists == d1_exists, and we can check only one of them
+        //       for existence.
+        if d0.is_none() | d1.is_none(){
             return None;
         }
-        let d1 = self.s1.data(this.s1.borrow(), level_index);
-        
-        let o0 = if let Some(d) = &d0 {
-            d.borrow()
-        } else { unreachable_unchecked() };
-        
-        let o1 = if let Some(d) = &d1 {
-            d.borrow()
-        } else { unreachable_unchecked() };
-        
-        return Some((this.f)(o0, o1));
+        Some((this.f)(d0.unwrap_unchecked().borrow(), d1.unwrap_unchecked().borrow()))
     }
 
     #[inline]
     unsafe fn data_unchecked<'a>(&self, this: &'a Self::This, level_index: usize) 
         -> <Self::This as SparseHierarchy>::Data<'a> 
     {
-        let d0 = self.s0.data_unchecked(
-            this.s0.borrow(), level_index
-        );
-        let d1 = self.s1.data_unchecked(
-            this.s1.borrow(), level_index
-        );
-
+        let d0 = self.s0.data_unchecked(this.s0.borrow(), level_index);
+        let d1 = self.s1.data_unchecked(this.s1.borrow(), level_index);
         (this.f)(d0.borrow(), d1.borrow())
     }
 }
@@ -205,6 +203,10 @@ mod test{
         *a2.get_or_insert(200) = 200;        
         
         let i = intersection(&a1, &a2, |i0, i1| i0+i1);
+        
+        assert_eq!(unsafe{ i.get_unchecked(200) }, 400);
+        assert_eq!(i.get(15), Some(30));
+        assert_eq!(i.get(10), None);
         
         assert_equal(i.iter(), [(15,30), (200, 400)]);
     }
