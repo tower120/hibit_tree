@@ -6,11 +6,12 @@ use std::ptr::{NonNull, null};
 use crate::bit_block::BitBlock;
 use crate::utils::Borrowable;
 use crate::level_block::HiBlock;
-use crate::level::{ILevel, IntrusiveListLevel};
+use crate::level::ILevel;
 use crate::const_utils::const_int::{ConstUsize, ConstInteger, ConstIntVisitor};
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
 use crate::const_utils::{const_loop, ConstBool, ConstFalse, ConstTrue};
 use crate::{Empty, Index};
+use crate::req_default::{DefaultInit, DefaultInitFor, DefaultRequirement, ReqDefault};
 use crate::utils::primitive::Primitive;
 use crate::utils::array::{Array};
 use crate::sparse_array_levels::{FoldMutVisitor, FoldVisitor, MutVisitor, SparseArrayLevels, TypeVisitor, Visitor};
@@ -77,7 +78,29 @@ fn test_level_indices_new(){
     }
 }
 
-pub struct SparseArray<Levels, Data> {
+///
+/// # Universal set
+/// 
+/// Pass [ReqDefault] as `R` argument, to unlock [get_or_default] operation[^1].
+/// This will require `Data` to be [Default] to construct container.
+/// 
+/// [get_or_default] is as fast as [get_unchecked] and has no
+/// performance hit from branching[^2]. 
+/// 
+/// Accessing items through [get_or_default] effectively makes container 
+/// [universal set](https://en.wikipedia.org/wiki/Universal_set)[^3].
+///
+/// [^1]: We can't just treat container with `Data: Default` as `ReqDefault`,
+///       due to stable Rust limitations - we need specialization for that.
+/// [^2]: All non-existent items just point to the very first default item.
+/// [^3]: Container acts as it has all items across index range.
+/// 
+/// [get_or_default]: SparseArray::get_or_default 
+/// [get_unchecked]: SparseArray::get_unchecked
+pub struct SparseArray<Levels, Data, R = ReqDefault<false>>
+where
+    R: DefaultRequirement
+{
     levels: Levels,
     
     // TODO: some kind of multi-vec, to reduce allocation count?
@@ -89,25 +112,35 @@ pub struct SparseArray<Levels, Data> {
     // TODO: can be pair of u32's
     // Used only in remove().
     /// Coordinates in last level of pointer to value with this vec index.  
-    last_level_block_indices: Vec<(usize/*block_index*/, usize/*in-block index*/)>, 
+    last_level_block_indices: Vec<(usize/*block_index*/, usize/*in-block index*/)>,
+    
+    phantom_data: PhantomData<R>
 }
 
-impl<Levels, Data> Default for
-    SparseArray<Levels, Data>
+impl<Levels, Data, R> Default for
+    SparseArray<Levels, Data, R>
 where
     Levels: SparseArrayLevels,
+    R: DefaultRequirement,
+    DefaultInitFor<Data, R>: DefaultInit
 {
     #[inline]
     fn default() -> Self {
-        let mut values = Vec::with_capacity(1);
+        let mut values: Vec<Data> = Vec::with_capacity(1);
         unsafe{ values.set_len(1); }
+        unsafe{
+            <DefaultInitFor::<Data, R> as DefaultInit>
+            ::init_default(values.as_mut_ptr().cast());
+        }
         
         Self{
             levels: Levels::default(),
             
             values, 
             keys  : vec![usize::MAX /*doesn't matter*/],
-            last_level_block_indices: vec![(0,0)]
+            last_level_block_indices: vec![(0,0)],
+            
+            phantom_data: PhantomData
         }
     }
 }
@@ -202,9 +235,10 @@ where
     }
 }
 
-impl<Levels, Data> SparseArray<Levels, Data>
+impl<Levels, Data, R> SparseArray<Levels, Data, R>
 where
     Levels: SparseArrayLevels,
+    R: DefaultRequirement,
 {
     #[inline(always)]
     unsafe fn get_block<LevelN>(&self, level_n: LevelN, level_index: usize) 
@@ -541,29 +575,56 @@ where
     }
 }
 
-impl<Levels, Data> Drop for SparseArray<Levels, Data>{
+impl<Levels, Data> SparseArray<Levels, Data, ReqDefault>
+where
+    Levels: SparseArrayLevels,
+    Data: Default
+{
+    /// This is **SIGNIFICANTLY** faster than `get(index).unwrap_or(Default::default())`.
+    /// 
+    /// Completely branchless implementation. 
+    /// Performance-wise equivalent of dereferencing `LevelCount` pointers.
+    #[inline]
+    pub fn get_or_default(&self, index: impl Into<Index<Levels::Mask, Levels::LevelCount>>) 
+        -> &Data
+    {
+        let index: usize = index.into().into();
+        let level_indices = level_indices::<Levels::Mask, Levels::LevelCount>(index);
+        let data_block_index = unsafe{ self.fetch_block_index(level_indices) };
+        unsafe{ self.values.get_unchecked(data_block_index) }
+    }
+}
+
+impl<Levels, Data, R> Drop for SparseArray<Levels, Data, R>
+where
+    R: DefaultRequirement,
+{
     #[inline]
     fn drop(&mut self) {
-        // Manually drop values, skipping first non-existent element.
+        // Manually drop values, skipping first non-existent element, if necessary.
         unsafe{
-            ptr::drop_in_place(
-                ptr::slice_from_raw_parts_mut(
-                    self.values.as_mut_ptr().add(1), 
-                    self.values.len() - 1
-                )
-            );
-           self.values.set_len(0);
+            let skip_first = !R::REQUIRED; 
+            let slice = ptr::slice_from_raw_parts_mut(
+                self.values.as_mut_ptr().add(skip_first as usize), 
+                self.values.len() - skip_first as usize
+            ); 
+            ptr::drop_in_place(slice);
+            self.values.set_len(0);
         }
     }
 }
 
-impl<Levels, Data> Borrowable for SparseArray<Levels, Data>{
-    type Borrowed = SparseArray<Levels, Data>; 
+impl<Levels, Data, R> Borrowable for SparseArray<Levels, Data, R>
+where
+    R: DefaultRequirement
+{
+    type Borrowed = SparseArray<Levels, Data, R>; 
 }
 
-impl<Levels, Data> SparseHierarchy for SparseArray<Levels, Data>
+impl<Levels, Data, R> SparseHierarchy for SparseArray<Levels, Data, R>
 where
-    Levels: SparseArrayLevels
+    Levels: SparseArrayLevels,
+    R: DefaultRequirement 
 {
     const EXACT_HIERARCHY: bool = true;
     
@@ -607,12 +668,13 @@ where
         self.values.get_unchecked(data_block_index)*/
     }
 
-    type State = SparseArrayState<Levels, Data>;
+    type State = SparseArrayState<Levels, Data, R>;
 }
 
-pub struct SparseArrayState<Levels, Data>
+pub struct SparseArrayState<Levels, Data, R>
 where
-    Levels: SparseArrayLevels
+    Levels: SparseArrayLevels,
+    R: DefaultRequirement 
 {
     /// [*const u8; Levels::LevelCount-1]
     /// 
@@ -621,14 +683,15 @@ where
         *const u8, 
         <Levels::LevelCount as ConstInteger>::Dec
     >,
-    phantom_data: PhantomData<SparseArray<Levels, Data>>
+    phantom_data: PhantomData<SparseArray<Levels, Data, R>>
 }
 
-impl<Levels, Data> SparseHierarchyState for SparseArrayState<Levels, Data>
+impl<Levels, Data, R> SparseHierarchyState for SparseArrayState<Levels, Data, R>
 where
-    Levels: SparseArrayLevels
+    Levels: SparseArrayLevels,
+    R: DefaultRequirement
 {
-    type This = SparseArray<Levels, Data>;
+    type This = SparseArray<Levels, Data, R>;
 
     #[inline]
     fn new(_: &Self::This) -> Self {

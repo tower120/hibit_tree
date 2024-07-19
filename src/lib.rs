@@ -73,9 +73,9 @@
 //! empty elements or nodes. Hence, it's bitmasks contains "exact" emptiness info.
 //! 
 //! Speeds up following operations:
-//! - [Eq]
-//! - [is_empty()]
-//! - [contains()]
+//! - TODO [Eq]
+//! - TODO [is_empty()]
+//! - TODO [contains()]
 //! - TODO From<impl SparseHierarchy>
 //! - iterated elements are guaranteed to be ![is_empty].
 
@@ -97,9 +97,11 @@ pub mod bit_queue;
 pub mod const_utils;
 pub mod utils;
 pub mod config;
+mod req_default;
 
 //pub use ref_or_val::*;
 pub use bit_block::BitBlock;
+pub use req_default::ReqDefault;
 pub use sparse_array::SparseArray;
 pub use compact_sparse_array::CompactSparseArray;
 //pub use sparse_array_levels::SparseArrayLevels;
