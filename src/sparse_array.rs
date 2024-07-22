@@ -137,7 +137,7 @@ where
             levels: Levels::default(),
             
             values, 
-            keys  : vec![usize::MAX /*doesn't matter*/],
+            keys  : vec![usize::MAX],
             last_level_block_indices: vec![(0,0)],
             
             phantom_data: PhantomData

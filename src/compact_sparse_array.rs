@@ -1,16 +1,18 @@
 // Having masks wider, then 64 bit is not viable, 
 // since get_dense_index becomes more complex for SIMD registers.
+// (no bzhi + popcnt analog for m256)
 // Performance drops significantly, and it is cheaper to add more
 // depth to a tree, instead.
 
 use std::alloc::{alloc, dealloc, Layout, realloc};
 use std::{mem, ptr};
+use std::any::TypeId;
 use std::marker::PhantomData;
-use std::mem::{align_of, size_of};
+use std::mem::{align_of, MaybeUninit, size_of};
 use std::ptr::{addr_of, addr_of_mut, NonNull, null};
 use crate::bit_utils::{get_bit_unchecked, set_bit_unchecked};
 use crate::{BitBlock, Index};
-use crate::const_utils::{ConstArray, ConstArrayType, ConstBool, ConstFalse, ConstInteger, ConstTrue, ConstUsize};
+use crate::const_utils::{const_loop, ConstArray, ConstArrayType, ConstBool, ConstFalse, ConstInteger, ConstTrue, ConstUsize};
 use crate::sparse_array::level_indices;
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::utils::{Array, Borrowable, Primitive};
@@ -24,19 +26,40 @@ type DataIndex = u32;
 const DEFAULT_CAP: u8 = 2;
 
 /// Just for safety
-trait NodeChild{}
+trait NodeChild: 'static{}
 impl NodeChild for NodePtr{} 
 impl NodeChild for DataIndex{}
 
-const fn empty_node() -> NodePtr {
-    type EmptyNode = NodeHeaderN<1>;
-    const EMPTY_NODE: EmptyNode = EmptyNode {
-        mask: 0,
-        capacity: 1,
-        len: 1,
-        children_placeholder: [null()], // null for node, 0 - for terminal node
-    };
-    NodePtr(unsafe{ mem::transmute(&EMPTY_NODE) })
+fn empty_branch() -> &'static [EmptyNode] {
+    macro_rules! gen_empty_branch {
+        ($name:ident = $len:literal : $($is: literal),*) => {
+            static $name: [EmptyNode; $len] = [
+                $(
+                    EmptyNode {
+                        mask: 0,
+                        capacity: 1,
+                        len: 1,
+                        children_placeholder: [&$name[$is] as *const EmptyNode as *const u8],
+                    },           
+                )*
+                EmptyNode {
+                    mask: 0,
+                    capacity: 1,
+                    len: 1,
+                    children_placeholder: [unsafe{mem::zeroed()}]
+                }                
+            ];
+        };
+    }
+    gen_empty_branch!(EMPTY_BRANCH = 9: 1,2,3,4,5,6,7,8);
+    &EMPTY_BRANCH
+}
+
+#[inline]
+fn empty_node<N: ConstInteger, const DEPTH: usize>() -> NodePtr {
+    /*const*/ let empty_branch = empty_branch();
+    let ptr = &empty_branch[(empty_branch.len() - DEPTH) + N::VALUE];
+    NodePtr(unsafe{ mem::transmute(ptr) })
 }
 
 #[repr(C)]
@@ -47,13 +70,20 @@ struct NodeHeaderN<const N: usize> {
     len: u8,
     
     /// NonNull<Node> / DataIndex
+    /// 
+    /// Always have one element more than specified by mask. 
+    /// Last excess element = empty_node/0.
+    /// We need that, so get_dense_index(index) point to valid node, even
+    /// if `index` points past the mask's bit population (popcnt).
     children_placeholder: [*const u8; N]
 }
 
-type NodeHeader = NodeHeaderN<0>;
+type EmptyNode = NodeHeaderN<1>;
+unsafe impl Sync for EmptyNode{}    // Need this for static EMPTY_NODE
 
+type NodeHeader = NodeHeaderN<0>;
 impl NodeHeader{
-    /// `index` must be set. Otherwise return unspecified number that is
+    /// `index` must be set. Otherwise, return unspecified number that is
     /// less or equal to mask population.
     #[inline]
     unsafe fn get_dense_index(&self, index: usize) -> usize {
@@ -100,7 +130,7 @@ impl NodePtr {
         ptr.add(Self::children_addr_offset()) as _
     }     
     
-    // TODO: remove
+/*    // TODO: remove
     #[inline]
     unsafe fn header_and_children_mut<'a, T: NodeChild>(mut self) 
         -> (&'a mut NodeHeader, *mut T) 
@@ -110,7 +140,7 @@ impl NodePtr {
             self.header_mut(),
             ptr.add(Self::children_addr_offset()) as _
         )
-    }
+    }*/
     
     #[inline]
     pub unsafe fn get_child<'a, T: NodeChild>(self, index: usize) -> &'a T {
@@ -136,10 +166,11 @@ impl NodePtr {
     pub unsafe fn children_mut_iter<'a, T: NodeChild + 'a>(mut self) 
         -> impl Iterator<Item = &'a mut T>
     {
-        let (header, children_ptr) = self.header_and_children_mut::<T>();
-        header.mask.into_bits_iter()
+        //let (header, children_ptr) = self.header_and_children_mut::<T>();
+        self.header().mask.into_bits_iter()
             .map(move |i| {
-                let dense_index = header.get_dense_index(i);
+                let dense_index = self.header().get_dense_index(i);
+                let children_ptr = self.children_mut_ptr::<T>();
                 &mut*children_ptr.add(dense_index)
             } )
     }
@@ -156,15 +187,20 @@ impl NodePtr {
     }
     
     #[inline]
-    pub fn new<T: NodeChild>(cap: u8) -> Self {
+    pub fn new<T: NodeChild>(cap: u8, empty_child: T) -> Self {
         unsafe {
             let node = alloc(Self::layout::<T>(cap)) as *mut NodeHeader;
             
             addr_of_mut!((*node).mask).write(Mask::default());
+            debug_assert!(cap>=1);
             addr_of_mut!((*node).capacity).write(cap);
-            addr_of_mut!((*node).len).write(0);
+            addr_of_mut!((*node).len).write(1);
             
-            Self(NonNull::new_unchecked(node))
+            // empty_child will always be the last one.
+            // Right after real childs.
+            let mut this = Self(NonNull::new_unchecked(node));
+            this.children_mut_ptr::<T>().write(empty_child);
+            this
         }
     }
     
@@ -200,12 +236,12 @@ impl NodePtr {
             }
         }
         
-        let (header, children_ptr) = self.header_and_children_mut::<T>();
+        let header = self.header_mut();
         set_bit_unchecked::<true, _>(&mut header.mask, index);
         let dense_index = header.get_dense_index(index);
         
         /* move right */ 
-        let p: *mut T = children_ptr.add(dense_index);
+        let p: *mut T = self.children_mut_ptr::<T>().add(dense_index);
         // Shift everything over to make space. (Duplicating the
         // `index`th element into two consecutive places.)
         ptr::copy(p, p.offset(1), header.len as usize - dense_index);
@@ -220,12 +256,12 @@ impl NodePtr {
     
     #[inline]
     pub unsafe fn remove<T: NodeChild>(mut self, index: usize){
-        let (header, children_ptr) = self.header_and_children_mut::<T>();
+        let header = self.header_mut();
         let dense_index = header.get_dense_index(index);
         set_bit_unchecked::<false, _>(&mut header.mask, index);        
 
         /* move left */
-        let p: *mut _ = children_ptr.add(dense_index);
+        let p: *mut _ = self.children_mut_ptr::<T>().add(dense_index);
         ptr::copy(p.offset(1), p, header.len as usize - dense_index - 1);
         
         header.len -= 1;
@@ -234,7 +270,7 @@ impl NodePtr {
     /// Deallocate node WITHOUT deallocating child objects.
     #[inline]
     pub unsafe fn drop_node<T: NodeChild>(self){
-        let capacity = unsafe{ self.0.as_ref().capacity };
+        let capacity = self.0.as_ref().capacity;
         let layout = Self::layout::<T>(capacity);
         dealloc(self.0.as_ptr().cast(), layout);
     }
@@ -287,6 +323,7 @@ impl NodePtr {
 pub struct CompactSparseArray<T, const DEPTH: usize>{
     root: NodePtr,
     
+    /// First item - is a placeholder for non-existent/default element.
     data: Vec<T>,
     keys: Vec<usize>,
     
@@ -302,10 +339,17 @@ pub struct CompactSparseArray<T, const DEPTH: usize>{
 impl<T, const DEPTH: usize> Default for CompactSparseArray<T, DEPTH>{
     #[inline]
     fn default() -> Self {
+        let mut data: Vec<T> = Vec::with_capacity(1);
+        unsafe{ data.set_len(1); }
+
         Self{
-            root: NodePtr::new::<NodePtr>(DEFAULT_CAP),
-            data: Vec::new(),
-            keys: Vec::new(),
+            root: if DEPTH == 1 {
+                NodePtr::new::<DataIndex>(DEFAULT_CAP, 0)                
+            } else {
+                NodePtr::new::<NodePtr>(DEFAULT_CAP, empty_node::<ConstUsize<1>, DEPTH>())
+            },
+            data,
+            keys: vec![usize::MAX]
         }
     }
 }
@@ -323,11 +367,10 @@ where
     ) -> &mut T {
         let indices = level_indices::<Mask, ConstUsize<DEPTH>>(index);
         
-        // TODO: const for
         // get terminal node pointing to data
         let mut node = &mut self.root;
-        for n in 0..DEPTH-1 {
-            let inner_index = indices.as_ref()[n];
+        const_loop!(N in 0..{DEPTH-1} => {
+            let inner_index = indices.as_ref()[N];
             unsafe{
                 let mut node_ptr = *node;
                 node = if node_ptr.contains(inner_index) {
@@ -339,16 +382,17 @@ where
 
                     // update a child pointer with a (possibly) new address
                     let (mut inserted_ptr, new_node) =
-                        if n == DEPTH-2{
-                            node_ptr.insert( inner_index, NodePtr::new::<DataIndex>(DEFAULT_CAP) )
+                        if N == DEPTH-2 /* terminal node */ {
+                            node_ptr.insert( inner_index, NodePtr::new::<DataIndex>(DEFAULT_CAP, 0) )
                         } else {
-                            node_ptr.insert( inner_index, NodePtr::new::<NodePtr>(DEFAULT_CAP) )
+                            let empty_child = empty_node::<<ConstUsize<N> as ConstInteger>::Inc, DEPTH>();
+                            node_ptr.insert( inner_index, NodePtr::new::<NodePtr>(DEFAULT_CAP, empty_child) )
                         };
                     *node = new_node;   // This is actually optional
                     inserted_ptr.as_mut()
                 }
             }
-        }        
+        });
      
         // now fetch data
         unsafe{
@@ -387,22 +431,25 @@ where
     }
     
     /// As long as container not empty - will always point to some valid nodes.
+    /// 
+    /// First level skipped in return, since it is always root node.
     #[inline]
     unsafe fn get_branch(&self, level_indices: &impl ConstArray<Item=usize>) 
         -> ConstArrayType<NodePtr, <ConstUsize<DEPTH> as ConstInteger>::Dec> 
     {
-         // TODO: Do better? Good as is?
-        let mut out: ConstArrayType<NodePtr, <ConstUsize<DEPTH> as ConstInteger>::Dec> = 
-            Array::from_fn(|_|empty_node());
+        let mut out = ConstArrayType::<NodePtr, <ConstUsize<DEPTH> as ConstInteger>::Dec>
+                        ::uninit_array();
         
         let mut node_ptr = self.root;
         for n in 0..DEPTH-1 {
             let inner_index = level_indices.as_ref()[n];
             node_ptr = unsafe{ *node_ptr.get_child(inner_index) };
-            out.as_mut()[n] = node_ptr;
+            out.as_mut()[n].write(node_ptr);
         }
         
-        out
+        // Should be just `transmute`, but we have "dependent type". 
+        // `transmute_unchecked` / `assume_init_array` when available. 
+        mem::transmute_copy(&out)
     }
 
     /// As long as container not empty - will always point to some valid (node, in-node-index).
@@ -422,10 +469,6 @@ where
     pub fn remove(&mut self, index: impl Into<Index<Mask, ConstUsize<DEPTH>>>) -> Option<T>{
         let index: usize = index.into().into();
         
-        if self.data.is_empty(){
-            return None;
-        }
-        
         unsafe{
             let indices = level_indices::<Mask, ConstUsize<DEPTH>>(index);
             let branch = self.get_branch(&indices);
@@ -437,36 +480,44 @@ where
             
             if *self.keys.get_unchecked(data_index) == index {
                 terminal_node.remove::<DataIndex>(terminal_inner_index);
-                if terminal_node.header().len == 0 /* TODO: unlikely */ {
+
+                // 1. Try remove empty terminal node recursively.
+                if terminal_node.header().len == 1 /* TODO: unlikely */ {
                     terminal_node.drop_node::<DataIndex>();
-                    
-                    // TODO: const loop
-                    for level_n in (0..DEPTH-2).rev() {
-                        let node = branch.as_ref()[level_n];
-                        node.remove::<NodePtr>(indices.as_ref()[level_n]);
-                        if node.header().len != 0 {
-                            break;
+
+                    // climb up the tree, and remove empty nodes
+                    const_loop!(N in 0..{DEPTH-1} rev => 'out: {
+                        let node = if N == 0 {
+                            self.root
+                        } else {
+                            branch.as_ref()[N-1]
+                        };
+                        
+                        node.remove::<NodePtr>(indices.as_ref()[N]);
+                        if node.header().len != 1 {
+                            break 'out;
                         } 
                         
-                        /*const*/ if level_n != 0 /*don't touch root*/ {
+                        /*const*/ if N != 0 /*don't touch root*/ {
                             node.drop_node::<NodePtr>();
-                        }
-                    }
+                        }                        
+                    });
                 }
 
-                // 2. Update swapped's terminal node
-                let last_key = *self.keys.last().unwrap_unchecked();
-                if last_key != index {
-                    // TODO: this can be get from `terminal_node_positions` as well.
-                    let indices = level_indices::<Mask, ConstUsize<DEPTH>>(index);
-                    let (node, inner_index) = self.get_terminal_node(indices);                    
-                    *node.get_child_mut::<DataIndex>(inner_index) = data_index as DataIndex; 
+                // 2. Swap remove key + update swapped terminal node
+                {
+                    let last_key = self.keys.pop().unwrap_unchecked();
+                    if last_key != index {
+                        *self.keys.get_unchecked_mut(data_index) = last_key;
+
+                        let indices = level_indices::<Mask, ConstUsize<DEPTH>>(last_key);
+                        let (node, inner_index) = self.get_terminal_node(indices);                    
+                        *node.get_child_mut::<DataIndex>(inner_index) = data_index as DataIndex; 
+                    }    
                 }
                 
                 // 3. Remove data        
-                self.keys.swap_remove(data_index);
-                let value = self.data.swap_remove(data_index);
-                
+                let value = self.data.swap_remove(data_index);                
                 Some(value)                
             } else {
                 None
@@ -477,21 +528,41 @@ where
     /// Key-values in arbitrary order.
     #[inline]
     pub fn key_values(&self) -> (&[usize], &[T]) {
-        (self.keys.as_slice(), self.data.as_slice())
+        // skip first element
+        unsafe{
+            (
+                self.keys.as_slice().get_unchecked(1..), 
+                self.data.as_slice().get_unchecked(1..)
+            )
+        }        
     }
 
-    // Key-values in arbitrary order.
+    /// Key-values in arbitrary order.
     #[inline]
     pub fn key_values_mut(&mut self) -> (&[usize], &mut [T]) {
-        (self.keys.as_slice(), self.data.as_mut_slice())
+        // skip first element
+        unsafe{
+            (
+                self.keys.as_slice().get_unchecked(1..), 
+                self.data.as_mut_slice().get_unchecked_mut(1..)
+            )
+        }
     }
-
 }
 
 impl<T, const DEPTH: usize> Drop for CompactSparseArray<T, DEPTH> {
     #[inline]
     fn drop(&mut self) {
         unsafe{ 
+            // drop values
+            let slice = ptr::slice_from_raw_parts_mut(
+                self.data.as_mut_ptr().add(1), 
+                self.data.len() - 1
+            ); 
+            ptr::drop_in_place(slice);
+            self.data.set_len(0);
+            
+            // drop node hierarchy
             self.root.drop_node_with_childs::<ConstUsize<0>, DEPTH>() 
         };
     }
@@ -516,11 +587,6 @@ where
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
     {
-        // super rare
-        if self.data.is_empty(){
-            return None;
-        }
-        
         unsafe{            
             let (node, inner_index) = self.get_terminal_node(level_indices);
             // point to SOME valid item
@@ -598,7 +664,8 @@ where
         // 2. store *node in state cache
         let contains = prev_node.contains(level_index); 
         let node = *prev_node.get_child::<NodePtr>(level_index);
-        let node = if contains{ node } else { empty_node() };   // This is not a branch!
+        // This is not a branch!
+        let node = if contains{ node } else { empty_node::<N, DEPTH>() };   
         *self.level_nodes.as_mut().get_unchecked_mut(level_node_index) = Some(node);
         
         &node.header().mask
@@ -677,7 +744,7 @@ impl<T, const DEPTH: usize> Borrowable for CompactSparseArray<T, DEPTH>{ type Bo
 
 #[cfg(test)]
 mod test{
-    use std::ptr::NonNull;
+    use std::{mem::ManuallyDrop, ptr::NonNull};
     use std::slice;
     use itertools::assert_equal;
     use crate::sparse_hierarchy::SparseHierarchy;
@@ -688,36 +755,49 @@ mod test{
     fn test(){
         let mut a: CompactSparseArray<usize, 3> = Default::default();
         assert_eq!(a.get(15), None);
-        *a.get_or_insert(15) = 89;
-        assert_eq!(*a.get(15).unwrap(), 89);
 
-        /*for (_, v) in a.iter() {
-            println!("{:?}", *v);
-        }*/
+        *a.get_or_insert(15) = 89;
+        assert_eq!(a.get(15), Some(&89));
+
+        *a.get_or_insert(16) = 90;
+        assert_eq!(a.get(20), None);
                 
         assert_eq!(*a.get_or_insert(15), 89);
         assert_eq!(*a.get_or_insert(0), 0);
         assert_eq!(*a.get_or_insert(100), 0);
     }
     
-    #[cfg(not(miri))]
     #[test]
     fn test2(){
         let mut a: CompactSparseArray<usize, 3> = Default::default();
+
+        #[cfg(not(miri))]
+        const COUNT: usize = 200_000;
+        #[cfg(miri)]
+        const COUNT: usize = 200;
         
-        for i in 0..200_000{
+        for i in 0..COUNT{
             *a.get_or_insert(i) = i;
         }
         
-        for i in 0..200_000{
-            let v = *a.get(i).unwrap();
-            assert_eq!(i, v);
+        for i in 0..COUNT{
+            let v = a.get(i);
+            assert_eq!(v, Some(&i));
+        }
+        
+        for i in 0..COUNT{
+            a.remove(i);
+        }
+
+        for i in 0..COUNT{
+            let v = a.get(i);
+            assert_eq!(v, None);
         }
     }
     
     #[test]
     fn test_remove(){
-        let mut a: CompactSparseArray<usize, 4> = Default::default();
+        let mut a: CompactSparseArray<usize, 2> = Default::default();
         *a.get_or_insert(10) = 10;
         *a.get_or_insert(11) = 11;
         //*a.get_or_insert(12) = 12;
@@ -725,4 +805,16 @@ mod test{
         a.remove(11);
         a.remove(10);
     }    
+
+    #[test]
+    fn test_remove2(){
+        let mut a: CompactSparseArray<usize, 2> = Default::default();
+
+        for i in 0..2000{
+            *a.get_or_insert(i) = i;
+        }
+
+        a.remove(0).unwrap();
+        a.remove(1).unwrap();
+    }        
 }

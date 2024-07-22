@@ -207,6 +207,7 @@ mod test{
         assert_eq!(unsafe{ i.get_unchecked(200) }, 400);
         assert_eq!(i.get(15), Some(30));
         assert_eq!(i.get(10), None);
+        assert_eq!(i.get(20), None);
         
         assert_equal(i.iter(), [(15,30), (200, 400)]);
     }
