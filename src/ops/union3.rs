@@ -25,6 +25,7 @@ impl<T> OptionBorrow<T> for Option<T>{
     }
 }*/
 
+// TODO: consider removing
 pub trait UnionResolve<T0, T1>
     : Fn(Option<&T0>, Option<&T1>) -> Self::Out
 {
@@ -38,6 +39,48 @@ where
     type Out = Out; 
 }
 
+#[inline]
+fn get_data<T0, T1, F, R>(d0: Option<impl Borrow<T0>>, d1: Option<impl Borrow<T1>>, f: &F) 
+    -> Option<R>
+where
+    F: Fn(Option<&T0>, Option<&T1>) -> R,
+{
+    let d0_is_none = d0.is_none(); 
+    let d1_is_none = d1.is_none();
+    if d0_is_none & d1_is_none{
+        return None;
+    }
+    
+    // Looks like compiler optimize away these re-borrow transformations.
+    let o0;
+    let o1;
+    if d0_is_none {
+        o0 = None;
+        
+        // we know that d1 exists.
+        o1 = if let Some(d) = &d1 {
+            Some(d.borrow())
+        } else { unsafe {unreachable_unchecked()} };
+    } else if d1_is_none {
+        // we know that d0 exists.
+        o0 = if let Some(d) = &d0 {
+            Some(d.borrow())
+        } else { unsafe {unreachable_unchecked()} };
+        
+        o1 = None;
+    } else {
+        // both exists
+        o0 = if let Some(d) = &d0 {
+            Some(d.borrow())
+        } else { unsafe {unreachable_unchecked()} };
+        
+        o1 = if let Some(d) = &d1 {
+            Some(d.borrow())
+        } else { unsafe {unreachable_unchecked()} };
+    }
+    
+    Some(f(o0, o1))    
+}
 
 pub struct Union<S0, S1, F>{
     s0: S0,
@@ -71,18 +114,22 @@ where
     type DataType = F::Out;
     type Data<'a> = F::Out where Self: 'a;
 
+    #[inline]
     unsafe fn data<I>(&self, index: usize, level_indices: I) -> Option<Self::Data<'_>>
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
     {
-        todo!()
+        let d0 = self.s0.borrow().data(index, level_indices);
+        let d1 = self.s1.borrow().data(index, level_indices);
+        get_data(d0, d1, &self.f)
     }
 
+    #[inline]
     unsafe fn data_unchecked<I>(&self, index: usize, level_indices: I) -> Self::Data<'_>
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
     {
-        todo!()
+        self.data(index, level_indices).unwrap_unchecked()
     }
 
     type State = State<S0, S1, F>;
@@ -165,42 +212,7 @@ where
     {
         let d0 = self.s0.data(this.s0.borrow(), level_index);
         let d1 = self.s1.data(this.s1.borrow(), level_index);
-        
-        let d0_is_none = d0.is_none(); 
-        let d1_is_none = d1.is_none();
-        if d0_is_none & d1_is_none{
-            return None;
-        }
-        
-        // Looks like compiler optimize away these re-borrow transformations.
-        let o0;
-        let o1;
-        if d0_is_none {
-            o0 = None;
-            
-            // we know that d1 exists.
-            o1 = if let Some(d) = &d1 {
-                Some(d.borrow())
-            } else { unreachable_unchecked() };
-        } else if d1_is_none {
-            // we know that d0 exists.
-            o0 = if let Some(d) = &d0 {
-                Some(d.borrow())
-            } else { unreachable_unchecked() };
-            
-            o1 = None;
-        } else {
-            // both exists
-            o0 = if let Some(d) = &d0 {
-                Some(d.borrow())
-            } else { unreachable_unchecked() };
-            
-            o1 = if let Some(d) = &d1 {
-                Some(d.borrow())
-            } else { unreachable_unchecked() };
-        }
-        
-        return Some((this.f)(o0, o1));
+        get_data(d0, d1, &this.f)
     }
 
     #[inline]
@@ -255,6 +267,11 @@ mod test{
         let union = union(&a1, &a2, |i0, i1| {
             i0.unwrap_or(&0) + i1.unwrap_or(&0)
         });
+        
+        assert_eq!(unsafe{ union.get_unchecked(200) }, 400);
+        assert_eq!(union.get(15), Some(30));
+        assert_eq!(union.get(10), Some(10));
+        assert_eq!(union.get(20), None);
         
         assert_equal(union.iter(), [(10, 10), (15, 30), (100, 100), (200, 400)]);
     }
