@@ -7,8 +7,7 @@ use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::BitBlock;
 use crate::bit_queue::BitQueue;
-use crate::utils::{Array, Borrowable, FnRR, Take};
-
+use crate::utils::{Array, Borrowable, Take};
 
 /*// Not used now
 trait OptionBorrow<T>{
@@ -24,20 +23,6 @@ impl<T> OptionBorrow<T> for Option<T>{
         self.as_ref()
     }
 }*/
-
-// TODO: consider removing
-pub trait UnionResolve<T0, T1>
-    : Fn(Option<&T0>, Option<&T1>) -> Self::Out
-{
-    type Out;
-}
-
-impl<F, T0, T1, Out> UnionResolve<T0, T1> for F 
-where
-    F: Fn(Option<&T0>, Option<&T1>) -> Out,
-{
-    type Out = Out; 
-}
 
 #[inline]
 fn get_data<T0, T1, F, R>(d0: Option<impl Borrow<T0>>, d1: Option<impl Borrow<T1>>, f: &F) 
@@ -85,10 +70,10 @@ where
 pub struct Union<S0, S1, F>{
     s0: S0,
     s1: S1,
-    f: F
+    f: F,
 }
 
-impl<S0, S1, F> SparseHierarchy for Union<S0, S1, F>
+impl<S0, S1, F, T> SparseHierarchy for Union<S0, S1, F>
 where
     S0: Borrowable<Borrowed: SparseHierarchy<DataType: Clone>>,
     S1: Borrowable<Borrowed: SparseHierarchy<
@@ -96,11 +81,10 @@ where
         LevelMaskType = <S0::Borrowed as SparseHierarchy>::LevelMaskType,
     >>,
     
-    F: UnionResolve<
-        // v1
-        <S0::Borrowed as SparseHierarchy>::DataType, 
-        <S1::Borrowed as SparseHierarchy>::DataType,
-    >,
+    F: Fn(
+        Option<&<S0::Borrowed as SparseHierarchy>::DataType>,
+        Option<&<S1::Borrowed as SparseHierarchy>::DataType>,
+    ) -> T,
 {
     /// true if S0 & S1 are EXACT_HIERARCHY.
     const EXACT_HIERARCHY: bool = <S0::Borrowed as SparseHierarchy>::EXACT_HIERARCHY 
@@ -111,8 +95,8 @@ where
     type LevelMaskType = <S0::Borrowed as SparseHierarchy>::LevelMaskType;
     type LevelMask<'a> = Self::LevelMaskType where Self:'a;
     
-    type DataType = F::Out;
-    type Data<'a> = F::Out where Self: 'a;
+    type DataType = T;
+    type Data<'a> = T where Self: 'a;
 
     #[inline]
     unsafe fn data<I>(&self, index: usize, level_indices: I) -> Option<Self::Data<'_>>
@@ -152,7 +136,7 @@ where
     phantom_data: PhantomData<(S0, S1, F)>
 }
 
-impl<S0, S1, F> SparseHierarchyState for State<S0, S1, F>
+impl<S0, S1, F, T> SparseHierarchyState for State<S0, S1, F>
 where
     S0: Borrowable<Borrowed: SparseHierarchy<DataType: Clone>>,
     S1: Borrowable<Borrowed: SparseHierarchy<
@@ -160,11 +144,10 @@ where
         LevelMaskType = <S0::Borrowed as SparseHierarchy>::LevelMaskType,
     >>,
     
-    F: UnionResolve<
-        // v1
-        <S0::Borrowed as SparseHierarchy>::DataType, 
-        <S1::Borrowed as SparseHierarchy>::DataType,
-    >,
+    F: Fn(
+        Option<&<S0::Borrowed as SparseHierarchy>::DataType>,
+        Option<&<S1::Borrowed as SparseHierarchy>::DataType>,
+    ) -> T,
 {
     type This = Union<S0, S1, F>;
 
@@ -226,7 +209,7 @@ where
 impl<S0, S1, F> Borrowable for Union<S0, S1, F>{ type Borrowed = Self; }
 
 #[inline]
-pub fn union<S0, S1, F>(s0: S0, s1: S1, f: F) -> Union<S0, S1, F>
+pub fn union<S0, S1, F, T>(s0: S0, s1: S1, f: F) -> Union<S0, S1, F>
 where
     // bounds needed here for F's arguments auto-deduction
     S0: Borrowable<Borrowed: SparseHierarchy>,
@@ -235,10 +218,10 @@ where
         LevelMaskType = <S0::Borrowed as SparseHierarchy>::LevelMaskType,
     >>,
     
-    F: UnionResolve<
-        <S0::Borrowed as SparseHierarchy>::DataType, 
-        <S1::Borrowed as SparseHierarchy>::DataType,
-    >,
+    F: Fn(
+        Option<&<S0::Borrowed as SparseHierarchy>::DataType>,
+        Option<&<S1::Borrowed as SparseHierarchy>::DataType>,
+    ) -> T,
 {
     Union { s0, s1, f }
 } 
@@ -247,7 +230,7 @@ where
 mod test{
     use itertools::assert_equal;
     use crate::compact_sparse_array::CompactSparseArray;
-    use crate::ops::union3::union;
+    use crate::ops::union::union;
     use crate::sparse_hierarchy::SparseHierarchy;
 
     #[test]

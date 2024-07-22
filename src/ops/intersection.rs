@@ -1,10 +1,9 @@
 use std::marker::PhantomData;
 use std::borrow::Borrow;
-use std::hint::unreachable_unchecked;
 use std::ops::BitAnd;
 use crate::const_utils::{ConstArray, ConstInteger};
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
-use crate::utils::{Borrowable, FnRR, Take};
+use crate::utils::{Borrowable, Take};
 
 pub struct Intersection<S0, S1, F>{
     s0: S0,
@@ -12,7 +11,7 @@ pub struct Intersection<S0, S1, F>{
     f: F
 }
 
-impl<S0, S1, F> SparseHierarchy for Intersection<S0, S1, F>
+impl<S0, S1, F, T> SparseHierarchy for Intersection<S0, S1, F>
 where
     S0: Borrowable<Borrowed: SparseHierarchy>,
     S1: Borrowable<Borrowed: SparseHierarchy<
@@ -20,10 +19,10 @@ where
         LevelMaskType = <S0::Borrowed as SparseHierarchy>::LevelMaskType,
     >>,
     
-    F: FnRR<
-        <S0::Borrowed as SparseHierarchy>::DataType, 
-        <S1::Borrowed as SparseHierarchy>::DataType
-    >,
+    F: Fn(
+        &<S0::Borrowed as SparseHierarchy>::DataType, 
+        &<S1::Borrowed as SparseHierarchy>::DataType,
+    ) -> T
 {
     const EXACT_HIERARCHY: bool = false;
     
@@ -32,8 +31,8 @@ where
     type LevelMaskType = <S0::Borrowed as SparseHierarchy>::LevelMaskType;
     type LevelMask<'a> = Self::LevelMaskType where Self:'a;
     
-    type DataType = F::Out;
-    type Data<'a> = F::Out where Self: 'a;
+    type DataType = T;
+    type Data<'a> = T where Self: 'a;
 
     #[inline]
     unsafe fn data<I>(&self, index: usize, level_indices: I) -> Option<Self::Data<'_>>
@@ -72,7 +71,7 @@ where
     phantom_data: PhantomData<(S0, S1, F)>
 }
 
-impl<S0, S1, F> SparseHierarchyState for State<S0, S1, F>
+impl<S0, S1, F, T> SparseHierarchyState for State<S0, S1, F>
 where
     S0: Borrowable<Borrowed: SparseHierarchy>,
     S1: Borrowable<Borrowed: SparseHierarchy<
@@ -80,10 +79,10 @@ where
         LevelMaskType = <S0::Borrowed as SparseHierarchy>::LevelMaskType,
     >>,
     
-    F: FnRR<
-        <S0::Borrowed as SparseHierarchy>::DataType, 
-        <S1::Borrowed as SparseHierarchy>::DataType,
-    >,
+    F: Fn(
+        &<S0::Borrowed as SparseHierarchy>::DataType, 
+        &<S1::Borrowed as SparseHierarchy>::DataType,
+    ) -> T
 {
     type This = Intersection<S0, S1, F>;
 
@@ -164,7 +163,7 @@ where
 impl<S0, S1, F> Borrowable for Intersection<S0, S1, F>{ type Borrowed = Self; }
 
 #[inline]
-pub fn intersection<S0, S1, F>(s0: S0, s1: S1, f: F) -> Intersection<S0, S1, F>
+pub fn intersection<S0, S1, F, T>(s0: S0, s1: S1, f: F) -> Intersection<S0, S1, F>
 where
     // bounds needed here for F's arguments auto-deduction
     S0: Borrowable<Borrowed: SparseHierarchy>,
@@ -173,10 +172,10 @@ where
         LevelMaskType = <S0::Borrowed as SparseHierarchy>::LevelMaskType,
     >>,
     
-    F: FnRR<
-        <S0::Borrowed as SparseHierarchy>::DataType, 
-        <S1::Borrowed as SparseHierarchy>::DataType,
-    >,
+    F: Fn(
+        &<S0::Borrowed as SparseHierarchy>::DataType, 
+        &<S1::Borrowed as SparseHierarchy>::DataType,
+    ) -> T
 {
     Intersection { s0, s1, f }
 } 

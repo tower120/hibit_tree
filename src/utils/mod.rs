@@ -2,11 +2,9 @@ use std::borrow::Borrow;
 
 pub(crate) mod primitive;
 pub(crate) mod array;
-mod function;
 
 pub use primitive::*;
 pub use array::*;
-pub use function::*;
 
 /// `Borrowable` means it can be either T or &T.
 /// 
