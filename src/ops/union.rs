@@ -1,7 +1,6 @@
 use std::marker::PhantomData;
 use std::borrow::Borrow;
 use std::hint::unreachable_unchecked;
-use std::mem::MaybeUninit;
 use std::ops::{BitAnd, BitOr};
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
@@ -99,9 +98,8 @@ where
     type Data<'a> = T where Self: 'a;
 
     #[inline]
-    unsafe fn data<I>(&self, index: usize, level_indices: I) -> Option<Self::Data<'_>>
-    where
-        I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
+    unsafe fn data(&self, index: usize, level_indices: &[usize])
+        -> Option<Self::Data<'_>> 
     {
         let d0 = self.s0.borrow().data(index, level_indices);
         let d1 = self.s1.borrow().data(index, level_indices);
@@ -109,9 +107,8 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked<I>(&self, index: usize, level_indices: I) -> Self::Data<'_>
-    where
-        I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
+    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
+        -> Self::Data<'_> 
     {
         self.data(index, level_indices).unwrap_unchecked()
     }

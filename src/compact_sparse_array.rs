@@ -454,7 +454,7 @@ where
 
     /// As long as container not empty - will always point to some valid (node, in-node-index).
     #[inline(always)]
-    unsafe fn get_terminal_node(&self, indices: impl ConstArray<Item=usize>) -> (NodePtr, usize) {
+    unsafe fn get_terminal_node(&self, indices: &[usize]) -> (NodePtr, usize) {
         //let indices = level_indices::<Mask, ConstUsize<DEPTH>>(index);
         let mut node_ptr = self.root;
         for n in 0..DEPTH-1 {
@@ -511,7 +511,7 @@ where
                         *self.keys.get_unchecked_mut(data_index) = last_key;
 
                         let indices = level_indices::<Mask, ConstUsize<DEPTH>>(last_key);
-                        let (node, inner_index) = self.get_terminal_node(indices);                    
+                        let (node, inner_index) = self.get_terminal_node(indices.as_ref());                    
                         *node.get_child_mut::<DataIndex>(inner_index) = data_index as DataIndex; 
                     }    
                 }
@@ -583,28 +583,24 @@ where
     type Data<'a> = &'a T where Self: 'a;
 
     #[inline]
-    unsafe fn data<I>(&self, index: usize, level_indices: I) -> Option<Self::Data<'_>>
-    where
-        I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
+    unsafe fn data(&self, index: usize, level_indices: &[usize]) 
+        -> Option<Self::Data<'_>> 
     {
-        unsafe{            
-            let (node, inner_index) = self.get_terminal_node(level_indices);
-            // point to SOME valid item
-            let data_index = node.get_child::<DataIndex>(inner_index).as_usize();
+        let (node, inner_index) = self.get_terminal_node(level_indices);
+        // point to SOME valid item
+        let data_index = node.get_child::<DataIndex>(inner_index).as_usize();
 
-            // The element may be wrong thou, so we check its index.
-            if *self.keys.get_unchecked(data_index) == index {
-                Some(self.data.get_unchecked(data_index))
-            } else {
-                None
-            }
-        }        
+        // The element may be wrong thou, so we check its index.
+        if *self.keys.get_unchecked(data_index) == index {
+            Some(self.data.get_unchecked(data_index))
+        } else {
+            None
+        }
     }
 
     #[inline]
-    unsafe fn data_unchecked<I>(&self, index: usize, level_indices: I) -> Self::Data<'_>
-    where
-        I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
+    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
+        -> Self::Data<'_> 
     {
         self.data(index, level_indices).unwrap_unchecked()
     }
