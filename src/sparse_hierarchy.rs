@@ -100,17 +100,27 @@ pub trait SparseHierarchy: Sized + Borrowable<Borrowed=Self> {
     type Data<'a>: Borrow<Self::DataType> + Take<Self::DataType>
         where Self: 'a;
  
-    /// Element may not exists, but `index` must be in range, and `level_indices` must
-    /// corresponds to `index`.
-    unsafe fn data<I>(&self, index: usize, level_indices: I) -> Option<Self::Data<'_>>
-    where
-        I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy;
+    /// # Safety
+    /// 
+    /// Element may not exist, but `index` must be in range, and `level_indices` must
+    /// correspond to `index`.
+    /// 
+    /// `level_indices` must be [LevelCount] size[^1].
+    /// 
+    /// [^1]: It is not just `[usize; LevelCount::VALUE]` due to troublesome 
+    ///       Rust const expressions in generic context. 
+    unsafe fn data(&self, index: usize, level_indices: &[usize]) -> Option<Self::Data<'_>>;
  
-    /// pointed element must exists,  and `level_indices` must
+    /// # Safety
+    /// 
+    /// pointed element must exist, and `level_indices` must
     /// corresponds to `index`.
-    unsafe fn data_unchecked<I>(&self, index: usize, level_indices: I) -> Self::Data<'_>
-    where
-        I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy;
+    /// 
+    /// `level_indices` must be [LevelCount] size[^1].
+    /// 
+    /// [^1]: It is not just `[usize; LevelCount::VALUE]` due to troublesome 
+    ///       Rust const expressions in generic context. 
+    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) -> Self::Data<'_>;
     
     type State: SparseHierarchyState<This = Self>; 
     
@@ -126,7 +136,7 @@ pub trait SparseHierarchy: Sized + Borrowable<Borrowed=Self> {
     {
         let index: usize = index.into().into();
         let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
-        unsafe{ self.data(index, indices) }
+        unsafe{ self.data(index, indices.as_ref()) }
     }
 
     /// # Safety
@@ -135,7 +145,7 @@ pub trait SparseHierarchy: Sized + Borrowable<Borrowed=Self> {
     #[inline]
     unsafe fn get_unchecked(&self, index: usize) -> Self::Data<'_> {
         let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
-        self.data_unchecked(index, indices)
+        self.data_unchecked(index, indices.as_ref())
     }
     
     /// Index range this SparseHierarchy can handle - `0..width^depth`.

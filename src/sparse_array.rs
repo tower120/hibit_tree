@@ -287,12 +287,13 @@ where
     }
     
     #[inline]
-    unsafe fn fetch_block_indices<I: ConstArray<Item=usize>>(&self, level_indices: I)
-        -> (I, usize)
+    unsafe fn fetch_block_indices(&self, level_indices: &[usize])
+        -> (ConstCopyArrayType<usize, Levels::LevelCount>, usize)
     {
-        let mut out = I::from_fn(|_|0);
+        debug_assert_eq!(level_indices.len(), Levels::LevelCount::VALUE);
+        let mut out = Array::from_fn(|_|0);
         struct V<'a, LevelIndices>{
-            level_indices: LevelIndices,
+            level_indices: &'a [usize],
             out: &'a mut LevelIndices
         }
         impl<'a, LevelIndices: ConstArray<Item=usize>, M> FoldVisitor<M> for V<'a, LevelIndices> {
@@ -313,14 +314,12 @@ where
                 }
             }
         }        
-        let last_level_block_index = self.levels.fold_n(I::Cap::default(), 0, V{level_indices, out: &mut out});
+        let last_level_block_index = self.levels.fold(0, V{level_indices, out: &mut out});
         (out, last_level_block_index)
     }
     
     #[inline]
-    unsafe fn fetch_block_index<I: ConstArray<Item=usize>>(&self, level_indices: I)
-        -> usize 
-    {
+    unsafe fn fetch_block_index(&self, level_indices: &[usize]) -> usize {
         self.fetch_block_indices(level_indices).1
     }
     
@@ -332,7 +331,7 @@ where
 
         let level_indices = level_indices::<Levels::Mask, Levels::LevelCount>(index);
         let (levels_block_indices, data_block_index) = unsafe { 
-            self.fetch_block_indices(level_indices) 
+            self.fetch_block_indices(level_indices.as_ref()) 
         };
         
         if data_block_index == 0 {
@@ -527,7 +526,7 @@ where
         let index: usize = index.into().into();
         
         let level_indices = level_indices::<Levels::Mask, Levels::LevelCount>(index);
-        let data_block_index = unsafe{ self.fetch_block_index(level_indices) };
+        let data_block_index = unsafe{ self.fetch_block_index(level_indices.as_ref()) };
         
         if data_block_index != 0{
             Some(unsafe{ self.values.get_unchecked_mut(data_block_index) })
@@ -590,7 +589,7 @@ where
     {
         let index: usize = index.into().into();
         let level_indices = level_indices::<Levels::Mask, Levels::LevelCount>(index);
-        let data_block_index = unsafe{ self.fetch_block_index(level_indices) };
+        let data_block_index = unsafe{ self.fetch_block_index(level_indices.as_ref()) };
         unsafe{ self.values.get_unchecked(data_block_index) }
     }
 }
@@ -645,10 +644,7 @@ where
     }*/    
 
     #[inline]
-    unsafe fn data<I>(&self, index: usize, level_indices: I) -> Option<Self::Data<'_>>
-    where
-        I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
-    {
+    unsafe fn data(&self, index: usize, level_indices: &[usize]) -> Option<Self::Data<'_>> {
         let data_block_index = self.fetch_block_index(level_indices);
         if data_block_index == 0 {
             None
@@ -659,10 +655,7 @@ where
 
     // This is also data_or_default
     #[inline]
-    unsafe fn data_unchecked<I>(&self, index: usize, level_indices: I) -> Self::Data<'_>
-    where
-        I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
-    {
+    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) -> Self::Data<'_> {
         self.data(index, level_indices).unwrap_unchecked()
         /*let data_block_index = self.fetch_block_index(level_indices);
         self.values.get_unchecked(data_block_index)*/

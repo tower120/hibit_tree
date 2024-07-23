@@ -2,7 +2,7 @@ use criterion::{black_box, Criterion, criterion_group, criterion_main};
 use rand::{Rng, SeedableRng};
 use rand::seq::SliceRandom;
 use hi_sparse_array::{config, SparseArray, Index};
-use hi_sparse_array::compact_sparse_array::CompactSparseArray;
+use hi_sparse_array::CompactSparseArray;
 //use hi_sparse_array::level_block::{Block, ClusterBlock, SmallBlock};
 //use hi_sparse_array::Iter;
 //use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
@@ -40,7 +40,7 @@ type CompactArray = CompactSparseArray<DataBlock, 6>;
 type BlockArray = SparseArray<config::width_64::depth_6, DataBlock>;
 
 //type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<CompactLvl1Block>, IntrusiveListLevel<CompactLvl2Block>), DataBlock>;
-type SmallBlockArray = SparseArray<config::sbo::width_64::depth_6, DataBlock>;
+//type SmallBlockArray = SparseArray<config::sbo::width_64::depth_6, DataBlock>;
 /*type ClusterBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<ClusterLvl1Block>), IntrusiveListLevel<DataBlock>>;*/
 
 /*fn cluster_array_get(array: &ClusterBlockArray) -> u64 {
