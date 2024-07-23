@@ -4,7 +4,7 @@ use std::slice;
 use arrayvec::ArrayVec;
 use crate::BitBlock;
 use crate::const_utils::{ConstArray, ConstInteger};
-use crate::sparse_hierarchy2::{SparseHierarchy2, SparseHierarchyState2};
+use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::utils::{Array, Borrowable, Take};
 
 pub struct MultiIntersection<Iter, R> {
@@ -14,27 +14,28 @@ pub struct MultiIntersection<Iter, R> {
 
 type IterItem<Iter> = <<Iter as Iterator>::Item as Borrowable>::Borrowed;
 
-impl<Iter, R> SparseHierarchy2 for MultiIntersection<Iter, R>
+impl<Iter, R> SparseHierarchy for MultiIntersection<Iter, R>
 where
-    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>> + Clone,
-    for<'a> R: Resolve<Item<'a> = <IterItem<Iter> as SparseHierarchy2>::Data<'a>> + 'a
+    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + Clone,
+    for<'a> R: Resolve<Item<'a> = <IterItem<Iter> as SparseHierarchy>::Data<'a>> + 'a
 {
-    type LevelCount = <IterItem<Iter> as SparseHierarchy2>::LevelCount;
+    const EXACT_HIERARCHY: bool = false;
+    type LevelCount = <IterItem<Iter> as SparseHierarchy>::LevelCount;
 
-    type LevelMaskType = <IterItem<Iter> as SparseHierarchy2>::LevelMaskType;
+    type LevelMaskType = <IterItem<Iter> as SparseHierarchy>::LevelMaskType;
     type LevelMask<'a> = Self::LevelMaskType where Self: 'a;
     
     type DataType = R::Out;
     type Data<'a> = R::Out where Self: 'a;
 
-    unsafe fn data<I>(&self, level_indices: I) -> Option<Self::Data<'_>>
+    unsafe fn data<I>(&self, index: usize, level_indices: I) -> Option<Self::Data<'_>>
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
     {
         todo!()
     }
 
-    unsafe fn data_unchecked<I>(&self, level_indices: I) -> Self::Data<'_>
+    unsafe fn data_unchecked<I>(&self, index: usize, level_indices: I) -> Self::Data<'_>
     where
         I: ConstArray<Item=usize, Cap=Self::LevelCount> + Copy
     {
@@ -45,25 +46,25 @@ where
 }
 
 const N: usize = 32;
-type StatesItem<Iter> = (<Iter as Iterator>::Item, <IterItem<Iter> as SparseHierarchy2>::State);
+type StatesItem<Iter> = (<Iter as Iterator>::Item, <IterItem<Iter> as SparseHierarchy>::State);
 
 pub struct MultiIntersectionState<Iter, R>
 where
-    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>> + Clone,
+    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + Clone,
 {
     states: ArrayVec<
-        (<Iter as Iterator>::Item, <IterItem<Iter> as SparseHierarchy2>::State),
+        (<Iter as Iterator>::Item, <IterItem<Iter> as SparseHierarchy>::State),
         N
     >,    
     empty_below_n: usize,
-    terminal_node_mask: <IterItem<Iter> as SparseHierarchy2>::LevelMaskType,
+    terminal_node_mask: <IterItem<Iter> as SparseHierarchy>::LevelMaskType,
     phantom_data: PhantomData<(Iter, R)>
 }
 
-impl<Iter, R> SparseHierarchyState2 for MultiIntersectionState<Iter, R>
+impl<Iter, R> SparseHierarchyState for MultiIntersectionState<Iter, R>
 where
-    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>> + Clone,
-    for<'a> R: Resolve<Item<'a> = <IterItem<Iter> as SparseHierarchy2>::Data<'a>> + 'a
+    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + Clone,
+    for<'a> R: Resolve<Item<'a> = <IterItem<Iter> as SparseHierarchy>::Data<'a>> + 'a
 {
     type This = MultiIntersection<Iter, R>;
 
@@ -72,7 +73,7 @@ where
         let states = ArrayVec::from_iter(
             this.iter.clone()
                 .map(|array|{
-                    let state = SparseHierarchyState2::new(array.borrow()); 
+                    let state = SparseHierarchyState::new(array.borrow()); 
                     (array, state)
                 })
         );
@@ -88,7 +89,7 @@ where
     #[inline]
     unsafe fn select_level_node<'a, N: ConstInteger>(
         &mut self, this: &'a Self::This, level_n: N, level_index: usize
-    ) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
+    ) -> <Self::This as SparseHierarchy>::LevelMask<'a> {
         // if we know that upper levels returned empty - return early.
         if N > self.empty_below_n {
             return BitBlock::zero(); 
@@ -118,7 +119,7 @@ where
             usize::MAX
         };
         
-        /*const*/ if N::VALUE == <Self::This as SparseHierarchy2>::LevelCount::VALUE - 1 {
+        /*const*/ if N::VALUE == <Self::This as SparseHierarchy>::LevelCount::VALUE - 1 {
             self.terminal_node_mask = acc_mask.clone(); 
         }
         
@@ -128,7 +129,7 @@ where
     #[inline]
     unsafe fn select_level_node_unchecked<'a, N: ConstInteger> (
         &mut self, this: &'a Self::This, level_n: N, level_index: usize
-    ) -> <Self::This as SparseHierarchy2>::LevelMask<'a> {
+    ) -> <Self::This as SparseHierarchy>::LevelMask<'a> {
         let mut states_iter = self.states.iter_mut();
         
         let mut acc_mask = 
@@ -151,7 +152,7 @@ where
 
     #[inline]
     unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize) 
-        -> Option<<Self::This as SparseHierarchy2>::Data<'a>> 
+        -> Option<<Self::This as SparseHierarchy>::Data<'a>> 
     {
         if !self.terminal_node_mask.get_bit(level_index){
             return None;
@@ -163,7 +164,7 @@ where
     #[inline]
     unsafe fn data_unchecked<'a>(
         &self, this: &'a Self::This, level_index: usize
-    ) -> <Self::This as SparseHierarchy2>::Data<'a> {
+    ) -> <Self::This as SparseHierarchy>::Data<'a> {
         
         let datas = self.states.iter()
             .map(|(array, array_state)| unsafe { 
@@ -231,8 +232,8 @@ where
 pub fn multi_intersection<Iter, R>(iter: Iter, r: R) 
     -> MultiIntersection<Iter, R>
 where
-    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>> + Clone,
-    for<'a> R: Resolve<Item<'a> = <IterItem<Iter> as SparseHierarchy2>::Data<'a>> + 'a
+    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + Clone,
+    for<'a> R: Resolve<Item<'a> = <IterItem<Iter> as SparseHierarchy>::Data<'a>> + 'a
 {
     MultiIntersection{ iter, r }
 }
@@ -246,11 +247,11 @@ pub struct FoldResolve<Iter, Init, F, T>{
 
 impl<Iter, Init, F, T> Resolve for FoldResolve<Iter, Init, F, T>
 where
-    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>>,
-    for<'a> Init: Fn(<IterItem<Iter> as SparseHierarchy2>::Data<'a>) -> T,
-    for<'a> F: Fn(T, <IterItem<Iter> as SparseHierarchy2>::Data<'a>) -> T,    
+    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>>,
+    for<'a> Init: Fn(<IterItem<Iter> as SparseHierarchy>::Data<'a>) -> T,
+    for<'a> F: Fn(T, <IterItem<Iter> as SparseHierarchy>::Data<'a>) -> T,    
 {
-    type Item<'a> = <IterItem<Iter> as SparseHierarchy2>::Data<'a> where Self: 'a ;
+    type Item<'a> = <IterItem<Iter> as SparseHierarchy>::Data<'a> where Self: 'a ;
     type Out = T;
 
     #[inline]
@@ -267,7 +268,7 @@ where
 pub fn fold_intersection<Iter, Init, F, T>(iter: Iter, init: Init, f: F) 
     -> MultiIntersection<Iter, FoldResolve<Iter, Init, F, T>>
 where
-    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy2>> + Clone,
+    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + Clone,
     
 {
     todo!()
@@ -278,15 +279,16 @@ where
 
 #[cfg(test)]
 mod test{
+    use std::marker::PhantomData;
     use itertools::assert_equal;
-    use crate::compact_sparse_array2::CompactSparseArray2;
-    use crate::ops2::multi_intersection3::{multi_intersection, Resolve};
-    use crate::sparse_hierarchy2::SparseHierarchy2;
+    use crate::compact_sparse_array::CompactSparseArray;
+    use crate::ops::multi_intersection3::{multi_intersection, Resolve};
+    use crate::sparse_hierarchy::SparseHierarchy;
     use crate::utils::Take;
 
     #[test]
     fn smoke_test(){
-        type Array = CompactSparseArray2<usize, 3>;
+        type Array = CompactSparseArray<usize, 3>;
         let mut a1 = Array::default();
         let mut a2 = Array::default();
         let mut a3 = Array::default();
@@ -304,27 +306,39 @@ mod test{
         
         let arrays = [a1, a2, a3];
         
-        struct R;
-        impl Resolve for R {
-            type Item<'a> = &'a usize where Self: 'a;
-            type Out = usize;
+        struct R<T>(PhantomData<T>);
+        impl<T> Resolve for R<T>
+        where
+            T: Clone
+        {
+            type Item<'a> = &'a T where Self: 'a;
+            type Out = T;
 
             fn resolve<'a, I>(&'a self, elements: I) -> Self::Out
             where
                 I: Iterator<Item=Self::Item<'a>>
                 //I: Iterator<Item=&'a usize>
             {
-                let mut s: usize = 0;
+                /*let mut s: usize = 0;
                 for e in elements{
                     let v: usize = e.take_or_clone(); 
                     s += v;
                 } 
-                s
-                //elements.sum()
+                s*/
+                elements.sum()
             }
         }
         
-        let intersection = multi_intersection(arrays.iter(), R ); 
+        let intersection = multi_intersection(arrays.iter(), R(PhantomData) );
+        /*
+        
+        let intersection = multi_intersection(arrays.iter(), resolve!(|elements| elements.sum()) );
+        
+        arrays.iter().intersection(resolve!(|elements| elements.sum()))
+        
+        let state = 0;
+        let intersection = multi_intersection(arrays.iter(), resolve!([i, state] |elements| elements.sum() + i) );
+         */
         
         assert_equal(intersection.iter(), [(15, 45)]);
     }

@@ -2,6 +2,7 @@ pub(crate) mod intersection;
 pub(crate) mod union;
 pub(crate) mod multi_union3;
 pub(crate) mod multi_intersection2;
+//pub(crate) mod multi_intersection3;
 
 pub use intersection::{Intersection};
 pub use union::Union;
