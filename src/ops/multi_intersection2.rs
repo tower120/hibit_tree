@@ -16,7 +16,8 @@ use crate::utils::{Array, Borrowable, Take};
 // require generic closures.
 /// Iterator for [multi_intersection] resolve function.
 /// 
-/// Can be one of a few iterators, depending on what operation you call.
+// Following part of doc valid for data() variant 1 implementation. 
+/*/// Can be one of a few iterators, depending on what operation you call.
 /// _(Compiler optimizes away all dispatch switches)_
 /// 
 /// Iterator returned for [data()]/[get()] is special: it will detect fact of 
@@ -62,7 +63,7 @@ use crate::utils::{Array, Borrowable, Take};
 /// .map(|data_array: ArrayVec<Data, 32>| -> Data {
 ///     // construct Data somehow very funny from data_array 
 /// }) 
-/// ```
+/// ```*/
 pub enum MultiIntersectionResolveIter<'a, Iter>
 where
     Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>>
@@ -73,7 +74,7 @@ where
 }
 impl<'a, Iter> Iterator for MultiIntersectionResolveIter<'a, Iter>
 where
-    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + 'a,
+    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>>,
 {
     type Item = <IterItem<Iter> as SparseHierarchy>::Data<'a>;
 
@@ -149,7 +150,7 @@ where
         // 3. Contains + get_unchecked. We traverse hierarchy TWICE.
         
         // Variant 1 implementation.
-        {
+/*        {
             if self.iter.clone().next().is_none(){
                 return None;
             }
@@ -170,14 +171,19 @@ where
             } else {
                 Some(resolve)
             }
-        }
+        }*/
         
         // Variant 2 implementation.
+        //
         // Slower 20% than variant 1 on plain data. Could be more on something
-        // complex.
-        // Performs poorly with Vec storage instead of ArrayVec.
+        // more complex. (But we expect that generative SparseHierarchies will not
+        // be used for heavy objects)
+        //
+        // Performs poorly with Vec storage instead of ArrayVec (thou if it 
+        // does not fit stack - overhead will probably be neglectable).
+        //
         // But no "special cases" from user perspective.
-        /*{
+        {
             let mut datas: ArrayVec<_, N> = Default::default();
             for array in self.iter.clone(){
                 let array = NonNull::from(array.borrow()); // drop borrow lifetime
@@ -196,6 +202,29 @@ where
                 )
             );
             Some(resolve)
+        }
+
+        // Variant 3 implementation.
+        // Performance degrades linearly with depth increase.
+        /*{
+            for array in self.iter.clone(){
+                let array = NonNull::from(array.borrow()); // drop borrow lifetime
+                let data = unsafe{ array.as_ref().data(index, level_indices) };
+                if data.is_none(){
+                    return None;
+                }
+            }
+            
+            let resolve = (self.f)(
+                MultiIntersectionResolveIter::stateless(
+                    ResolveIter {
+                        index,
+                        level_indices,
+                        iter: self.iter.clone(),
+                    }
+                )
+            );
+            Some(resolve)            
         }*/
     }
 
@@ -217,7 +246,7 @@ where
     type State = MultiIntersectionState<Iter, F, T>;
 }
 
-use data_resolve_v1::ResolveIter;
+use data_resolve_v2::ResolveIter;
 
 mod data_resolve_v1 {
     use super::*;
@@ -240,7 +269,6 @@ mod data_resolve_v1 {
         #[inline]
         fn next(&mut self) -> Option<Self::Item> {
             if let Some(array) = self.iter.next(){
-                // TODO: reuse as fn?
                 let array = NonNull::from(array.borrow()); // drop borrow lifetime
                 if let Some(data) = unsafe{ array.as_ref().data(self.index, self.level_indices) } {
                     return Some(data);
@@ -286,13 +314,48 @@ mod data_resolve_v2 {
             self.items.next()
         }
 
-        #[inline]
+        // Do nothing for ArrayVec/Vec
+        /*#[inline]
         fn fold<B, F>(self, init: B, f: F) -> B
         where
             Self: Sized,
             F: FnMut(B, Self::Item) -> B,
         {
             self.items.fold(init, f)
+        }*/
+
+        #[inline]
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            self.items.size_hint()
+        }
+    }
+}
+
+mod data_resolve_v3 {
+    use super::*;
+    
+    pub struct ResolveIter<'a, Iter>
+    where
+        Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + 'a,
+    {
+        pub index: usize, 
+        pub level_indices: &'a [usize],
+        pub iter: Iter,
+    }
+    impl<'a, Iter> Iterator for ResolveIter<'a, Iter>
+    where
+        Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + 'a,
+    {
+        type Item = <IterItem<Iter> as SparseHierarchy>::Data<'a>;
+    
+        #[inline]
+        fn next(&mut self) -> Option<Self::Item> {
+            if let Some(array) = self.iter.next(){
+                let array = NonNull::from(array.borrow()); // drop borrow lifetime
+                Some(unsafe{ array.as_ref().data_unchecked(self.index, self.level_indices) })
+            } else {
+                None
+            }
         }
     }
 }
@@ -330,6 +393,11 @@ where
             let data = array.as_ref().data_unchecked(self.index, self.level_indices);
             f(init, data)
         })
+    }
+    
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
     }
 }
 
@@ -519,8 +587,6 @@ where
 
 impl<Iter, Init, F> Borrowable for MultiIntersection<Iter, Init, F>{ type Borrowed = Self; }
 
-///
-/// See [MultiIntersectionResolveIter] for additional info. 
 #[inline]
 pub fn multi_intersection<Iter, F, T>(iter: Iter, resolve: F) 
     -> MultiIntersection<Iter, F, T>

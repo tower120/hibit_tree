@@ -1,11 +1,67 @@
 use std::marker::PhantomData;
 use std::borrow::Borrow;
+use std::ptr::NonNull;
 use std::slice;
 use arrayvec::ArrayVec;
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::BitBlock;
+use crate::ops::MultiIntersectionResolveIter;
 use crate::utils::{Array, Borrowable};
+
+// TODO: reuse somehow. macro_rules?
+/// This iterator is **GUARANTEED** to be initially non-empty. 
+/// 
+/// Prefer [fold]-dependent[^1] operations whenever possible, instead of just
+/// [next]ing items.
+/// 
+/// [^1]: All [Iterator] operations that redirect to `fold` under the hood: 
+/// [for_each], [sum], etc.
+pub enum MultiUnionResolveIter<'a, I>
+where
+    I: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>>
+{
+    stateless_unchecked(ResolveIterUnchecked<'a, I>),
+    stateless(ResolveIter<'a, I>),
+    stateful(StateResolveIter<'a, I>)
+}
+impl<'a, Iter> Iterator for MultiUnionResolveIter<'a, Iter>
+where
+    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + 'a,
+{
+    type Item = <IterItem<Iter> as SparseHierarchy>::Data<'a>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        match self{
+            Self::stateless_unchecked(iter) => iter.next(),
+            Self::stateless(iter) => iter.next(),
+            Self::stateful(iter) => iter.next(),
+        }
+    }
+
+    #[inline]
+    fn fold<B, F>(self, init: B, f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        match self{
+            Self::stateless_unchecked(iter) => iter.fold(init, f),
+            Self::stateless(iter) => iter.fold(init, f),
+            Self::stateful(iter) => iter.fold(init, f),
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self{
+            Self::stateless_unchecked(iter) => iter.size_hint(),
+            Self::stateless(iter) => iter.size_hint(),
+            Self::stateful(iter) => iter.size_hint(),
+        }
+    }
+}
 
 pub struct MultiUnion<Iter, F, T> {
     array_iter: Iter,
@@ -30,16 +86,115 @@ where
     type DataType = T;
     type Data<'a> = T where Self: 'a;
 
+    #[inline]
     unsafe fn data(&self, index: usize, level_indices: &[usize]) -> Option<Self::Data<'_>> {
-        todo!()
+        // Use variant 2 from multi_intersection.
+        // Gather items - then apply resolve function over.
+        let mut datas: ArrayVec<_, N> = Default::default();
+        for array in self.array_iter.clone(){
+            let array = NonNull::from(array.borrow()); // drop borrow lifetime
+            let data = unsafe{ array.as_ref().data(index, level_indices) };
+            if let Some(data) = data {
+                datas.push(data);
+            }
+        }
+        if datas.is_empty(){
+            return None;
+        }
+        let resolve = (self.f)(
+            MultiUnionResolveIter::stateless(
+                ResolveIter {
+                    items: datas.into_iter()
+                }
+            )
+        );
+        Some(resolve)
     }
 
-    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) -> Self::Data<'_> {
-        todo!()
+    #[inline]
+    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
+        -> Self::Data<'_> 
+    {
+        (self.f)(MultiUnionResolveIter::stateless_unchecked(
+            ResolveIterUnchecked {
+                array_iter: self.array_iter.clone(),
+                index,
+                level_indices,
+            })
+        )
     }
 
-    type State = MultiUnion2State<Iter, F, T>;
+    type State = MultiUnionState<Iter, F, T>;
 }
+
+pub struct ResolveIter<'a, Iter>
+where
+    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + 'a,
+{
+    pub items: arrayvec::IntoIter<<IterItem<Iter> as SparseHierarchy>::Data<'a>, N>
+    //pub items: std::vec::IntoIter<<IterItem<Iter> as SparseHierarchy>::Data<'a>>
+}
+impl<'a, Iter> Iterator for ResolveIter<'a, Iter>
+where
+    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + 'a,
+{
+    type Item = <IterItem<Iter> as SparseHierarchy>::Data<'a>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.items.next()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.items.size_hint()
+    }
+}
+
+pub struct ResolveIterUnchecked<'a, I>{
+    array_iter: I,
+    index: usize, 
+    level_indices: &'a [usize],
+}
+impl<'a, I> Iterator for ResolveIterUnchecked<'a, I>
+where
+    I: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + 'a,
+{
+    type Item = <IterItem<I> as SparseHierarchy>::Data<'a>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.array_iter.find_map(|array|{
+            unsafe{
+                let array = NonNull::from(array.borrow()); // drop borrow lifetime
+                array.as_ref().data(self.index, self.level_indices)
+            }
+        })
+    }
+
+    #[inline]
+    fn fold<B, F>(self, mut init: B, mut f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        for array in self.array_iter {
+            unsafe{
+                let array = NonNull::from(array.borrow()); // drop borrow lifetime
+                if let Some(item) = array.as_ref().data(self.index, self.level_indices){
+                    init = f(init, item)    
+                }
+            }
+        }
+        init
+    }
+    
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, self.array_iter.size_hint().1)
+    }
+}
+
 
 // TODO: Configurable State storage 
 const N: usize = 32;
@@ -52,7 +207,7 @@ type Masks<S> = ConstArrayType<
     <<S as Borrowable>::Borrowed as SparseHierarchy>::LevelCount,
 >;
 
-pub struct MultiUnion2State<Iter, F, T>
+pub struct MultiUnionState<Iter, F, T>
 where
     Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>>,
 {
@@ -72,7 +227,7 @@ where
 
 impl<Iter, F, T> SparseHierarchyState
 for 
-    MultiUnion2State<Iter, F, T>
+    MultiUnionState<Iter, F, T>
 where
     Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + Clone,
     for<'a> F: Fn(MultiUnionResolveIter<'a, Iter>) -> T
@@ -153,11 +308,12 @@ where
         }
         
         Some(
-            (this.f)(MultiUnionResolveIter {
+            (this.f)(MultiUnionResolveIter::stateful(
+             StateResolveIter {
                 lvl_non_empty_states: lvl_non_empty_states.iter(),
                 states: &self.states,
                 level_index,
-            })
+            }))
         )
     }
 
@@ -171,14 +327,7 @@ where
 
 impl<ArrayIter, Init, F> Borrowable for MultiUnion<ArrayIter, Init, F>{ type Borrowed = Self; }
 
-/// This iterator is **GUARANTEED** to be initially non-empty. 
-/// 
-/// Prefer [fold]-dependent[^1] operations whenever possible, instead of just
-/// [next]ing items.
-/// 
-/// [^1]: All [Iterator] operations that redirect to `fold` under the hood: 
-/// [for_each], [sum], etc.
-pub struct MultiUnionResolveIter<'a, I>
+pub struct StateResolveIter<'a, I>
 where
     I: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>>
 {
@@ -187,7 +336,7 @@ where
     level_index: usize,
 }
 
-impl<'a, I> Iterator for MultiUnionResolveIter<'a, I>
+impl<'a, I> Iterator for StateResolveIter<'a, I>
 where
     I: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>>
 {
@@ -223,8 +372,6 @@ where
         init
     }
 
-    /// Thou it is not state in `size_hint`, freshly constructed iterator
-    /// has minimal bound 1. That not tracked for performance reasons. 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         (0, Some(self.lvl_non_empty_states.len()))
@@ -271,6 +418,10 @@ mod test{
         let union = multi_union( arrays.iter(), |is| is.sum() ); 
         
         assert_equal(union.iter(), [(10, 10), (15, 45), (100, 100), (200, 400), (300, 300)]);
+        assert_eq!(unsafe{union.get_unchecked(10)}, 10);
+        assert_eq!(unsafe{union.get_unchecked(15)}, 45);
+        assert_eq!(unsafe{union.get(15)}, Some(45));
+        assert_eq!(unsafe{union.get(25)}, None);
     }
 
 }
