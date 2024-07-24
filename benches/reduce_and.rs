@@ -1,27 +1,25 @@
+//! TODO: Deprecated. Remove.
+
 use std::any::Any;
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::{BitAnd, BitOr, Mul};
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
-use hi_sparse_array::{apply, BitBlock, Empty, fold, SparseArray};
-use hi_sparse_array::level_block::{Block, SmallBlock};
-use hi_sparse_array::Iter;
+use hi_sparse_array::{config, Iter};
 use hi_sparse_array::const_utils::ConstFalse;
-use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
-use hi_sparse_array::BinaryOp;
-use hi_sparse_array::compact_sparse_array2::CompactSparseArray;
+use hi_sparse_array::{CompactSparseArray, SparseArray};
 use hi_sparse_array::utils::Take;
 
-type Lvl0Block = Block<u64, [u8;64]>;
+/*type Lvl0Block = Block<u64, [u8;64]>;
 type Lvl1Block = Block<u64, [u16;64]>;
-type SmallLvl1Block = SmallBlock<u64, [u8;1], [u16;64], [u16;7]>;
+type SmallLvl1Block = SmallBlock<u64, [u8;1], [u16;64], [u16;7]>;*/
 
 /*type Lvl0Block = Block<wide::u64x2, [u8;128]>;
 type Lvl1Block = Block<wide::u64x2, [u16;128]>;*/
 
 #[derive(Clone, Default)]
 struct DataBlock(u64);
-impl BitAnd for DataBlock{
+/*impl BitAnd for DataBlock{
     type Output = Self;
 
     #[inline]
@@ -55,13 +53,14 @@ impl Empty for DataBlock{
     fn is_empty(&self) -> bool {
         todo!()
     }
-}
+}*/
 
-type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), /*IntrusiveListLevel<*/DataBlock/*>*/>;
-type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<SmallLvl1Block>), DataBlock>;
-type CompactArray = CompactSparseArray<DataBlock, 2>;
+//type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>), /*IntrusiveListLevel<*/DataBlock/*>*/>;
+type BlockArray = SparseArray<config::width_64::depth_4, DataBlock>;
+//type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<SmallLvl1Block>), DataBlock>;
+type CompactArray = CompactSparseArray<DataBlock, 4>;
 
-pub struct AndOp<M, LD>(PhantomData<(M, LD)>);
+/*pub struct AndOp<M, LD>(PhantomData<(M, LD)>);
 impl<M, LD> Default for AndOp<M, LD>{
     fn default() -> Self {
         Self(PhantomData)
@@ -91,7 +90,7 @@ where
         //left.into_owned() & right.into_owned()
         left.borrow() & right.borrow()
     }
-}
+}*/
 
 /*pub struct OrOp<L0, L1, L2, LD>(PhantomData<(L0, L1, L2, LD)>);
 impl<L0, L1, L2, LD> Default for OrOp<L0, L1, L2, LD> {
@@ -208,8 +207,8 @@ pub fn bench_iter(c: &mut Criterion) {
     let mut block_array3 = BlockArray::default();
     let mut block_array4 = BlockArray::default();
     
-    let mut small_block_array1 = SmallBlockArray::default();
-    let mut small_block_array2 = SmallBlockArray::default();
+    /*let mut small_block_array1 = SmallBlockArray::default();
+    let mut small_block_array2 = SmallBlockArray::default();*/
     
     let mut compact_array1 = CompactArray::default();
     let mut compact_array2 = CompactArray::default();
@@ -220,8 +219,8 @@ pub fn bench_iter(c: &mut Criterion) {
         *block_array3.get_mut(i*20) = DataBlock(i as u64);
         *block_array4.get_mut(i*20) = DataBlock(i as u64);
         
-        *small_block_array1.get_mut(i*20) = DataBlock(i as u64);
-        *small_block_array2.get_mut(i*20) = DataBlock(i as u64);
+        /**small_block_array1.get_mut(i*20) = DataBlock(i as u64);
+        *small_block_array2.get_mut(i*20) = DataBlock(i as u64);*/
         
         *compact_array1.get_or_insert(i*20) = DataBlock(i as u64);
         *compact_array2.get_or_insert(i*20) = DataBlock(i as u64);
@@ -231,7 +230,7 @@ pub fn bench_iter(c: &mut Criterion) {
     c.bench_function("fold", |b| b.iter(|| fold_iter(black_box(&arrays))));
     c.bench_function("apply", |b| b.iter(|| apply_iter(black_box(&arrays[0]), black_box(&arrays[1]))));
     
-    c.bench_function("apply_small", |b| b.iter(|| apply_small_iter(black_box(&small_block_array1), black_box(&small_block_array2))));
+    // c.bench_function("apply_small", |b| b.iter(|| apply_small_iter(black_box(&small_block_array1), black_box(&small_block_array2))));
     
     c.bench_function("intersection2", |b| b.iter(|| intersection2_iter(black_box(&compact_array1), black_box(&compact_array2))));
     //c.bench_function("fold_w_empty", |b| b.iter(|| fold_w_empty_iter(black_box(&arrays))));

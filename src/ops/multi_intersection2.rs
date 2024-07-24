@@ -8,22 +8,70 @@ use crate::const_utils::{ConstArray, ConstCopyArrayType, ConstInteger};
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::utils::{Array, Borrowable, Take};
 
-type LevelIndices<S> = ConstCopyArrayType<usize, <S as SparseHierarchy>::LevelCount>;
-
 // HOPEFULLY this always acts as one of concrete iterator variants,
 // without additional branching. At least small tests in godbolt show so.
 // (because we construct and immoderately consume iterator in resolve closure)
 //
 // Ideally, we would need to pass concrete iterators to closure, but that would
 // require generic closures.
-pub enum AnyResolveIter<'a, Iter>
+/// Iterator for [multi_intersection] resolve function.
+/// 
+/// Can be one of a few iterators, depending on what operation you call.
+/// _(Compiler optimizes away all dispatch switches)_
+/// 
+/// Iterator returned for [data()]/[get()] is special: it will detect fact of 
+/// intersection on the fly - by iterating over items at requested index, 
+/// even if there is no actual intersection there (not all SparseHierarchies 
+/// return Some at requested index).
+/// If iterator meets None item - there is no intersection, and the result
+/// of resolve function **will be thrown away**. 
+/// 
+/// This is the fastest way of doing this - in one go. Other methods either require additional
+/// memory for storing all items, while we check if all of them exists at requested index.
+/// Or require traversing to the same point twice, first - to check if it exists, 
+/// second - to actually get item.
+///
+/// [data_unchecked()]/[get_unchecked()] just assumes that intersection occurs,
+/// so we just don't check.
+/// 
+/// Stateful operations always have computed bitmask of terminal node, so we always
+/// know do we intersect at requested item or not. So this is not the problem for
+/// [iter()]. 
+/// 
+/// All-in-all we believe that this is the most performant solution for the most 
+/// cases, which does not require a separate resolve function for each kind of operation.
+/// 
+/// If an object is heavy to build / heavy to drop, **and** you use [get()] heavily - consider splitting
+/// intersection operation into intersection + map:
+/// 
+/// ```
+/// multi_intersection(arrays.iter(), |ds| -> usize {
+///     ds.map(|d: Data|d.0).sum()  // gather data for construction of a heavy object.
+/// })
+/// // this map() will be called only in case of actual intersection 
+/// .map(|i| Data(i))   // Data is heavy object. 
+/// ```
+/// 
+/// In the worst case - you can gather items in container - and then process them: 
+/// ```
+/// #use arrayvec::ArrayVec;
+/// multi_intersection(arrays.iter(), |ds| -> ArrayVec<Data, 32> {
+///     ds.collect()
+/// })
+/// // this map() will be called only in case of actual intersection
+/// .map(|data_array: ArrayVec<Data, 32>| -> Data {
+///     // construct Data somehow very funny from data_array 
+/// }) 
+/// ```
+pub enum MultiIntersectionResolveIter<'a, Iter>
 where
     Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>>
 {
-    stateless(ResolveIter<'a, LevelIndices<IterItem<Iter>>, Iter>),
-    statefull(MultiIntersectionResolveIter<'a, Iter>)
+    stateless(ResolveIter<'a, Iter>),
+    stateless_unchecked(ResolveIterUnchecked<'a, Iter>),
+    statefull(StateResolveIter<'a, Iter>)
 }
-impl<'a, Iter> Iterator for AnyResolveIter<'a, Iter>
+impl<'a, Iter> Iterator for MultiIntersectionResolveIter<'a, Iter>
 where
     Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + 'a,
 {
@@ -32,12 +80,34 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         match self{
-            AnyResolveIter::stateless(iter) => iter.next(),
-            AnyResolveIter::statefull(iter) => iter.next(),
+            MultiIntersectionResolveIter::stateless(iter) => iter.next(),
+            MultiIntersectionResolveIter::stateless_unchecked(iter) => iter.next(),
+            MultiIntersectionResolveIter::statefull(iter) => iter.next(),
+        }
+    }
+
+    #[inline]
+    fn fold<B, F>(self, init: B, f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        match self{
+            MultiIntersectionResolveIter::stateless(iter) => iter.fold(init, f),
+            MultiIntersectionResolveIter::stateless_unchecked(iter) => iter.fold(init, f),
+            MultiIntersectionResolveIter::statefull(iter) => iter.fold(init, f),
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self{
+            MultiIntersectionResolveIter::stateless(iter) => iter.size_hint(),
+            MultiIntersectionResolveIter::stateless_unchecked(iter) => iter.size_hint(),
+            MultiIntersectionResolveIter::statefull(iter) => iter.size_hint(),
         }
     }
 }
-// TODO: size_hint, fold, ExactSize
 
 pub struct MultiIntersection<Iter, F, T> {
     iter: Iter,
@@ -50,7 +120,7 @@ type IterItem<Iter> = <<Iter as Iterator>::Item as Borrowable>::Borrowed;
 impl<Iter, F, T> SparseHierarchy for MultiIntersection<Iter, F, T>
 where
     Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + Clone,
-    for<'a> F: Fn(AnyResolveIter<'a, Iter>) -> T
+    for<'a> F: Fn(MultiIntersectionResolveIter<'a, Iter>) -> T
 {
     const EXACT_HIERARCHY: bool = false;
     
@@ -62,41 +132,179 @@ where
     type DataType = T;
     type Data<'a> = T where Self: 'a;
 
+    #[inline]
     unsafe fn data(&self, index: usize, level_indices: &[usize]) 
         -> Option<Self::Data<'_>> 
     {
-        todo!()
+        // There are few ways to do it:
+        // 1. Iterate, get data() and build resolve value on the fly. As
+        //    soon as None meet - throw away half-built resolve value and 
+        //    return None. 
+        //    This should be the fastest one, when intersection is
+        //    successful most of the time. Thou it may be not the best one
+        //    from user perspective, since resolve function will act "special"
+        //    for get() operations.
+        // 2. Iterate, get data() and STORE it. If we do not meet None - pass 
+        //    stored data to resolve function.
+        // 3. Contains + get_unchecked. We traverse hierarchy TWICE.
+        
+        // Variant 1 implementation.
+        {
+            if self.iter.clone().next().is_none(){
+                return None;
+            }
+            
+            let mut not_intersects = false;
+            let resolve = (self.f)(
+                MultiIntersectionResolveIter::stateless(
+                    ResolveIter {
+                        index, 
+                        level_indices, 
+                        iter: self.iter.clone(), 
+                        not_intersects: &mut not_intersects
+                    }
+                )
+            );
+            if not_intersects{
+                None
+            } else {
+                Some(resolve)
+            }
+        }
+        
+        // Variant 2 implementation.
+        // Slower 20% than variant 1 on plain data. Could be more on something
+        // complex.
+        // Performs poorly with Vec storage instead of ArrayVec.
+        // But no "special cases" from user perspective.
+        /*{
+            let mut datas: ArrayVec<_, N> = Default::default();
+            for array in self.iter.clone(){
+                let array = NonNull::from(array.borrow()); // drop borrow lifetime
+                let data = unsafe{ array.as_ref().data(index, level_indices) };
+                if let Some(data) = data{
+                    datas.push(data);
+                } else {
+                    return None;
+                }
+            }
+            let resolve = (self.f)(
+                MultiIntersectionResolveIter::stateless(
+                    ResolveIter {
+                        items: datas.into_iter()
+                    }
+                )
+            );
+            Some(resolve)
+        }*/
     }
 
+    #[inline]
     unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
         -> Self::Data<'_> 
     {
-        todo!()
-        /*(self.f)(
-            AnyResolveIter::stateless(
-                ResolveIter{
+        (self.f)(
+            MultiIntersectionResolveIter::stateless_unchecked(
+                ResolveIterUnchecked {
                     index, 
                     level_indices, 
                     iter: self.iter.clone(), 
-                    phantom_data: PhantomData
                 }
             )
-        )*/
+        )
     }
 
     type State = MultiIntersectionState<Iter, F, T>;
 }
 
-pub struct ResolveIter<'a, Indices, Iter> {
-    index: usize, 
-    level_indices: Indices,
-    iter: Iter,
-    phantom_data: PhantomData<&'a ()>
+use data_resolve_v1::ResolveIter;
+
+mod data_resolve_v1 {
+    use super::*;
+    
+    pub struct ResolveIter<'a, Iter>
+    where
+        Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + 'a,
+    {
+        pub index: usize, 
+        pub level_indices: &'a [usize],
+        pub iter: Iter,
+        pub not_intersects: &'a mut bool
+    }
+    impl<'a, Iter> Iterator for ResolveIter<'a, Iter>
+    where
+        Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + 'a,
+    {
+        type Item = <IterItem<Iter> as SparseHierarchy>::Data<'a>;
+    
+        #[inline]
+        fn next(&mut self) -> Option<Self::Item> {
+            if let Some(array) = self.iter.next(){
+                // TODO: reuse as fn?
+                let array = NonNull::from(array.borrow()); // drop borrow lifetime
+                if let Some(data) = unsafe{ array.as_ref().data(self.index, self.level_indices) } {
+                    return Some(data);
+                }
+                *self.not_intersects = true;
+            }
+            None
+        }
+    }
+    impl<'a, Iter> Drop for ResolveIter<'a, Iter>
+    where
+        Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + 'a,
+    {
+        #[inline]
+        fn drop(&mut self) {
+            if *self.not_intersects{
+                return;
+            }
+            // search if there are any non-intersected elements left.
+            self.fold((), |_, _|());
+        }
+    }
 }
-impl<'a, Indices, Iter> Iterator for ResolveIter<'a, Indices, Iter>
+
+mod data_resolve_v2 {
+    use super::*;
+    
+    pub struct ResolveIter<'a, Iter>
+    where
+        Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + 'a,
+    {
+        pub items: arrayvec::IntoIter<<IterItem<Iter> as SparseHierarchy>::Data<'a>, N>
+        //pub items: std::vec::IntoIter<<IterItem<Iter> as SparseHierarchy>::Data<'a>>
+    }
+    impl<'a, Iter> Iterator for ResolveIter<'a, Iter>
+    where
+        Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + 'a,
+    {
+        type Item = <IterItem<Iter> as SparseHierarchy>::Data<'a>;
+    
+        #[inline]
+        fn next(&mut self) -> Option<Self::Item> {
+            self.items.next()
+        }
+
+        #[inline]
+        fn fold<B, F>(self, init: B, f: F) -> B
+        where
+            Self: Sized,
+            F: FnMut(B, Self::Item) -> B,
+        {
+            self.items.fold(init, f)
+        }
+    }
+}
+
+struct ResolveIterUnchecked<'a, Iter> {
+    index: usize, 
+    level_indices: &'a [usize],
+    iter: Iter,
+}
+impl<'a, Iter> Iterator for ResolveIterUnchecked<'a, Iter>
 where
     Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + 'a,
-    Indices: ConstArray<Item=usize, Cap=<IterItem<Iter> as SparseHierarchy>::LevelCount> + Copy
 {
     type Item = <IterItem<Iter> as SparseHierarchy>::Data<'a>;
 
@@ -105,10 +313,23 @@ where
         self.iter
             .next()
             .map(|array| unsafe {
-                // drop borrow lifetime
-                let array = NonNull::from(array.borrow());
+                // TODO: reuse as fn?
+                let array = NonNull::from(array.borrow()); // drop borrow lifetime
                 array.as_ref().data_unchecked(self.index, self.level_indices)
             })
+    }
+
+    #[inline]
+    fn fold<B, F>(self, init: B, mut f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        self.iter.fold(init, |init, array| unsafe {
+            let array = NonNull::from(array.borrow()); // drop borrow lifetime
+            let data = array.as_ref().data_unchecked(self.index, self.level_indices);
+            f(init, data)
+        })
     }
 }
 
@@ -131,7 +352,7 @@ where
 impl<Iter, F, T> SparseHierarchyState for MultiIntersectionState<Iter, F, T>
 where
     Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + Clone,
-    for<'a> F: Fn(AnyResolveIter<'a, Iter>) -> T
+    for<'a> F: Fn(MultiIntersectionResolveIter<'a, Iter>) -> T
 {
     type This = MultiIntersection<Iter, F, T>;
 
@@ -233,15 +454,15 @@ where
         &self, this: &'a Self::This, level_index: usize
     ) -> <Self::This as SparseHierarchy>::Data<'a> {
         (this.f)(
-            AnyResolveIter::statefull(
-                MultiIntersectionResolveIter { level_index, states_iter: self.states.iter() }
+            MultiIntersectionResolveIter::statefull(
+                StateResolveIter { level_index, states_iter: self.states.iter() }
             )
         )
     }
 }
 
 // States slice to Data iterator adapter.
-pub struct MultiIntersectionResolveIter<'a, I>
+struct StateResolveIter<'a, I>
 where
     I: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>>
 {
@@ -254,7 +475,7 @@ where
 /// Prefer using [fold]-based[^1] operations over [next]-ing.
 ///
 /// [^1]: Such as [for_each], [sum], etc... 
-impl<'a, I> Iterator for MultiIntersectionResolveIter<'a, I>
+impl<'a, I> Iterator for StateResolveIter<'a, I>
 where
     I: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>>
 {
@@ -291,19 +512,21 @@ where
     }
 }
 
-impl<'a, I> ExactSizeIterator for MultiIntersectionResolveIter<'a, I>
+impl<'a, I> ExactSizeIterator for StateResolveIter<'a, I>
 where
     I: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>>
 {}
 
 impl<Iter, Init, F> Borrowable for MultiIntersection<Iter, Init, F>{ type Borrowed = Self; }
 
+///
+/// See [MultiIntersectionResolveIter] for additional info. 
 #[inline]
 pub fn multi_intersection<Iter, F, T>(iter: Iter, resolve: F) 
     -> MultiIntersection<Iter, F, T>
 where
     Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + Clone,
-    for<'a> F: Fn(AnyResolveIter<'a, Iter>) -> T
+    for<'a> F: Fn(MultiIntersectionResolveIter<'a, Iter>) -> T
 {
     MultiIntersection{ iter, f: resolve, phantom_data: Default::default() }
 }
@@ -338,6 +561,9 @@ mod test{
         let intersection = multi_intersection(arrays.iter(), |vs| vs.sum() ); 
         
         assert_equal(intersection.iter(), [(15, 45)]);
+        assert_eq!(unsafe{ intersection.get_unchecked(15) }, 45);
+        assert_eq!(unsafe{ intersection.get(15) }, Some(45));
+        assert_eq!(unsafe{ intersection.get(200) }, None);
     }
 
 }

@@ -12,7 +12,7 @@ simd = ["dep:wide"]
 
 [dependencies]
 arrayvec = "0.7.4"
-thin-vec = "0.2.13"
+#thin-vec = "0.2.13"
 
 [dependencies.wide]
 optional = true
@@ -42,4 +42,8 @@ harness = false
 
 [[bench]]
 name = "reduce_or"
+harness = false
+
+[[bench]]
+name = "intersection"
 harness = false
