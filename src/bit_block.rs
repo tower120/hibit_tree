@@ -77,6 +77,8 @@ pub trait BitBlock
     type Array: Array<Item = u64>;
     fn as_array(&self) -> &Self::Array;
     fn as_array_mut(&mut self) -> &mut Self::Array;
+    
+    fn count_ones(&self) -> usize;
 }
 
 impl BitBlock for u64{
@@ -103,6 +105,11 @@ impl BitBlock for u64{
         unsafe {
             mem::transmute::<&mut u64, &mut [u64; 1]>(self)
         }        
+    }
+
+    #[inline]
+    fn count_ones(&self) -> usize {
+        u64::count_ones(*self) as usize
     }
 }
 
@@ -134,6 +141,15 @@ impl BitBlock for wide::u64x2{
     fn as_array_mut(&mut self) -> &mut Self::Array {
         self.as_array_mut()
     }
+
+    #[inline]
+    fn count_ones(&self) -> usize {
+        let this = self.as_array_ref();
+        (
+            u64::count_ones(this[0]) + u64::count_ones(this[1])
+        ) 
+        as usize
+    }
 }
 
 #[cfg(feature = "simd")]
@@ -164,4 +180,17 @@ impl BitBlock for wide::u64x4{
     fn as_array_mut(&mut self) -> &mut Self::Array {
         self.as_array_mut()
     }
+    
+    #[inline]
+    fn count_ones(&self) -> usize {
+        let this = self.as_array_ref();
+        (
+            u64::count_ones(this[0]) 
+            + u64::count_ones(this[1])
+            + u64::count_ones(this[2])
+            + u64::count_ones(this[3])
+        ) 
+        as usize
+    }
+    
 }

@@ -63,14 +63,14 @@ mod test{
     
     #[test]
     fn const_loop_macro_test(){
-        const_loop!(n1 in 1..3 => { println!("aa {:?}", n1) });
+        const_loop!(N in 1..3 => { println!("aa {:?}", N) });
 
         fn test<I: ConstInteger>(_: I){
             let i = 5;
-            const_loop!(n in 0..{<I as ConstInteger>::VALUE} => 'out: {
-                if n>i {break 'out;}
+            const_loop!(N in 0..{<I as ConstInteger>::VALUE} => 'out: {
+                if N>i {break 'out;}
                 
-                println!("bb {:?}", n)
+                println!("bb {:?}", N)
                 
             });    
         }
@@ -79,13 +79,13 @@ mod test{
 
     #[test]
     fn const_loop_rev_macro_test(){
-        const_loop!(n1 in 1..3 rev => { println!("aa {:?}", n1) });
+        const_loop!(N in 1..3 rev => { println!("aa {:?}", N) });
 
         fn test<I: ConstInteger>(_: I){
             let i = 2;
-            const_loop!(n in 0..{<I as ConstInteger>::VALUE} rev => 'out: {
-                if n<i {break 'out;}
-                println!("bb {:?}", n)
+            const_loop!(N in 0..{<I as ConstInteger>::VALUE} rev => 'out: {
+                if N<i {break 'out;}
+                println!("bb {:?}", N)
             });    
         }
         test(ConstUsize::<7>);

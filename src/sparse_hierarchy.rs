@@ -159,6 +159,39 @@ pub trait SparseHierarchy: Sized + Borrowable<Borrowed=Self> {
     }
 }
 
+/// [SparseHierarchy] that is not a concrete collection.
+/// 
+/// Most results of operations are.
+pub trait LazySparseHierarchy: SparseHierarchy{
+    
+    /// Make a concrete collection from a lazy/virtual one.
+    #[inline]
+    fn materialize<T>(self) -> T
+    where 
+        T: FromSparseHierarchy<
+            LevelMaskType = Self::LevelMaskType,
+            LevelCount = Self::LevelCount,
+            DataType = Self::DataType
+        >
+    {
+        T::from_sparse_hierarchy(self)
+    }
+    
+}
+
+/// Construct a [SparseHierarchy] collection from any [SparseHierarchy].
+pub trait FromSparseHierarchy: SparseHierarchy{
+    fn from_sparse_hierarchy<T>(other: T) -> Self
+    where 
+        T: Borrowable<
+            Borrowed: SparseHierarchy<
+                LevelMaskType = Self::LevelMaskType,
+                LevelCount = Self::LevelCount,
+                DataType = Self::DataType
+            >
+        >;
+}
+
 /// Stateful [SparseHierarchy] interface.
 /// 
 /// Having state allows implementations to have cache level meta-info.
