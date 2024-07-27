@@ -12,6 +12,7 @@ use std::mem::{align_of, MaybeUninit, size_of};
 use std::ops::ControlFlow;
 use std::ops::ControlFlow::Continue;
 use std::ptr::{addr_of, addr_of_mut, NonNull, null};
+use arrayvec::ArrayVec;
 use crate::bit_utils::{get_bit_unchecked, set_bit_unchecked};
 use crate::{BitBlock, FromSparseHierarchy, Index, LazySparseHierarchy};
 use crate::bit_queue::BitQueue;
@@ -213,6 +214,35 @@ impl NodePtr {
     }
     
     #[inline]
+    pub unsafe fn from_parts<T: NodeChild>(
+        mask: Mask,
+        childs: &[T],
+        empty_child: T, 
+    ) -> Self {
+        let len = childs.len();
+        let cap = (len + 1) as u8; 
+        let node = alloc(Self::layout::<T>(cap)) as *mut NodeHeader;
+        
+        addr_of_mut!((*node).mask).write(mask);
+        addr_of_mut!((*node).capacity).write(cap);
+        addr_of_mut!((*node).len).write(len as u8);
+        
+        let mut this = Self(NonNull::new_unchecked(node));
+        
+        // copy childs
+        ptr::copy_nonoverlapping(
+            childs.as_ptr(),
+            this.children_mut_ptr::<T>(),
+            len
+        );
+        
+        // add empty_child at the end.
+        this.children_mut_ptr::<T>().add(len).write(empty_child);
+        
+        this
+    }    
+    
+    #[inline]
     pub fn raw_new<T: NodeChild>(cap: u8, mask: Mask) -> MaybeUninit<Self> {
         unsafe {
             let node = alloc(Self::layout::<T>(cap)) as *mut NodeHeader;
@@ -226,40 +256,6 @@ impl NodePtr {
             )
         }
     }
-    
-/*    #[inline]
-    pub unsafe fn init_with_childs<T, I>(
-        mask: Mask,
-        node: MaybeUninit<Self>, 
-        empty_child: T, 
-        child_iter: I
-    ) -> Self 
-    where
-        T: NodeChild, 
-        I: Iterator<Item = T>
-    {
-        let node = node.assume_init();
-        
-        // write childs
-        let ptr = node.children_mut_ptr::<T>();
-        let mut i = 0;
-        for child in child_iter {
-            ptr.add(i).write(child);
-            i+=1;
-        }
-    
-        // write empty_child last
-        ptr.add(i).write(empty_child);
-
-        // write meta
-        let node_ptr = node.0.as_ptr();
-        addr_of_mut!((*node_ptr).mask).write(mask);
-        addr_of_mut!((*node_ptr).len).write((i+1) as u8);
-        
-        debug_assert!((*node_ptr).len <= (*node_ptr).capacity);
-
-        node
-    }*/
     
     /// Mask will not be updated.
     ///
@@ -509,50 +505,106 @@ where
     NodePtr::raw_finalize(raw_node, empty_child)
 }
 
+#[inline(always)]
+unsafe fn from_sparse_hierarchy<L, N, F>(
+    other: &L, 
+    other_state: &mut L::State, 
+    n: N,
+    index: usize,
+    key_acc: usize,    
+    push_data: &mut F,
+) -> Option<NodePtr>
+where
+    L: SparseHierarchy<LevelMaskType = Mask, DataType: Clone>,
+    N: ConstInteger,
+    F: FnMut(usize, L::DataType) -> DataIndex
+{
+    let mask = other_state.select_level_node_unchecked(other, n, index)
+               .take_or_clone();
+    
+    if N::VALUE == L::LevelCount::VALUE - 1 {
+        // terminal node with data
+        let len = mask.count_ones();
+        let raw_node = NodePtr::raw_new::<DataIndex>((len+1) as u8, mask);
+        
+        mask.traverse_bits(|index| {
+            let data = other_state.data_unchecked(other, index).take_or_clone();
+            let key = key_acc + index; 
+            let data_index = push_data(key, data);
+            NodePtr::raw_push_within_capacity(raw_node, index, data_index);
+            
+            Continue(())
+        });
+        return Some(NodePtr::raw_finalize(raw_node, 0));          
+    }
+    
+    let mut node_mask = Mask::zero();
+    let mut childs: ArrayVec<NodePtr, {Mask::SIZE}> = Default::default(); 
+    
+    mask.traverse_bits(|index| {
+        let next_n = n.inc();
+        let key_acc = key_acc + index << (L::LevelMaskType::SIZE.ilog2() as usize * (L::LevelCount::VALUE - N::VALUE - 1));
+        if let Some(child_node) = from_sparse_hierarchy(other, other_state, next_n, index, key_acc, push_data){
+            node_mask.set_bit::<true>(index);
+            childs.push_unchecked(child_node);
+        }
+        Continue(())
+    });
+    
+    if childs.is_empty(){
+        None
+    } else {
+        let empty_child = empty_node(n.inc(), L::LevelCount::default());
+        Some(NodePtr::from_parts(node_mask, childs.as_slice(), empty_child))
+    }
+}
+
 impl<T, const DEPTH: usize> FromSparseHierarchy for CompactSparseArray<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger,
     //TODO: remove clone
     T: Clone
 {
-    // TODO: L can be just & 
     fn from_sparse_hierarchy<L>(other: L) -> Self
     where 
-        L: Borrowable<
-            Borrowed: SparseHierarchy<
-                LevelMaskType = Self::LevelMaskType,
-                LevelCount = Self::LevelCount,
-                DataType = Self::DataType
-            >
-        >
+        L: SparseHierarchy<
+            LevelMaskType = Self::LevelMaskType,
+            LevelCount = Self::LevelCount,
+            DataType = Self::DataType
+        >     
     {
+        let mut data: Vec<<L::Borrowed as SparseHierarchy>::DataType> = Vec::with_capacity(1);
+        unsafe{ data.set_len(1); }
+        
+        let mut keys = vec![usize::MAX];
+        
+        let mut push_fn = |index, value| -> DataIndex {
+            let i = data.len(); 
+            data.push(value);
+            keys.push(index);
+            i as DataIndex
+        };        
+
+        let mut other_state = <L::Borrowed as SparseHierarchy>::State::new(&other);
+
+        let root = 
         if <L::Borrowed as SparseHierarchy>::EXACT_HIERARCHY {
-            let other = other.borrow();
-            
-            let mut other_state = <L::Borrowed as SparseHierarchy>::State::new(other);
-            
-            let root_mask = unsafe{ other_state.select_level_node_unchecked(other, ConstUsize::<0>, 0) }
+            let root_mask = unsafe{ other_state.select_level_node_unchecked(&other, ConstUsize::<0>, 0) }
                              .take_or_clone();
             let raw_root_node = NodePtr::raw_new::<NodePtr>((root_mask.count_ones() + 1) as u8, root_mask);
             unsafe{
-                let mut data: Vec<<L::Borrowed as SparseHierarchy>::DataType> = Vec::with_capacity(1);
-                unsafe{ data.set_len(1); }
-                
-                let mut keys = vec![usize::MAX];
-                
-                let mut push_fn = |index, value| -> DataIndex {
-                    let i = data.len(); 
-                    data.push(value);
-                    keys.push(index);
-                    i as DataIndex
-                };
-                let root = from_exact_sparse_hierarchy(raw_root_node, other, &mut other_state, ConstUsize::<0>, root_mask, 0, &mut push_fn);
-                
-                Self{ root, data, keys }
+                from_exact_sparse_hierarchy(
+                    raw_root_node, &other, &mut other_state, ConstUsize::<0>, root_mask, 0, &mut push_fn
+                )
             }
         } else {
-            unimplemented!()
-        }
+            unsafe{
+                from_sparse_hierarchy(
+                    &other, &mut other_state, ConstUsize::<0>, 0, 0, &mut push_fn
+                ).unwrap_unchecked()
+            }
+        };
+        Self{ root, data, keys }
     }
 }
 
@@ -1024,7 +1076,7 @@ mod test{
         a.insert(15, 15);
         a.insert(4500, 4500);
         
-        let b = CompactSparseArray::from_sparse_hierarchy(&a);
+        let b = CompactSparseArray::from_sparse_hierarchy(a);
         assert_equal(b.iter(),
             [(15, &15), (4500, &4500)]
         );

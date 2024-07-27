@@ -183,12 +183,10 @@ pub trait LazySparseHierarchy: SparseHierarchy{
 pub trait FromSparseHierarchy: SparseHierarchy{
     fn from_sparse_hierarchy<T>(other: T) -> Self
     where 
-        T: Borrowable<
-            Borrowed: SparseHierarchy<
-                LevelMaskType = Self::LevelMaskType,
-                LevelCount = Self::LevelCount,
-                DataType = Self::DataType
-            >
+        T: SparseHierarchy<
+            LevelMaskType = Self::LevelMaskType,
+            LevelCount = Self::LevelCount,
+            DataType = Self::DataType
         >;
 }
 
