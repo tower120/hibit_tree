@@ -444,13 +444,46 @@ where
     }
 }
 
+#[inline]
+unsafe fn make_terminal_node<L, F>(
+    other: &L, 
+    other_state: &mut L::State,
+    mask: Mask,
+    cap: u8,
+    key_acc: usize,
+    mut push_data: F
+) -> NodePtr
+where
+    L: SparseHierarchy<LevelMaskType = Mask, DataType: Clone>,
+    F: FnMut(usize, L::DataType) -> DataIndex
+{
+    let raw_node = NodePtr::raw_new::<DataIndex>(cap, mask);
+    mask.traverse_bits(|index| {
+        let data = other_state.data_unchecked(other, index).take_or_clone();
+        let key = key_acc + index; 
+        let data_index = push_data(key, data);
+        NodePtr::raw_push_within_capacity(raw_node, index, data_index);
+        
+        Continue(())
+    });
+    return NodePtr::raw_finalize(raw_node, 0);    
+}
+
+// TODO: move somewhere up, use in iter
+#[inline]
+fn block_start<S: SparseHierarchy, N: ConstInteger>(index: usize) -> usize {
+    index << (
+        S::LevelMaskType::SIZE.ilog2() as usize * 
+        (S::LevelCount::VALUE - N::VALUE - 1)
+    )
+}
+
 #[inline(always)]
 unsafe fn from_exact_sparse_hierarchy<L, N, F>(
-    raw_node: MaybeUninit<NodePtr>, 
     other: &L, 
     other_state: &mut L::State, 
-    n: N, 
-    mask: Mask,
+    n: N,
+    index: usize,
     key_acc: usize,    
     push_data: &mut F,
 ) -> NodePtr
@@ -461,42 +494,27 @@ where
 {
     const{ assert!(L::EXACT_HIERARCHY) }
     
+    let mask = other_state.select_level_node_unchecked(other, n, index)
+               .take_or_clone();
+    let len = mask.count_ones() as u8;
+    let cap = len + 1;
+    
     if N::VALUE == L::LevelCount::VALUE - 1 {
         // terminal node with data
-        mask.traverse_bits(|index| {
-            let data = other_state.data_unchecked(other, index).take_or_clone();
-            let key = key_acc + index; 
-            let data_index = push_data(key, data);
-            NodePtr::raw_push_within_capacity(raw_node, index, data_index);
-            
-            Continue(())
-        });
-        return NodePtr::raw_finalize(raw_node, 0);    
+        return make_terminal_node(other, other_state, mask, cap, key_acc, push_data);
     }
     
+    let mut raw_node = NodePtr::raw_new::<NodePtr>(cap, mask);
     mask.traverse_bits(|index| {
-        let next_n = n.inc();
-        // select `other` level node.
-        let child_mask = other_state.select_level_node_unchecked(other, next_n, index)
-                         .take_or_clone();
-        
-        // make new node
-        let len = child_mask.count_ones();
-        let new_raw_node = if N::VALUE == L::LevelCount::VALUE - 2 {
-            NodePtr::raw_new::<DataIndex>((len+1) as u8, child_mask)
-        } else {
-            NodePtr::raw_new::<NodePtr>((len+1) as u8, child_mask)
-        };
-        
         // TODO: try calculate key the same in iter. Benchmark.
         // go deeper
-        let key_acc = key_acc + index << (L::LevelMaskType::SIZE.ilog2() as usize * (L::LevelCount::VALUE - N::VALUE - 1)); 
-        let new_node = from_exact_sparse_hierarchy(
-            new_raw_node, other, other_state, next_n, child_mask, key_acc, push_data
+        let key_acc = key_acc + block_start::<L, N>(index); 
+        let child_node = from_exact_sparse_hierarchy(
+            other, other_state, n.inc(), index, key_acc, push_data
         );
         
         // connect to current
-        NodePtr::raw_push_within_capacity(raw_node, index, new_node);
+        NodePtr::raw_push_within_capacity(raw_node, index, child_node);
         
         Continue(())
     });
@@ -524,27 +542,17 @@ where
     
     if N::VALUE == L::LevelCount::VALUE - 1 {
         // terminal node with data
-        let len = mask.count_ones();
-        let raw_node = NodePtr::raw_new::<DataIndex>((len+1) as u8, mask);
-        
-        mask.traverse_bits(|index| {
-            let data = other_state.data_unchecked(other, index).take_or_clone();
-            let key = key_acc + index; 
-            let data_index = push_data(key, data);
-            NodePtr::raw_push_within_capacity(raw_node, index, data_index);
-            
-            Continue(())
-        });
-        return Some(NodePtr::raw_finalize(raw_node, 0));          
+        let len = mask.count_ones() as u8;
+        let cap = len + 1;
+        return Some(make_terminal_node(other, other_state, mask, cap, key_acc, push_data));        
     }
     
     let mut node_mask = Mask::zero();
     let mut childs: ArrayVec<NodePtr, {Mask::SIZE}> = Default::default(); 
     
     mask.traverse_bits(|index| {
-        let next_n = n.inc();
-        let key_acc = key_acc + index << (L::LevelMaskType::SIZE.ilog2() as usize * (L::LevelCount::VALUE - N::VALUE - 1));
-        if let Some(child_node) = from_sparse_hierarchy(other, other_state, next_n, index, key_acc, push_data){
+        let key_acc = key_acc + block_start::<L, N>(index);
+        if let Some(child_node) = from_sparse_hierarchy(other, other_state, n.inc(), index, key_acc, push_data){
             node_mask.set_bit::<true>(index);
             childs.push_unchecked(child_node);
         }
@@ -559,6 +567,7 @@ where
     }
 }
 
+// TODO: split from-machinery into sepearte file, its too big already.
 impl<T, const DEPTH: usize> FromSparseHierarchy for CompactSparseArray<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger,
@@ -587,18 +596,12 @@ where
 
         let mut other_state = <L::Borrowed as SparseHierarchy>::State::new(&other);
 
-        let root = 
-        if <L::Borrowed as SparseHierarchy>::EXACT_HIERARCHY {
-            let root_mask = unsafe{ other_state.select_level_node_unchecked(&other, ConstUsize::<0>, 0) }
-                             .take_or_clone();
-            let raw_root_node = NodePtr::raw_new::<NodePtr>((root_mask.count_ones() + 1) as u8, root_mask);
-            unsafe{
+        let root = unsafe { 
+            if <L::Borrowed as SparseHierarchy>::EXACT_HIERARCHY {                 
                 from_exact_sparse_hierarchy(
-                    raw_root_node, &other, &mut other_state, ConstUsize::<0>, root_mask, 0, &mut push_fn
+                    &other, &mut other_state, ConstUsize::<0>, 0, 0, &mut push_fn
                 )
-            }
-        } else {
-            unsafe{
+            } else {
                 from_sparse_hierarchy(
                     &other, &mut other_state, ConstUsize::<0>, 0, 0, &mut push_fn
                 ).unwrap_unchecked()
