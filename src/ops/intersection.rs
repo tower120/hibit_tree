@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 use std::borrow::Borrow;
 use std::ops::BitAnd;
 use crate::const_utils::{ConstArray, ConstInteger};
+use crate::LazySparseHierarchy;
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::utils::{Borrowable, Take};
 
@@ -158,6 +159,11 @@ where
     }
 }
 
+impl<S0, S1, F> LazySparseHierarchy for Intersection<S0, S1, F>
+where
+    Intersection<S0, S1, F>: SparseHierarchy
+{}
+
 impl<S0, S1, F> Borrowable for Intersection<S0, S1, F>{ type Borrowed = Self; }
 
 #[inline]
@@ -179,7 +185,7 @@ where
 } 
 
 #[cfg(test)]
-mod test{
+mod tests{
     use itertools::assert_equal;
     use crate::compact_sparse_array::CompactSparseArray;
     use crate::ops::intersection::intersection;

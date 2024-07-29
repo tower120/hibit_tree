@@ -101,11 +101,9 @@ pub fn bench_iter(c: &mut Criterion) {
     
     c.bench_function("bench_multi_intersection_get", |b| b.iter(|| bench_multi_intersection_get(black_box(&compact_arrays))));
     c.bench_function("bench_multi_intersection_fold_get", |b| b.iter(|| bench_multi_intersection_fold_get(black_box(&compact_arrays))));
-    return;
-
+    
     c.bench_function("bench_multi_intersection", |b| b.iter(|| bench_multi_intersection(black_box(&arrays))));
     c.bench_function("bench_multi_intersection_fold", |b| b.iter(|| bench_multi_intersection_fold(black_box(&arrays))));
-    //c.bench_function("array union2", |b| b.iter(|| union2_iter(black_box(&arrays[0]), black_box(&arrays[1]))));
 }
 
 criterion_group!(benches_iter, bench_iter);

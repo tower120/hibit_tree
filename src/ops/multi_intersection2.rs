@@ -3,7 +3,7 @@ use std::borrow::Borrow;
 use std::ptr::NonNull;
 use std::slice;
 use arrayvec::ArrayVec;
-use crate::BitBlock;
+use crate::{BitBlock, LazySparseHierarchy};
 use crate::const_utils::{ConstArray, ConstCopyArrayType, ConstInteger};
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::utils::{Array, Borrowable, Take};
@@ -521,6 +521,27 @@ where
     unsafe fn data_unchecked<'a>(
         &self, this: &'a Self::This, level_index: usize
     ) -> <Self::This as SparseHierarchy>::Data<'a> {
+        /*
+        // Store data in ArrayVec. That would let to use the same iter with &[Data] 
+        // for all cases.
+        // More than 100% (x2 times) performance drop.
+        {
+            let mut datas: ArrayVec<_, N> = Default::default();
+            
+            let level_index = level_index;
+            for (array, array_state) in self.states.iter() {
+                let data = unsafe{ array_state.data_unchecked(array.borrow(), level_index) };
+                datas.push_unchecked(data);
+            }
+            
+            (this.f)(
+                MultiIntersectionResolveIter::stateless(
+                    ResolveIter { items: datas.into_iter() }
+                )
+            )
+        }
+        */
+        
         (this.f)(
             MultiIntersectionResolveIter::statefull(
                 StateResolveIter { level_index, states_iter: self.states.iter() }
@@ -585,6 +606,11 @@ where
     I: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>>
 {}
 
+impl<Iter, Init, F> LazySparseHierarchy for MultiIntersection<Iter, Init, F>
+where
+    MultiIntersection<Iter, Init, F>: SparseHierarchy
+{}
+
 impl<Iter, Init, F> Borrowable for MultiIntersection<Iter, Init, F>{ type Borrowed = Self; }
 
 #[inline]
@@ -598,7 +624,7 @@ where
 }
 
 #[cfg(test)]
-mod test{
+mod tests{
     use itertools::assert_equal;
     use crate::compact_sparse_array::CompactSparseArray;
     use crate::ops::multi_intersection2::multi_intersection;

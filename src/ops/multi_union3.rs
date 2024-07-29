@@ -5,8 +5,8 @@ use std::slice;
 use arrayvec::ArrayVec;
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
-use crate::BitBlock;
-use crate::ops::MultiIntersectionResolveIter;
+use crate::{BitBlock, LazySparseHierarchy};
+use crate::ops::{MultiIntersection, MultiIntersectionResolveIter};
 use crate::utils::{Array, Borrowable};
 
 // TODO: reuse somehow. macro_rules?
@@ -325,6 +325,11 @@ where
     }
 }
 
+impl<Iter, Init, F> LazySparseHierarchy for MultiUnion<Iter, Init, F>
+where
+    MultiUnion<Iter, Init, F>: SparseHierarchy
+{}
+
 impl<ArrayIter, Init, F> Borrowable for MultiUnion<ArrayIter, Init, F>{ type Borrowed = Self; }
 
 pub struct StateResolveIter<'a, I>
@@ -389,7 +394,7 @@ where
 }
 
 #[cfg(test)]
-mod test{
+mod tests{
     use itertools::assert_equal;
     use crate::compact_sparse_array::CompactSparseArray;
     use crate::sparse_hierarchy::SparseHierarchy;

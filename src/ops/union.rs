@@ -4,7 +4,7 @@ use std::hint::unreachable_unchecked;
 use std::ops::{BitAnd, BitOr};
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
-use crate::BitBlock;
+use crate::{BitBlock, LazySparseHierarchy};
 use crate::bit_queue::BitQueue;
 use crate::utils::{Array, Borrowable, Take};
 
@@ -203,6 +203,11 @@ where
     }
 }
 
+impl<S0, S1, F> LazySparseHierarchy for Union<S0, S1, F>
+where
+    Union<S0, S1, F>: SparseHierarchy
+{}
+
 impl<S0, S1, F> Borrowable for Union<S0, S1, F>{ type Borrowed = Self; }
 
 #[inline]
@@ -224,7 +229,7 @@ where
 } 
 
 #[cfg(test)]
-mod test{
+mod tests{
     use itertools::assert_equal;
     use crate::compact_sparse_array::CompactSparseArray;
     use crate::ops::union::union;
