@@ -104,6 +104,7 @@ pub use sparse_array::SparseArray;
 pub use compact_sparse_array::CompactSparseArray;
 pub use sparse_hierarchy::*;
 pub use iter::*;
+pub use ops::map::map;
 pub use ops::intersection::intersection;
 pub use ops::union::union;
 pub use ops::multi_union3::multi_union;

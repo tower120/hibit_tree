@@ -1,6 +1,6 @@
 use itertools::assert_equal;
 use rand::{Rng, SeedableRng};
-use hi_sparse_array::{CompactSparseArray, intersection, LazySparseHierarchy, union};
+use hi_sparse_array::{CompactSparseArray, intersection, LazySparseHierarchy, map, union};
 use hi_sparse_array::SparseHierarchy;
 
 mod common;
@@ -25,6 +25,9 @@ fn materialize_test(){
         a1.insert(v, Data(v));
         a2.insert(v, Data(v));
     }
+    
+    let ao: Array = map(&a1, |d| d.clone()).materialize();
+    assert_equal(ao.iter(), a1.iter());
     
     let ao: Array = intersection(&a1, &a2, |l, _r| l.clone()).materialize();
     assert_equal(ao.iter(), a1.iter());

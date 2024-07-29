@@ -2,11 +2,11 @@ use arrayvec::ArrayVec;
 use std::ops::ControlFlow::Continue;
 
 use crate::const_utils::{ConstInteger, ConstUsize};
-use crate::{BitBlock, compact_sparse_array, CompactSparseArray, FromSparseHierarchy, SparseHierarchy, SparseHierarchyState};
+use crate::{BitBlock, FromSparseHierarchy, SparseHierarchy, SparseHierarchyState};
 use crate::utils::Take;
 
 use super::node::{empty_node, NodeChild, NodePtr};
-use super::{DataIndex, Mask};
+use super::{CompactSparseArray, DataIndex, Mask};
 
 // TODO: move somewhere up, use in iter
 #[inline]
@@ -27,12 +27,12 @@ unsafe fn make_terminal_node<L, F>(
     mut push_data: F
 ) -> NodePtr
 where
-    L: SparseHierarchy<LevelMaskType = Mask, DataType: Clone>,
+    L: SparseHierarchy<LevelMaskType = Mask>,
     F: FnMut(usize, L::DataType) -> DataIndex
 {
     let raw_node = NodePtr::raw_new::<DataIndex>(cap, mask);
     mask.traverse_bits(|index| {
-        let data = other_state.data_unchecked(other, index).take_or_clone();
+        let data = other_state.data_unchecked(other, index).take();
         let key = key_acc + index; 
         let data_index = push_data(key, data);
         NodePtr::raw_push_within_capacity(raw_node, index, data_index);
@@ -52,7 +52,7 @@ unsafe fn from_exact_sparse_hierarchy<L, N, F>(
     push_data: &mut F,
 ) -> NodePtr
 where
-    L: SparseHierarchy<LevelMaskType = Mask, DataType: Clone>,
+    L: SparseHierarchy<LevelMaskType = Mask>,
     N: ConstInteger,
     F: FnMut(usize, L::DataType) -> DataIndex
 {
@@ -97,7 +97,7 @@ unsafe fn from_sparse_hierarchy<L, N, F>(
     push_data: &mut F,
 ) -> Option<NodePtr>
 where
-    L: SparseHierarchy<LevelMaskType = Mask, DataType: Clone>,
+    L: SparseHierarchy<LevelMaskType = Mask>,
     N: ConstInteger,
     F: FnMut(usize, L::DataType) -> DataIndex
 {
@@ -133,9 +133,7 @@ where
 
 impl<T, const DEPTH: usize> FromSparseHierarchy for CompactSparseArray<T, DEPTH>
 where
-    ConstUsize<DEPTH>: ConstInteger,
-    //TODO: remove clone
-    T: Clone
+    ConstUsize<DEPTH>: ConstInteger
 {
     fn from_sparse_hierarchy<L>(other: L) -> Self
     where 
