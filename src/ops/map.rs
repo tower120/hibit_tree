@@ -69,14 +69,14 @@ where
     unsafe fn select_level_node<'a, N: ConstInteger>(
         &mut self, this: &'a Self::This, level_n: N, level_index: usize
     ) -> <Self::This as SparseHierarchy>::LevelMask<'a> {
-        self.select_level_node(this, level_n, level_index)
+        self.0.select_level_node(this.s.borrow(), level_n, level_index)
     }
 
     #[inline]
     unsafe fn select_level_node_unchecked<'a, N: ConstInteger>(
         &mut self, this: &'a Self::This, level_n: N, level_index: usize
     ) -> <Self::This as SparseHierarchy>::LevelMask<'a> {
-        self.select_level_node_unchecked(this, level_n, level_index)
+        self.0.select_level_node_unchecked(this.s.borrow(), level_n, level_index)
     }
 
     #[inline]
