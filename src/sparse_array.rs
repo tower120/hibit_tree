@@ -594,7 +594,7 @@ where
     }
 }
 
-impl<Levels, Data, R> Drop for SparseArray<Levels, Data, R>
+unsafe impl<Levels, #[may_dangle] Data, R> Drop for SparseArray<Levels, Data, R>
 where
     R: DefaultRequirement,
 {

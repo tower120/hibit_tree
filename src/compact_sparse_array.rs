@@ -287,7 +287,7 @@ where
     }
 }
 
-impl<T, const DEPTH: usize> Drop for CompactSparseArray<T, DEPTH> {
+unsafe impl<#[may_dangle] T, const DEPTH: usize> Drop for CompactSparseArray<T, DEPTH> {
     #[inline]
     fn drop(&mut self) {
         unsafe{ 

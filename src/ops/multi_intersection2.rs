@@ -186,6 +186,17 @@ where
         {
             let mut datas: ArrayVec<_, N> = Default::default();
             for array in self.iter.clone(){
+                // TODO: This is only OK, if:
+                //
+                //     SparseHierarchy<Data = DataType>        // LazySparseHierarchy?
+                //     ||
+                //     Iterator<Item = &impl SparseHierarchy>
+                //
+                //  Or just accept only Iterator<Item = &impl SparseHierarchy> instead of Borrowable
+                
+                // TODO: AS-IS this is wrong, if self.iter returns arrays as values,
+                //       while array.data() contains pointer/reference to array.
+                //
                 let array = NonNull::from(array.borrow()); // drop borrow lifetime
                 let data = unsafe{ array.as_ref().data(index, level_indices) };
                 if let Some(data) = data{

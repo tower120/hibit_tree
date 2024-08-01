@@ -1,3 +1,5 @@
+#![feature(dropck_eyepatch)]
+
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 //! {TODO: This is changed}
