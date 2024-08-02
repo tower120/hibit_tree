@@ -34,17 +34,19 @@ fn materialize_test(){
         let i0 = 0;
         a1.insert(0, i0);
         
-        //let m1 = map(&a1, |d| d.clone());
-        // let m2 = map(m1, |d| d.clone());
+        let m1 = map(a1, |d: &usize| -> usize { d.clone() } );
+        let m2 = map(m1, |d: usize| d.clone() );
         // let mut a2: CompactSparseArray<_, 4> = m2.materialize();
         
-        fn test2<'a, T: SparseHierarchy<'a, LevelMaskType=u64, LevelCount=ConstUsize<4>, DataType=usize> >(a: &'a T)
+        /*fn test2<
+            T: SparseHierarchy<LevelCount=ConstUsize<4>> 
+        >(a: T)
             //-> CompactSparseArray<usize, 4>
         {
-            a.get(12);
+            let t = a.get(12);
             //a.materialize()
         }
-        test2(&a1);
+        test2(a1);*/
         
         /*
         // This not work

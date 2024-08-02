@@ -82,6 +82,16 @@ for usize
 
 // TODO: SparseHierarchyBase with non-generic types?
 
+pub trait SparseHierarchyTypes<'this, ImplicitBounds = &'this Self>{
+    // TODO: Try remove LevelMaskType/LevelMask distinction. Use always value.
+    //       Benchmark.
+    type LevelMaskType: BitBlock;
+    type LevelMask: Borrow<Self::LevelMaskType> + Take<Self::LevelMaskType>;
+    
+    type DataType;
+    type Data: Borrow<Self::DataType> + Take<Self::DataType>;
+}
+
 /// 
 /// TODO: Change description
 ///
@@ -100,19 +110,22 @@ for usize
 // 
 // We need xxxxType for each concrete level_block/mask type to avoid the need for use `for<'a>`,
 // which is still not working (at Rust level) in cases, where we need it most.
-pub trait SparseHierarchy<'a>: Sized + Borrowable<Borrowed=Self> {
+pub trait SparseHierarchy: Sized + Borrowable<Borrowed=Self>
+where
+	Self: for<'this> SparseHierarchyTypes<'this>,
+{
     /// TODO: Decription form hi_sparse_bitset TRUSTED_HIERARCHY
     const EXACT_HIERARCHY: bool;
     
     /// Hierarchy levels count (without a data level).
     type LevelCount: ConstInteger;
     
-    type LevelMaskType: BitBlock;
+    /*type LevelMaskType: BitBlock;
     type LevelMask: Borrow<Self::LevelMaskType> + Take<Self::LevelMaskType>;
  
     // TODO: We may not need it any more
     type DataType;
-    type Data: Borrow<Self::DataType> + Take<Self::DataType>;
+    type Data: Borrow<Self::DataType> + Take<Self::DataType>;*/
  
     /// # Safety
     /// 
@@ -123,7 +136,7 @@ pub trait SparseHierarchy<'a>: Sized + Borrowable<Borrowed=Self> {
     /// 
     /// [^1]: It is not just `[usize; LevelCount::VALUE]` due to troublesome 
     ///       Rust const expressions in generic context. 
-    unsafe fn data(&'a self, index: usize, level_indices: &[usize]) -> Option<Self::Data>;
+    unsafe fn data(&self, index: usize, level_indices: &[usize]) -> Option<<Self as SparseHierarchyTypes<'_>>::Data>;
  
     /// # Safety
     /// 
@@ -134,19 +147,19 @@ pub trait SparseHierarchy<'a>: Sized + Borrowable<Borrowed=Self> {
     /// 
     /// [^1]: It is not just `[usize; LevelCount::VALUE]` due to troublesome 
     ///       Rust const expressions in generic context. 
-    unsafe fn data_unchecked(&'a self, index: usize, level_indices: &[usize]) -> Self::Data;
+    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) -> <Self as SparseHierarchyTypes<'_>>::Data;
     
-    type State: SparseHierarchyState<'a, This = Self>; 
+    type State: SparseHierarchyState<This = Self>; 
     
     #[inline]
-    fn iter(&'a self) -> Iter<Self>{
+    fn iter(&self) -> Iter<Self>{
         Iter::new(self)
     }
 
     /// You can use `usize` or [Index] for `index`.
     #[inline]
-    fn get(&'a self, index: impl Into<Index<Self::LevelMaskType, Self::LevelCount>>) 
-        -> Option<Self::Data> 
+    fn get(&self, index: impl for<'any> Into<Index<<Self as SparseHierarchyTypes<'any>>::LevelMaskType, Self::LevelCount>>) 
+        -> Option<<Self as SparseHierarchyTypes<'_>>::Data> 
     {
         let index: usize = index.into().into();
         let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
@@ -157,7 +170,7 @@ pub trait SparseHierarchy<'a>: Sized + Borrowable<Borrowed=Self> {
     ///
     /// Item at `index` must exist.
     #[inline]
-    unsafe fn get_unchecked(&'a self, index: usize) -> Self::Data {
+    unsafe fn get_unchecked(&self, index: usize) -> <Self as SparseHierarchyTypes<'_>>::Data {
         let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
         self.data_unchecked(index, indices.as_ref())
     }
@@ -176,15 +189,17 @@ pub trait SparseHierarchy<'a>: Sized + Borrowable<Borrowed=Self> {
 /// [SparseHierarchy] that is not a concrete collection.
 /// 
 /// Most results of operations are.
-pub trait LazySparseHierarchy<'a>: SparseHierarchy<'a> {
+pub trait LazySparseHierarchy: SparseHierarchy {
     /// Make a concrete collection from a lazy/virtual one.
     #[inline]
-    fn materialize<T>(&'a self) -> T
+    fn materialize<T>(&self) -> T
     where 
-        T: FromSparseHierarchy<'a,
-            LevelMaskType = Self::LevelMaskType,
+        T: for<'a> SparseHierarchyTypes<'a,
+            LevelMaskType = <Self as SparseHierarchyTypes<'a>>::LevelMaskType,
+            DataType = <Self as SparseHierarchyTypes<'a>>::DataType
+        >,
+        T: FromSparseHierarchy<
             LevelCount = Self::LevelCount,
-            DataType = Self::DataType
         >
     {
         T::from_sparse_hierarchy(self)
@@ -192,13 +207,15 @@ pub trait LazySparseHierarchy<'a>: SparseHierarchy<'a> {
 }
 
 /// Construct a [SparseHierarchy] collection from any [SparseHierarchy].
-pub trait FromSparseHierarchy<'a>: SparseHierarchy<'a> {
-    fn from_sparse_hierarchy<T>(other: &'a T) -> Self
-    where 
-        T: SparseHierarchy<'a,
-            LevelMaskType = Self::LevelMaskType,
+pub trait FromSparseHierarchy: SparseHierarchy {
+    fn from_sparse_hierarchy<T>(other: &T) -> Self
+    where
+        T: for<'a> SparseHierarchyTypes<'a,
+            LevelMaskType = <Self as SparseHierarchyTypes<'a>>::LevelMaskType,
+            DataType = <Self as SparseHierarchyTypes<'a>>::DataType
+        >,
+        T: SparseHierarchy<
             LevelCount = Self::LevelCount,
-            DataType = Self::DataType
         >;
 }
 
@@ -226,38 +243,38 @@ pub trait FromSparseHierarchy<'a>: SparseHierarchy<'a> {
 /// // Select 9th data block (array index 201)
 /// let data = state.data(array, 9);
 /// ``` 
-pub trait SparseHierarchyState<'a> {
-    type This: SparseHierarchy<'a>;
+pub trait SparseHierarchyState {
+    type This: SparseHierarchy;
     
-    fn new(this: &'a Self::This) -> Self;
+    fn new(this: &Self::This) -> Self;
     
     /// Item at index may not exist. Will return empty mask in such case.
-    unsafe fn select_level_node<N: ConstInteger>(
+    unsafe fn select_level_node<'a, N: ConstInteger>(
         &mut self,
         this: &'a Self::This,
         level_n: N, 
         level_index: usize,
-    ) -> <Self::This as SparseHierarchy<'a>>::LevelMask;
+    ) -> <Self::This as SparseHierarchyTypes<'a>>::LevelMask;
     
     /// Pointed node must exists
-    unsafe fn select_level_node_unchecked<N: ConstInteger>(
+    unsafe fn select_level_node_unchecked<'a, N: ConstInteger>(
         &mut self,
         this: &'a Self::This,
         level_n: N, 
         level_index: usize
-    ) -> <Self::This as SparseHierarchy<'a>>::LevelMask;
+    ) -> <Self::This as SparseHierarchyTypes<'a>>::LevelMask;
     
     /// Item at index may not exist.
-    unsafe fn data(
+    unsafe fn data<'a>(
         &self,
         this: &'a Self::This,
         level_index: usize
-    ) -> Option<<Self::This as SparseHierarchy<'a>>::Data>;      
+    ) -> Option<<Self::This as SparseHierarchyTypes<'a>>::Data>;      
  
     /// Pointed data must exists
-    unsafe fn data_unchecked(
+    unsafe fn data_unchecked<'a>(
         &self,
         this: &'a Self::This,
         level_index: usize
-    ) -> <Self::This as SparseHierarchy<'a>>::Data;        
+    ) -> <Self::This as SparseHierarchyTypes<'a>>::Data;        
 }

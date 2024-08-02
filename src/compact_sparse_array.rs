@@ -7,12 +7,12 @@
 #[cfg(test)]
 mod tests;
 
-mod from;
+//mod from;
 mod node;
 
 use std::{mem, ptr};
 use std::marker::PhantomData;
-use crate::{BitBlock, Index};
+use crate::{BitBlock, Index, SparseHierarchyTypes};
 use crate::bit_queue::BitQueue;
 use crate::const_utils::{const_loop, ConstArray, ConstArrayType, ConstBool, ConstFalse, ConstInteger, ConstTrue, ConstUsize};
 use crate::level_indices;
@@ -305,24 +305,25 @@ unsafe impl<#[may_dangle] T, const DEPTH: usize> Drop for CompactSparseArray<T, 
     }
 }
 
-impl<'a, T, const DEPTH: usize> SparseHierarchy<'a> for CompactSparseArray<T, DEPTH>
+impl<'a, T, const DEPTH: usize> SparseHierarchyTypes<'a> for CompactSparseArray<T, DEPTH> {
+    type LevelMaskType = Mask;
+    type LevelMask = &'a Mask;
+    
+    type DataType = T;
+    type Data = &'a T;
+}
+
+impl<T, const DEPTH: usize> SparseHierarchy for CompactSparseArray<T, DEPTH>
 where
-    T: 'a,
     ConstUsize<DEPTH>: ConstInteger
 {
     const EXACT_HIERARCHY: bool = true;
     
     type LevelCount = ConstUsize<DEPTH>;
     
-    type LevelMaskType = Mask;
-    type LevelMask = &'a Mask;
-    
-    type DataType = T;
-    type Data = &'a T;
-
     #[inline]
-    unsafe fn data(&'a self, index: usize, level_indices: &[usize]) 
-        -> Option<Self::Data> 
+    unsafe fn data(&self, index: usize, level_indices: &[usize]) 
+        -> Option<&T> 
     {
         let (node, inner_index) = self.get_terminal_node(level_indices);
         // point to SOME valid item
@@ -337,8 +338,8 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked(&'a self, index: usize, level_indices: &[usize]) 
-        -> Self::Data 
+    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
+        -> &T 
     {
         self.data(index, level_indices).unwrap_unchecked()
     }
@@ -360,9 +361,8 @@ where
     phantom_data: PhantomData<T>
 }
 
-impl<'a, T, const DEPTH: usize> SparseHierarchyState<'a> for State<T, DEPTH>
+impl<T, const DEPTH: usize> SparseHierarchyState for State<T, DEPTH>
 where
-    T: 'a,
     ConstUsize<DEPTH>: ConstInteger
 {
     type This = CompactSparseArray<T, DEPTH>;
@@ -376,12 +376,12 @@ where
     }
     
     #[inline]
-    unsafe fn select_level_node<N: ConstInteger>(
+    unsafe fn select_level_node<'a, N: ConstInteger>(
         &mut self, 
         this: &'a Self::This,
         level_n: N, 
         level_index: usize
-    ) -> <Self::This as SparseHierarchy<'a>>::LevelMask {
+    ) -> <Self::This as SparseHierarchyTypes<'a>>::LevelMask {
         if N::VALUE == 0 {
             return &this.root.header().mask();
         }
@@ -407,12 +407,12 @@ where
     }
 
     #[inline]
-    unsafe fn select_level_node_unchecked<N: ConstInteger>(
+    unsafe fn select_level_node_unchecked<'a, N: ConstInteger>(
         &mut self, 
         this: &'a Self::This, 
         level_n: N, 
         level_index: usize
-    ) -> <Self::This as SparseHierarchy<'a>>::LevelMask {
+    ) -> <Self::This as SparseHierarchyTypes<'a>>::LevelMask {
         if N::VALUE == 0 {
             return this.root.header().mask();
         }
@@ -437,8 +437,8 @@ where
     // TODO: data_or_default possible too.
     
     #[inline]
-    unsafe fn data(&self, this: &'a Self::This, level_index: usize) 
-        -> Option<<Self::This as SparseHierarchy<'a>>::Data> 
+    unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize) 
+        -> Option<<Self::This as SparseHierarchyTypes<'a>>::Data> 
     {
         let node = if DEPTH == 1{
             // We do not store the root level's block.
@@ -460,8 +460,8 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked(&self, this: &'a Self::This, level_index: usize) 
-        -> <Self::This as SparseHierarchy<'a>>::Data
+    unsafe fn data_unchecked<'a>(&self, this: &'a Self::This, level_index: usize) 
+        -> <Self::This as SparseHierarchyTypes<'a>>::Data
     {
         let node = if DEPTH == 1{
             // We do not store the root level's block.

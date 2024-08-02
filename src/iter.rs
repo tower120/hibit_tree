@@ -1,6 +1,6 @@
 use std::ops::ControlFlow;
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
-use crate::{BitBlock, data_block_index};
+use crate::{BitBlock, data_block_index, SparseHierarchyTypes};
 use crate::bit_queue::BitQueue;
 use crate::const_utils::const_int::{const_for_rev, ConstInteger, ConstIntVisitor, ConstUsize};
 use crate::const_utils::const_array::ConstArrayType;
@@ -9,7 +9,7 @@ use crate::utils::array::Array;
 
 // TODO: could be u8's
 /// [usize; T::LevelCount::N - 1]
-type LevelIndices<'a, T: SparseHierarchy<'a>> =
+type LevelIndices<T: SparseHierarchy> =
     ConstArrayType<
         usize,
         <T::LevelCount as ConstInteger>::Dec   
@@ -18,9 +18,9 @@ type LevelIndices<'a, T: SparseHierarchy<'a>> =
 /// Each hierarchy level has its own iterator.
 /// 
 /// [T::LevelMaskType::BitsIter; T::LevelCount]
-type LevelIterators<'a, T: SparseHierarchy<'a>> =
+type LevelIterators<'a, T: SparseHierarchy> =
     ConstArrayType<
-        <T::LevelMaskType as BitBlock>::BitsIter,
+        <<T as SparseHierarchyTypes<'a>>::LevelMaskType as BitBlock>::BitsIter,
         T::LevelCount
     >;
 
@@ -29,7 +29,7 @@ type LevelIterators<'a, T: SparseHierarchy<'a>> =
 /// For non-[EXACT_HIERARCHY], iterator may return empty items. 
 pub struct Iter<'a, T>
 where
-    T: SparseHierarchy<'a>,
+    T: SparseHierarchy,
 {
     container: &'a T,
     
@@ -37,14 +37,14 @@ where
     level_iters: LevelIterators<'a, T>,
     
     /// [usize; T::LevelCount - 1]
-    level_indices: LevelIndices<'a, T>,
+    level_indices: LevelIndices<T>,
 
     state: T::State,
 }
 
 impl<'a, T> Iter<'a, T>
 where
-    T: SparseHierarchy<'a>,
+    T: SparseHierarchy,
 {
     #[inline]
     pub fn new(container: &'a T) -> Self {
@@ -75,9 +75,9 @@ where
 
 impl<'a, T> Iterator for Iter<'a, T>
 where
-    T: SparseHierarchy<'a>,
+    T: SparseHierarchy,
 {
-    type Item = (usize/*index*/, T::Data);
+    type Item = (usize/*index*/, <T as SparseHierarchyTypes<'a>>::Data);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -88,8 +88,8 @@ where
                 break index;
             } else {
                 let ctrl = const_for_rev(ConstUsize::<0>, T::LevelCount::DEFAULT.dec(), V(self)); 
-                struct V<'b,'a,T: SparseHierarchy<'a>>(&'b mut Iter<'a, T>); 
-                impl<'b,'a,T: SparseHierarchy<'a>> ConstIntVisitor for V<'b,'a,T> {
+                struct V<'b,'a,T: SparseHierarchy>(&'b mut Iter<'a, T>); 
+                impl<'b,'a,T: SparseHierarchy> ConstIntVisitor for V<'b,'a,T> {
                     type Out = ();
                     #[inline(always)]
                     fn visit<I: ConstInteger>(&mut self, i: I) -> ControlFlow<()> {
