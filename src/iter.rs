@@ -9,7 +9,7 @@ use crate::utils::array::Array;
 
 // TODO: could be u8's
 /// [usize; T::LevelCount::N - 1]
-type LevelIndices<T: SparseHierarchy> =
+type LevelIndices<'a, T: SparseHierarchy<'a>> =
     ConstArrayType<
         usize,
         <T::LevelCount as ConstInteger>::Dec   
@@ -18,7 +18,7 @@ type LevelIndices<T: SparseHierarchy> =
 /// Each hierarchy level has its own iterator.
 /// 
 /// [T::LevelMaskType::BitsIter; T::LevelCount]
-type LevelIterators<T: SparseHierarchy> =
+type LevelIterators<'a, T: SparseHierarchy<'a>> =
     ConstArrayType<
         <T::LevelMaskType as BitBlock>::BitsIter,
         T::LevelCount
@@ -29,22 +29,22 @@ type LevelIterators<T: SparseHierarchy> =
 /// For non-[EXACT_HIERARCHY], iterator may return empty items. 
 pub struct Iter<'a, T>
 where
-    T: SparseHierarchy,
+    T: SparseHierarchy<'a>,
 {
     container: &'a T,
     
     /// [T::LevelMaskType::BitsIter; T::LevelCount]
-    level_iters: LevelIterators<T>,
+    level_iters: LevelIterators<'a, T>,
     
     /// [usize; T::LevelCount - 1]
-    level_indices: LevelIndices<T>,
+    level_indices: LevelIndices<'a, T>,
 
     state: T::State,
 }
 
 impl<'a, T> Iter<'a, T>
 where
-    T: SparseHierarchy,
+    T: SparseHierarchy<'a>,
 {
     #[inline]
     pub fn new(container: &'a T) -> Self {
@@ -75,9 +75,9 @@ where
 
 impl<'a, T> Iterator for Iter<'a, T>
 where
-    T: SparseHierarchy,
+    T: SparseHierarchy<'a>,
 {
-    type Item = (usize/*index*/, T::Data<'a>);
+    type Item = (usize/*index*/, T::Data);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -88,8 +88,8 @@ where
                 break index;
             } else {
                 let ctrl = const_for_rev(ConstUsize::<0>, T::LevelCount::DEFAULT.dec(), V(self)); 
-                struct V<'b,'a,T: SparseHierarchy>(&'b mut Iter<'a, T>); 
-                impl<'b,'a,T: SparseHierarchy> ConstIntVisitor for V<'b,'a,T> {
+                struct V<'b,'a,T: SparseHierarchy<'a>>(&'b mut Iter<'a, T>); 
+                impl<'b,'a,T: SparseHierarchy<'a>> ConstIntVisitor for V<'b,'a,T> {
                     type Out = ();
                     #[inline(always)]
                     fn visit<I: ConstInteger>(&mut self, i: I) -> ControlFlow<()> {

@@ -81,7 +81,7 @@
 //! - TODO From<impl SparseHierarchy>
 //! - iterated elements are guaranteed to be ![is_empty].
 
-mod sparse_array;
+//mod sparse_array;
 mod sparse_array_levels;
 mod compact_sparse_array;
 mod bit_utils;
@@ -102,15 +102,15 @@ pub mod config;
 //pub use ref_or_val::*;
 pub use bit_block::BitBlock;
 pub use req_default::ReqDefault;
-pub use sparse_array::SparseArray;
+//pub use sparse_array::SparseArray;
 pub use compact_sparse_array::CompactSparseArray;
 pub use sparse_hierarchy::*;
 pub use iter::*;
 pub use ops::map::map;
-pub use ops::intersection::intersection;
+/*pub use ops::intersection::intersection;
 pub use ops::union::union;
 pub use ops::multi_union3::multi_union;
-pub use ops::multi_intersection2::multi_intersection;
+pub use ops::multi_intersection2::multi_intersection;*/
 
 use std::borrow::Borrow;
 use std::ops::BitAnd;
@@ -119,6 +119,7 @@ use utils::primitive::Primitive;
 use utils::array::Array;
 use level::IntrusiveListLevel;
 use utils::Borrowable;
+use crate::const_utils::{ConstCopyArrayType, ConstUsize};
 
 // TODO: move to sparse_array / level_block ?
 pub(crate) trait Empty {
@@ -148,6 +149,7 @@ pub(crate) trait MaybeEmptyIntrusive: Empty {
     fn restore_empty(&mut self);
 }
 
+// TODO: try replace with accumulated key on fly calculation.
 // Compile-time loop inside. Ends up with N ADDs.
 #[inline]
 pub(crate) fn data_block_index<LevelCount: ConstInteger, LevelMaskType: BitBlock>(
@@ -160,4 +162,65 @@ pub(crate) fn data_block_index<LevelCount: ConstInteger, LevelMaskType: BitBlock
         acc += level_indices.as_ref()[N] << (LevelMaskType::SIZE.ilog2() as usize * (level_count - N - 1));
     }
     acc
+}
+
+// TODO: make public
+// Compile-time loop inside. Ends up with N (AND + SHR)s.
+#[inline]
+pub(crate) fn level_indices<LevelMask, LevelsCount>(index: usize)
+     -> ConstCopyArrayType<usize, LevelsCount>
+where
+    LevelMask: BitBlock,
+    LevelsCount: ConstInteger,
+{
+    // TODO: need uninit?
+    let mut level_indices = ConstCopyArrayType::<usize, LevelsCount>::from_fn(|_|0);
+    
+    let mut level_remainder = index;
+    let level_count = LevelsCount::VALUE;
+    for level in 0..level_count - 1 {
+        // LevelMask::SIZE * 2^(level_count - level - 1)
+        let level_capacity_exp = LevelMask::SIZE.ilog2() as usize * (level_count - level - 1);
+        let level_capacity = 1 << level_capacity_exp;
+        
+        // level_remainder / level_capacity_exp
+        let level_index = level_remainder >> level_capacity_exp;
+        
+        // level_remainder % level_capacity_exp
+        level_remainder = level_remainder & (level_capacity - 1);
+        
+        level_indices.as_mut()[level] = level_index; 
+    }
+    
+    *level_indices.as_mut().last_mut().unwrap() = level_remainder; 
+    
+    level_indices
+}
+
+#[cfg(test)]
+#[test]
+fn test_level_indices_new(){
+    {
+        let indices = level_indices::<u64, ConstUsize<2>>(65);
+        assert_eq!(indices, [1, 1]);
+    }
+    {
+        let lvl0 = 262_144; // Total max capacity
+        let lvl1 = 4096;
+        let lvl2 = 64;
+        let indices = level_indices::<u64, ConstUsize<3>>(lvl1*2 + lvl2*3 + 4);
+        assert_eq!(indices, [2, 3, 4]);
+    }
+    {
+        let indices = level_indices::<u64, ConstUsize<3>>(32);
+        assert_eq!(indices, [0, 0, 32]);
+    }
+    {
+        let indices = level_indices::<u64, ConstUsize<2>>(32);
+        assert_eq!(indices, [0, 32]);
+    }    
+    {
+        let indices = level_indices::<u64, ConstUsize<1>>(32);
+        assert_eq!(indices, [32]);
+    }
 }

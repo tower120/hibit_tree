@@ -7,76 +7,15 @@ use crate::bit_block::BitBlock;
 use crate::utils::Borrowable;
 use crate::level_block::HiBlock;
 use crate::level::ILevel;
-use crate::const_utils::const_int::{ConstUsize, ConstInteger, ConstIntVisitor};
+use crate::const_utils::const_int::{ConstInteger, ConstIntVisitor, ConstUsize};
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
 use crate::const_utils::{const_loop, ConstBool, ConstFalse, ConstTrue};
 use crate::{Empty, Index};
 use crate::req_default::{DefaultInit, DefaultInitFor, DefaultRequirement, ReqDefault};
 use crate::utils::primitive::Primitive;
-use crate::utils::array::{Array};
+use crate::utils::array::Array;
 use crate::sparse_array_levels::{FoldMutVisitor, FoldVisitor, MutVisitor, SparseArrayLevels, TypeVisitor, Visitor};
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
-
-// TODO: make public
-// Compile-time loop inside. Ends up with N (AND + SHR)s.
-#[inline]
-pub(crate) fn level_indices<LevelMask, LevelsCount>(index: usize)
-     -> ConstCopyArrayType<usize, LevelsCount>
-where
-    LevelMask: BitBlock,
-    LevelsCount: ConstInteger,
-{
-    // TODO: need uninit?
-    let mut level_indices = ConstCopyArrayType::<usize, LevelsCount>::from_fn(|_|0);
-    
-    let mut level_remainder = index;
-    let level_count = LevelsCount::VALUE;
-    for level in 0..level_count - 1 {
-        // LevelMask::SIZE * 2^(level_count - level - 1)
-        let level_capacity_exp = LevelMask::SIZE.ilog2() as usize * (level_count - level - 1);
-        let level_capacity = 1 << level_capacity_exp;
-        
-        // level_remainder / level_capacity_exp
-        let level_index = level_remainder >> level_capacity_exp;
-        
-        // level_remainder % level_capacity_exp
-        level_remainder = level_remainder & (level_capacity - 1);
-        
-        level_indices.as_mut()[level] = level_index; 
-    }
-    
-    *level_indices.as_mut().last_mut().unwrap() = level_remainder; 
-    
-    level_indices
-}
-
-#[cfg(test)]
-#[test]
-fn test_level_indices_new(){
-    {
-        let indices = level_indices::<u64, ConstUsize<2>>(65);
-        assert_eq!(indices, [1, 1]);
-    }
-    {
-        let lvl0 = 262_144; // Total max capacity
-        let lvl1 = 4096;
-        let lvl2 = 64;
-        let indices = level_indices::<u64, ConstUsize<3>>(lvl1*2 + lvl2*3 + 4);
-        assert_eq!(indices, [2, 3, 4]);
-    }
-    {
-        let indices = level_indices::<u64, ConstUsize<3>>(32);
-        assert_eq!(indices, [0, 0, 32]);
-    }
-    {
-        let indices = level_indices::<u64, ConstUsize<2>>(32);
-        assert_eq!(indices, [0, 32]);
-    }    
-    {
-        let indices = level_indices::<u64, ConstUsize<1>>(32);
-        assert_eq!(indices, [32]);
-    }
-}
 
 ///
 /// # Universal set (better naming?)
@@ -329,7 +268,7 @@ where
     {
         let index: usize = index.into().into();
 
-        let level_indices = level_indices::<Levels::Mask, Levels::LevelCount>(index);
+        let level_indices = crate::level_indices::<Levels::Mask, Levels::LevelCount>(index);
         let (levels_block_indices, data_block_index) = unsafe { 
             self.fetch_block_indices(level_indices.as_ref()) 
         };
@@ -450,7 +389,7 @@ where
     fn get_or_insert_impl(&mut self, index: usize, insert: impl ConstBool, value_fn: impl FnOnce() -> Data)
         -> &mut Data 
     {
-        let level_indices = level_indices::<Levels::Mask, Levels::LevelCount>(index);
+        let level_indices = crate::level_indices::<Levels::Mask, Levels::LevelCount>(index);
         let last_level_inner_index = unsafe{ *level_indices.as_ref().last().unwrap_unchecked() };
         
         let mut level_block_index = 0;
@@ -525,7 +464,7 @@ where
     {
         let index: usize = index.into().into();
         
-        let level_indices = level_indices::<Levels::Mask, Levels::LevelCount>(index);
+        let level_indices = crate::level_indices::<Levels::Mask, Levels::LevelCount>(index);
         let data_block_index = unsafe{ self.fetch_block_index(level_indices.as_ref()) };
         
         if data_block_index != 0{
@@ -588,7 +527,7 @@ where
         -> &Data
     {
         let index: usize = index.into().into();
-        let level_indices = level_indices::<Levels::Mask, Levels::LevelCount>(index);
+        let level_indices = crate::level_indices::<Levels::Mask, Levels::LevelCount>(index);
         let data_block_index = unsafe{ self.fetch_block_index(level_indices.as_ref()) };
         unsafe{ self.values.get_unchecked(data_block_index) }
     }
@@ -620,20 +559,21 @@ where
     type Borrowed = SparseArray<Levels, Data, R>; 
 }
 
-impl<Levels, Data, R> SparseHierarchy for SparseArray<Levels, Data, R>
+impl<'a, Levels, Data, R> SparseHierarchy<'a> for SparseArray<Levels, Data, R>
 where
+    Self:'a,
     Levels: SparseArrayLevels,
-    R: DefaultRequirement 
+    R: DefaultRequirement
 {
     const EXACT_HIERARCHY: bool = true;
     
     type LevelCount = Levels::LevelCount;
     type LevelMaskType = Levels::Mask;
     
-    type LevelMask<'a> = &'a Levels::Mask where Self: 'a;
+    type LevelMask = &'a Levels::Mask;
     
     type DataType = Data;
-    type Data<'a> = &'a Data where Self: 'a;
+    type Data = &'a Data;
     
     // For terminal_node_mask
     /*#[inline]
@@ -644,7 +584,7 @@ where
     }*/    
 
     #[inline]
-    unsafe fn data(&self, index: usize, level_indices: &[usize]) -> Option<Self::Data<'_>> {
+    unsafe fn data(&'a self, index: usize, level_indices: &[usize]) -> Option<Self::Data> {
         let data_block_index = self.fetch_block_index(level_indices);
         if data_block_index == 0 {
             None
@@ -655,16 +595,16 @@ where
 
     // This is also data_or_default
     #[inline]
-    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) -> Self::Data<'_> {
+    unsafe fn data_unchecked(&'a self, index: usize, level_indices: &[usize]) -> Self::Data {
         self.data(index, level_indices).unwrap_unchecked()
         /*let data_block_index = self.fetch_block_index(level_indices);
         self.values.get_unchecked(data_block_index)*/
     }
 
-    type State = SparseArrayState<Levels, Data, R>;
+    type State = SparseArrayState</*'a, */Levels, Data, R>;
 }
 
-pub struct SparseArrayState<Levels, Data, R>
+pub struct SparseArrayState</*'a, */Levels, Data, R>
 where
     Levels: SparseArrayLevels,
     R: DefaultRequirement 
@@ -676,13 +616,14 @@ where
         *const u8, 
         <Levels::LevelCount as ConstInteger>::Dec
     >,
-    phantom_data: PhantomData<SparseArray<Levels, Data, R>>
+    phantom_data: PhantomData</*&'a */SparseArray<Levels, Data, R>>
 }
 
-impl<Levels, Data, R> SparseHierarchyState for SparseArrayState<Levels, Data, R>
+impl<'a, Levels, Data, R> SparseHierarchyState<'a> for SparseArrayState</*'a, */Levels, Data, R>
 where
-    Levels: SparseArrayLevels,
-    R: DefaultRequirement
+    Levels: SparseArrayLevels + 'a,
+    Data: 'a,
+    R: DefaultRequirement + 'a,
 {
     type This = SparseArray<Levels, Data, R>;
 
@@ -695,16 +636,17 @@ where
     }
 
     #[inline(always)]
-    unsafe fn select_level_node_unchecked<'a, N: ConstInteger>(
-        &mut self, this: &'a Self::This, level_n: N, level_index: usize
-    ) -> <Self::This as SparseHierarchy>::LevelMask<'a> {
-        self.select_level_node(this, level_n, level_index)
+    unsafe fn select_level_node_unchecked<'this, N: ConstInteger>(
+        &mut self, this: &'this Self::This, level_n: N, level_index: usize
+    ) -> <Self::This as SparseHierarchy<'a>>::LevelMask {
+        todo!()
+        //self.select_level_node(this, level_n, level_index)
     }
     
     #[inline(always)]
-    unsafe fn select_level_node<'a, N: ConstInteger>(
+    unsafe fn select_level_node<N: ConstInteger>(
         &mut self, this: &'a Self::This, level_n: N, level_index: usize
-    ) -> <Self::This as SparseHierarchy>::LevelMask<'a> {
+    ) -> <Self::This as SparseHierarchy<'a>>::LevelMask {
         if N::VALUE == 0 {
             assert_eq!(level_index, 0); // This act as compile-time check
             let block = this.get_block(level_n, 0);
@@ -734,15 +676,16 @@ where
     }
 
     #[inline(always)]
-    unsafe fn data_unchecked<'a>(&self, this: &'a Self::This, level_index: usize)
-        -> <Self::This as SparseHierarchy>::Data<'a> 
+    unsafe fn data_unchecked<'this>(&self, this: &'this Self::This, level_index: usize)
+        -> <Self::This as SparseHierarchy<'a>>::Data 
     {
-        self.data(this, level_index).unwrap_unchecked()
+        todo!()
+        //self.data(this, level_index).unwrap_unchecked()
     }
     
     #[inline(always)]
-    unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize)
-        -> Option<<Self::This as SparseHierarchy>::Data<'a>> 
+    unsafe fn data(&self, this: &'a Self::This, level_index: usize)
+        -> Option<<Self::This as SparseHierarchy<'a>>::Data> 
     {
         let last_level_index = Levels::LevelCount::VALUE - 1;
         

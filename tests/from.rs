@@ -1,7 +1,10 @@
 use itertools::assert_equal;
 use rand::{Rng, SeedableRng};
-use hi_sparse_array::{CompactSparseArray, intersection, LazySparseHierarchy, map, union};
+//use hi_sparse_array::{CompactSparseArray, intersection, LazySparseHierarchy, map, map2, union};
+use hi_sparse_array::{CompactSparseArray, LazySparseHierarchy, map};
+use hi_sparse_array::const_utils::ConstUsize;
 use hi_sparse_array::SparseHierarchy;
+use hi_sparse_array::utils::Borrowable;
 
 mod common;
 
@@ -25,13 +28,51 @@ fn materialize_test(){
         a1.insert(v, Data(v));
         a2.insert(v, Data(v));
     }
+
+    {
+        let mut a1: CompactSparseArray<_, 4> = Default::default();
+        let i0 = 0;
+        a1.insert(0, i0);
+        
+        //let m1 = map(&a1, |d| d.clone());
+        // let m2 = map(m1, |d| d.clone());
+        // let mut a2: CompactSparseArray<_, 4> = m2.materialize();
+        
+        fn test2<'a, T: SparseHierarchy<'a, LevelMaskType=u64, LevelCount=ConstUsize<4>, DataType=usize> >(a: &'a T)
+            //-> CompactSparseArray<usize, 4>
+        {
+            a.get(12);
+            //a.materialize()
+        }
+        test2(&a1);
+        
+        /*
+        // This not work
+        fn test<'a, T: Borrowable<Borrowed: SparseHierarchy<'a, LevelMaskType=u64, LevelCount=ConstUsize<4>, DataType=usize>>>(a: T)
+            //-> CompactSparseArray<usize, 4>
+        {
+            a.borrow().get(12);
+        }
+        test(a1);
+        */
+        
+        //let a1c: CompactSparseArray<_, 4> = m1.materialize();
+        //v.push(&i0);
+        
+        //let u = intersection(&a1, &a1, |_, _| 1 );
+        /*let m1 = map(a1, |v|v.clone());
+        let m2 = map(&m1, |v|v.clone());
+        let m3 = map(&m2, |v|v.clone());*/
+        //intersection(u, &a2, |_, _|2);    
+    }
     
-    let ao: Array = map(&a1, |d| d.clone()).materialize();
+    
+    /*let ao: Array = map(&a1, |d| d.clone()).materialize();
     assert_equal(ao.iter(), a1.iter());
     
     let ao: Array = intersection(&a1, &a2, |l, _r| l.clone()).materialize();
     assert_equal(ao.iter(), a1.iter());
     
     let ao: Array = union(&a1, &a2, |l, _r| l.unwrap().clone()).materialize();
-    assert_equal(ao.iter(), a1.iter());
+    assert_equal(ao.iter(), a1.iter());*/
 }

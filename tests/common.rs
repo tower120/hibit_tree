@@ -15,8 +15,8 @@ type CompactLvls = (
     IntrusiveListLevel<CompactLvl2Block>
 );*/
 
-use hi_sparse_array::{config, SparseArray};
+use hi_sparse_array::{config/*, SparseArray*/};
 
 // TODO: switch to Compact on flag for CI. 
-pub type Array<Data> = SparseArray<config::width_64::depth_3, Data>;
+//pub type Array<Data> = SparseArray<config::width_64::depth_3, Data>;
 pub const RANGE: usize = 260_000;

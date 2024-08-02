@@ -10,7 +10,7 @@ use super::{CompactSparseArray, DataIndex, Mask};
 
 // TODO: move somewhere up, use in iter
 #[inline]
-fn block_start<S: SparseHierarchy, N: ConstInteger>(index: usize) -> usize {
+fn block_start<'a, S: SparseHierarchy<'a>, N: ConstInteger>(index: usize) -> usize {
     index << (
         S::LevelMaskType::SIZE.ilog2() as usize * 
         (S::LevelCount::VALUE - N::VALUE - 1)
@@ -18,8 +18,8 @@ fn block_start<S: SparseHierarchy, N: ConstInteger>(index: usize) -> usize {
 }
 
 #[inline]
-unsafe fn make_terminal_node<L, F>(
-    other: &L, 
+unsafe fn make_terminal_node<'a, L, F>(
+    other: &'a L, 
     other_state: &mut L::State,
     mask: Mask,
     cap: u8,
@@ -27,7 +27,7 @@ unsafe fn make_terminal_node<L, F>(
     mut push_data: F
 ) -> NodePtr
 where
-    L: SparseHierarchy<LevelMaskType = Mask>,
+    L: SparseHierarchy<'a, LevelMaskType = Mask>,
     F: FnMut(usize, L::DataType) -> DataIndex
 {
     let raw_node = NodePtr::raw_new::<DataIndex>(cap, mask);
@@ -43,8 +43,8 @@ where
 }
 
 #[inline(always)]
-unsafe fn from_exact_sparse_hierarchy<L, N, F>(
-    other: &L, 
+unsafe fn from_exact_sparse_hierarchy<'a, L, N, F>(
+    other: &'a L, 
     other_state: &mut L::State, 
     n: N,
     index: usize,
@@ -52,7 +52,7 @@ unsafe fn from_exact_sparse_hierarchy<L, N, F>(
     push_data: &mut F,
 ) -> NodePtr
 where
-    L: SparseHierarchy<LevelMaskType = Mask>,
+    L: SparseHierarchy<'a, LevelMaskType = Mask>,
     N: ConstInteger,
     F: FnMut(usize, L::DataType) -> DataIndex
 {
@@ -88,8 +88,8 @@ where
 }
 
 #[inline(always)]
-unsafe fn from_sparse_hierarchy<L, N, F>(
-    other: &L, 
+unsafe fn from_sparse_hierarchy<'a, L, N, F>(
+    other: &'a L, 
     other_state: &mut L::State, 
     n: N,
     index: usize,
@@ -97,7 +97,7 @@ unsafe fn from_sparse_hierarchy<L, N, F>(
     push_data: &mut F,
 ) -> Option<NodePtr>
 where
-    L: SparseHierarchy<LevelMaskType = Mask>,
+    L: SparseHierarchy<'a, LevelMaskType = Mask>,
     N: ConstInteger,
     F: FnMut(usize, L::DataType) -> DataIndex
 {
@@ -131,17 +131,18 @@ where
     }
 }
 
-impl<T, const DEPTH: usize> FromSparseHierarchy for CompactSparseArray<T, DEPTH>
+impl<'a, T, const DEPTH: usize> FromSparseHierarchy<'a> for CompactSparseArray<T, DEPTH>
 where
+    Self: 'a,
     ConstUsize<DEPTH>: ConstInteger
 {
-    fn from_sparse_hierarchy<L>(other: L) -> Self
+    fn from_sparse_hierarchy<L>(other: &'a L) -> Self
     where 
-        L: SparseHierarchy<
+        L: SparseHierarchy<'a,
             LevelMaskType = Self::LevelMaskType,
             LevelCount = Self::LevelCount,
             DataType = Self::DataType
-        >     
+        >
     {
         let mut data: Vec<<L::Borrowed as SparseHierarchy>::DataType> = Vec::with_capacity(1);
         unsafe{ data.set_len(1); }
@@ -155,16 +156,16 @@ where
             i as DataIndex
         };        
 
-        let mut other_state = <L::Borrowed as SparseHierarchy>::State::new(&other);
+        let mut other_state = <L::Borrowed as SparseHierarchy>::State::new(other);
 
         let root = unsafe { 
-            if <L::Borrowed as SparseHierarchy>::EXACT_HIERARCHY {                 
+            if <L::Borrowed as SparseHierarchy>::EXACT_HIERARCHY {
                 from_exact_sparse_hierarchy(
-                    &other, &mut other_state, ConstUsize::<0>, 0, 0, &mut push_fn
+                    other, &mut other_state, ConstUsize::<0>, 0, 0, &mut push_fn
                 )
             } else {
                 from_sparse_hierarchy(
-                    &other, &mut other_state, ConstUsize::<0>, 0, 0, &mut push_fn
+                    other, &mut other_state, ConstUsize::<0>, 0, 0, &mut push_fn
                 ).unwrap_unchecked()
             }
         };
