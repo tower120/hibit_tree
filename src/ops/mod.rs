@@ -8,7 +8,7 @@ pub(crate) mod multi_intersection2;*/
 // TODO: hide. dev only
 //pub mod multi_intersection_fold;
 
-pub use map::Map;
+pub use map::{Map, MapFunction};
 /*pub use intersection::Intersection;
 pub use union::Union;
 pub use multi_intersection2::{MultiIntersection, MultiIntersectionResolveIter};

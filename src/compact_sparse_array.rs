@@ -7,7 +7,7 @@
 #[cfg(test)]
 mod tests;
 
-//mod from;
+mod from;
 mod node;
 
 use std::{mem, ptr};

@@ -193,14 +193,15 @@ pub trait LazySparseHierarchy: SparseHierarchy {
     /// Make a concrete collection from a lazy/virtual one.
     #[inline]
     fn materialize<T>(&self) -> T
-    where 
-        T: for<'a> SparseHierarchyTypes<'a,
+    where
+        T: FromSparseHierarchy,
+        T: SparseHierarchy<
+            LevelCount = Self::LevelCount,
+        >,
+        for<'a> T: SparseHierarchyTypes<'a,
             LevelMaskType = <Self as SparseHierarchyTypes<'a>>::LevelMaskType,
             DataType = <Self as SparseHierarchyTypes<'a>>::DataType
         >,
-        T: FromSparseHierarchy<
-            LevelCount = Self::LevelCount,
-        >
     {
         T::from_sparse_hierarchy(self)
     }
@@ -210,12 +211,12 @@ pub trait LazySparseHierarchy: SparseHierarchy {
 pub trait FromSparseHierarchy: SparseHierarchy {
     fn from_sparse_hierarchy<T>(other: &T) -> Self
     where
-        T: for<'a> SparseHierarchyTypes<'a,
-            LevelMaskType = <Self as SparseHierarchyTypes<'a>>::LevelMaskType,
-            DataType = <Self as SparseHierarchyTypes<'a>>::DataType
-        >,
         T: SparseHierarchy<
             LevelCount = Self::LevelCount,
+        >,
+        for<'a> T: SparseHierarchyTypes<'a,
+            LevelMaskType = <Self as SparseHierarchyTypes<'a>>::LevelMaskType,
+            DataType = <Self as SparseHierarchyTypes<'a>>::DataType
         >;
 }
 

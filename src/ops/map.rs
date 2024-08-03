@@ -4,20 +4,48 @@ use crate::{LazySparseHierarchy, SparseHierarchy, SparseHierarchyState, SparseHi
 use crate::const_utils::ConstInteger;
 use crate::utils::Borrowable;
 
-type MapperOutput<'a, F, I> = <F as Mapper<'a, I>>::Output; 
+// TODO : UnaryFn?
+// TODO : Move to utils.
+/// Implementable unary [Fn].
+pub trait UnaryFunction<Arg> {
+    type Output;
+    fn exec(&self, arg: Arg) -> Self::Output;
+}
 
-pub trait Mapper<'a, I>: Fn(I) -> <Self as Mapper<'a, I>>::Output {
+impl<F, Arg, Out> UnaryFunction<Arg> for F
+where
+    F: Fn(Arg) -> Out
+{
+    type Output = Out;
+
+    #[inline]
+    fn exec(&self, arg: Arg) -> Self::Output {
+        (self)(arg)
+    }
+}
+
+mod private {
+    pub trait Sealed<I> {} // Users in other crates cannot name this trait.
+    
+    impl<F, I, O> Sealed<I> for F
+    where
+        F: super::UnaryFunction<I, Output = O>
+    {}
+}
+
+pub trait MapFunction<'a, I>
+    : UnaryFunction<I, Output = <Self as MapFunction<'a, I>>::Output>
+    + private::Sealed<I>
+{
 	type Output;
 }
 
-impl<'a, I, F, O> Mapper<'a, I> for F
+impl<'a, I, F, O> MapFunction<'a, I> for F
 where
-	F: Fn(I) -> O,
+	F: UnaryFunction<I, Output = O>
 {
 	type Output = O;
 }
-
-
 
 pub struct Map<S, F>{
     s: S,
@@ -27,32 +55,23 @@ pub struct Map<S, F>{
 impl<'this, S, F> SparseHierarchyTypes<'this> for Map<S, F>
 where
     S: Borrowable<Borrowed: SparseHierarchy>,
-    F: for<'a> Mapper<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data> 
-        //Fn(<S::Borrowed as SparseHierarchyTypes<'a>>::Data) -> Out,
+    F: for<'a> MapFunction<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data> 
 {
     type LevelMaskType = <S::Borrowed as SparseHierarchyTypes<'this>>::LevelMaskType;
     type LevelMask = <S::Borrowed as SparseHierarchyTypes<'this>>::LevelMask;
     
-    type DataType = //MapperOutput<'this, F, <S::Borrowed as SparseHierarchyTypes<'this>>::Data>;
-                    <F as Mapper<'this, <S::Borrowed as SparseHierarchyTypes<'this>>::Data>>::Output;
+    type DataType = <F as MapFunction<'this, <S::Borrowed as SparseHierarchyTypes<'this>>::Data>>::Output;
     type Data = Self::DataType;
 }
 
 impl<S, F> SparseHierarchy for Map<S, F>
 where
     S: Borrowable<Borrowed: SparseHierarchy>,
-    F: for<'a> Mapper<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data>
-        //for<'a> Fn(<S::Borrowed as SparseHierarchyTypes<'a>>::Data) -> Out,
+    F: for<'a> MapFunction<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data>
 {
     const EXACT_HIERARCHY: bool = <S::Borrowed as SparseHierarchy>::EXACT_HIERARCHY;
     
     type LevelCount = <S::Borrowed as SparseHierarchy>::LevelCount;
-    
-    /*type LevelMaskType = <S::Borrowed as SparseHierarchy<'a>>::LevelMaskType;
-    type LevelMask = <S::Borrowed as SparseHierarchy<'a>>::LevelMask;
-    
-    type DataType = Out;
-    type Data = Out;*/
 
     #[inline]
     unsafe fn data(&self, index: usize, level_indices: &[usize]) 
@@ -60,7 +79,7 @@ where
     {
         let data = self.s.borrow().data(index, level_indices);
         if let Some(data) = data {
-            Some( (self.f)(data) )
+            Some( self.f.exec(data) )
         } else {
             None
         }
@@ -71,7 +90,7 @@ where
         -> <Self as SparseHierarchyTypes<'_>>::Data 
     {
         let data = self.s.borrow().data_unchecked(index, level_indices);
-        (self.f)(data)
+        self.f.exec(data)
     }
     
     type State = State<S, F>;
@@ -87,8 +106,7 @@ where
 impl<S, F> SparseHierarchyState for State<S, F>
 where 
     S: Borrowable<Borrowed: SparseHierarchy>,
-    F: for<'a> Mapper<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data>
-        //for<'a> Fn(<S::Borrowed as SparseHierarchyTypes<'a>>::Data) -> Out
+    F: for<'a> MapFunction<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data>
 {
     type This = Map<S, F>;
     
@@ -120,7 +138,7 @@ where
     {
         let data = self.0.data(this.s.borrow(), level_index);
         if let Some(data) = data {
-            Some( (this.f)(data) )
+            Some( this.f.exec(data) )
         } else {
             None
         }
@@ -131,7 +149,7 @@ where
         -> <Self::This as SparseHierarchyTypes<'a>>::Data
     {
         let data = self.0.data_unchecked(this.s.borrow(), level_index);
-        (this.f)(data)
+        this.f.exec(data)
     }
 }
 
@@ -146,8 +164,7 @@ impl<S, F> Borrowable for Map<S, F> { type Borrowed = Self; }
 pub fn map<S, F>(s: S, f: F) -> Map<S, F>
 where
     S: Borrowable<Borrowed: SparseHierarchy>,
-    F: for<'any> Mapper<'any, <S::Borrowed as SparseHierarchyTypes<'any>>::Data>
-       //for<'a> Fn(<S::Borrowed as SparseHierarchyTypes<'a>>::Data) -> Out
+    F: for<'a> MapFunction<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data>
 {
     Map{ s, f }
 } 
