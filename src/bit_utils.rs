@@ -1,7 +1,7 @@
 use std::mem;
 use std::mem::size_of;
 use std::ops::ControlFlow;
-use crate::Primitive;
+use crate::utils::Primitive;
 
 /// Block ordering undefined. But same as [get_array_bit].
 /// 

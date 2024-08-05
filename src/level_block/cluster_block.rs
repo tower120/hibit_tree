@@ -5,7 +5,7 @@ use std::slice::{from_raw_parts, from_raw_parts_mut};
 use arrayvec::ArrayVec;
 use crate::level_block::HiBlock;
 use crate::{BitBlock, Empty, MaybeEmptyIntrusive, Primitive};
-use crate::utils::array::Array;
+use crate::utils::Array;
 
 type SubBlockMask = u16;
 const SUB_BLOCK_SIZE: usize = size_of::<SubBlockMask>()*8;

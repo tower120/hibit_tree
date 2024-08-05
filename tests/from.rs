@@ -3,10 +3,10 @@
 use itertools::assert_equal;
 use rand::{Rng, SeedableRng};
 //use hi_sparse_array::{CompactSparseArray, intersection, LazySparseHierarchy, map, map2, union};
-use hi_sparse_array::{CompactSparseArray, FromSparseHierarchy, intersection, LazySparseHierarchy, map, UnaryFunction};
+use hi_sparse_array::{CompactSparseArray, FromSparseHierarchy, intersection, LazySparseHierarchy, map};
 use hi_sparse_array::const_utils::ConstUsize;
 use hi_sparse_array::SparseHierarchy;
-use hi_sparse_array::utils::Borrowable;
+use hi_sparse_array::utils::{Borrowable, UnaryFunction};
 
 mod common;
 

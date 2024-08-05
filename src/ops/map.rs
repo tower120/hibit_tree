@@ -2,27 +2,7 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use crate::{LazySparseHierarchy, SparseHierarchy, SparseHierarchyState, SparseHierarchyTypes};
 use crate::const_utils::ConstInteger;
-use crate::utils::Borrowable;
-
-// TODO : UnaryFn?
-// TODO : Move to utils.
-/// Implementable unary [Fn].
-pub trait UnaryFunction<Arg> {
-    type Output;
-    fn exec(&self, arg: Arg) -> Self::Output;
-}
-
-impl<F, Arg, Out> UnaryFunction<Arg> for F
-where
-    F: Fn(Arg) -> Out
-{
-    type Output = Out;
-
-    #[inline]
-    fn exec(&self, arg: Arg) -> Self::Output {
-        (self)(arg)
-    }
-}
+use crate::utils::{Borrowable, UnaryFunction};
 
 mod private {
     pub trait Sealed<I> {} // Users in other crates cannot name this trait.

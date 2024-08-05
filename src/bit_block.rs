@@ -2,7 +2,7 @@ use std::mem;
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, ControlFlow};
 use crate::bit_queue::{ArrayBitQueue, BitQueue, EmptyBitQueue, PrimitiveBitQueue};
 use crate::bit_utils;
-use crate::utils::array::Array;
+use crate::utils::Array;
 
 pub trait BitBlock
     : Eq

@@ -188,7 +188,7 @@ where
             for array in self.iter.clone(){
                 // TODO: This is only OK, if:
                 //
-                //     SparseHierarchy<Data = DataType>        // LazySparseHierarchy?
+                //     SparseHierarchy<Data:'static>
                 //     ||
                 //     Iterator<Item = &impl SparseHierarchy>
                 //

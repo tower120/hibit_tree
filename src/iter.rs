@@ -5,7 +5,7 @@ use crate::bit_queue::BitQueue;
 use crate::const_utils::const_int::{const_for_rev, ConstInteger, ConstIntVisitor, ConstUsize};
 use crate::const_utils::const_array::ConstArrayType;
 use crate::utils::Take;
-use crate::utils::array::Array;
+use crate::utils::Array;
 
 // TODO: could be u8's
 /// [usize; T::LevelCount::N - 1]

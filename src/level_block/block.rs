@@ -3,7 +3,7 @@ use crate::bit_block::BitBlock;
 use crate::level_block::HiBlock;
 use crate::{Empty, MaybeEmptyIntrusive};
 use crate::utils::Array;
-use crate::utils::primitive::Primitive;
+use crate::utils::Primitive;
 
 /// TODO: Description
 #[derive(Clone)]
