@@ -1,7 +1,9 @@
+#![feature(closure_lifetime_binder)]
+
 use itertools::assert_equal;
 use rand::{Rng, SeedableRng};
 //use hi_sparse_array::{CompactSparseArray, intersection, LazySparseHierarchy, map, map2, union};
-use hi_sparse_array::{CompactSparseArray, LazySparseHierarchy, map};
+use hi_sparse_array::{CompactSparseArray, FromSparseHierarchy, intersection, LazySparseHierarchy, map, UnaryFunction};
 use hi_sparse_array::const_utils::ConstUsize;
 use hi_sparse_array::SparseHierarchy;
 use hi_sparse_array::utils::Borrowable;
@@ -69,12 +71,12 @@ fn materialize_test(){
     }
     
     
-    /*let ao: Array = map(&a1, |d| d.clone()).materialize();
+    let ao: Array = map(&a1, |d: &Data| d.clone()).materialize();
     assert_equal(ao.iter(), a1.iter());
     
-    let ao: Array = intersection(&a1, &a2, |l, _r| l.clone()).materialize();
+    let ao: Array = map(intersection(&a1, &a2), |(l, _r) : (&Data, &Data)| l.clone()).materialize();
     assert_equal(ao.iter(), a1.iter());
     
-    let ao: Array = union(&a1, &a2, |l, _r| l.unwrap().clone()).materialize();
+    /*let ao: Array = union(&a1, &a2, |l, _r| l.unwrap().clone()).materialize();
     assert_equal(ao.iter(), a1.iter());*/
 }
