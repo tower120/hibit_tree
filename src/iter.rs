@@ -18,9 +18,9 @@ type LevelIndices<T: SparseHierarchy> =
 /// Each hierarchy level has its own iterator.
 /// 
 /// [T::LevelMaskType::BitsIter; T::LevelCount]
-type LevelIterators<'a, T: SparseHierarchy> =
+type LevelIterators<T: SparseHierarchy> =
     ConstArrayType<
-        <<T as SparseHierarchyTypes<'a>>::LevelMaskType as BitBlock>::BitsIter,
+        <<T as SparseHierarchy>::LevelMask as BitBlock>::BitsIter,
         T::LevelCount
     >;
 
@@ -34,7 +34,7 @@ where
     container: &'a T,
     
     /// [T::LevelMaskType::BitsIter; T::LevelCount]
-    level_iters: LevelIterators<'a, T>,
+    level_iters: LevelIterators<T>,
     
     /// [usize; T::LevelCount - 1]
     level_indices: LevelIndices<T>,
@@ -139,7 +139,7 @@ where
         let data_block = unsafe {
             self.state.data_unchecked(&self.container, level_index)
         };
-        let block_index = data_block_index::<T::LevelCount, T::LevelMaskType>(&self.level_indices, level_index);
+        let block_index = data_block_index::<T::LevelCount, T::LevelMask>(&self.level_indices, level_index);
         Some((block_index, data_block))
     }    
 }

@@ -306,9 +306,6 @@ unsafe impl<#[may_dangle] T, const DEPTH: usize> Drop for CompactSparseArray<T, 
 }
 
 impl<'a, T, const DEPTH: usize> SparseHierarchyTypes<'a> for CompactSparseArray<T, DEPTH> {
-    type LevelMaskType = Mask;
-    type LevelMask = &'a Mask;
-    
     type DataType = T;
     type Data = &'a T;
 }
@@ -320,6 +317,8 @@ where
     const EXACT_HIERARCHY: bool = true;
     
     type LevelCount = ConstUsize<DEPTH>;
+
+    type LevelMask = Mask;
     
     #[inline]
     unsafe fn data(&self, index: usize, level_indices: &[usize]) 
@@ -381,9 +380,9 @@ where
         this: &'a Self::This,
         level_n: N, 
         level_index: usize
-    ) -> <Self::This as SparseHierarchyTypes<'a>>::LevelMask {
+    ) -> <Self::This as SparseHierarchy>::LevelMask {
         if N::VALUE == 0 {
-            return &this.root.header().mask();
+            return *this.root.header().mask();
         }
         
         // We do not store the root level's node.
@@ -403,7 +402,7 @@ where
         let node = if contains{ node } else { empty_node(level_n, ConstUsize::<DEPTH>) };   
         *self.level_nodes.as_mut().get_unchecked_mut(level_node_index) = Some(node);
         
-        node.header().mask()
+        *node.header().mask()
     }
 
     #[inline]
@@ -412,9 +411,9 @@ where
         this: &'a Self::This, 
         level_n: N, 
         level_index: usize
-    ) -> <Self::This as SparseHierarchyTypes<'a>>::LevelMask {
+    ) -> <Self::This as SparseHierarchy>::LevelMask {
         if N::VALUE == 0 {
-            return this.root.header().mask();
+            return *this.root.header().mask();
         }
         
         // We do not store the root level's node.
@@ -431,7 +430,7 @@ where
         let node = *prev_node.get_child::<NodePtr>(level_index);
         *self.level_nodes.as_mut().get_unchecked_mut(level_node_index) = Some(node);
         
-        node.header().mask()
+        *node.header().mask()
     }
     
     // TODO: data_or_default possible too.

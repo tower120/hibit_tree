@@ -15,7 +15,7 @@ use super::{CompactSparseArray, DataIndex, Mask};
 #[inline]
 fn block_start<S: SparseHierarchy, N: ConstInteger>(index: usize) -> usize {
     index << (
-        <S as SparseHierarchyTypes<'_>>::LevelMaskType::SIZE.ilog2() as usize * 
+        <S as SparseHierarchy>::LevelMask::SIZE.ilog2() as usize * 
         (S::LevelCount::VALUE - N::VALUE - 1)
     )
 }
@@ -30,8 +30,7 @@ unsafe fn make_terminal_node<L, F>(
     mut push_data: F
 ) -> NodePtr
 where
-    L: SparseHierarchy,
-    L: for<'a> SparseHierarchyTypes<'a, LevelMaskType = Mask>,
+    L: SparseHierarchy<LevelMask = Mask>,
     F: for<'a> FnMut(usize, <L as SparseHierarchyTypes<'a>>::DataType) -> DataIndex
 {
     let raw_node = NodePtr::raw_new::<DataIndex>(cap, mask);
@@ -56,8 +55,7 @@ unsafe fn from_exact_sparse_hierarchy<L, N, F>(
     push_data: &mut F,
 ) -> NodePtr
 where
-    L: SparseHierarchy,
-    L: for<'a> SparseHierarchyTypes<'a, LevelMaskType = Mask>,
+    L: SparseHierarchy<LevelMask = Mask>,
     F: for<'a> FnMut(usize, <L as SparseHierarchyTypes<'a>>::DataType) -> DataIndex,
     N: ConstInteger,
 {
@@ -102,8 +100,7 @@ unsafe fn from_sparse_hierarchy<L, N, F>(
     push_data: &mut F,
 ) -> Option<NodePtr>
 where
-    L: SparseHierarchy,
-    L: for<'a> SparseHierarchyTypes<'a, LevelMaskType = Mask>,
+    L: SparseHierarchy<LevelMask = Mask>,
     F: for<'a> FnMut(usize, <L as SparseHierarchyTypes<'a>>::DataType) -> DataIndex,
     N: ConstInteger,
 {
@@ -144,10 +141,10 @@ where
     fn from_sparse_hierarchy<L>(other: &L) -> Self
     where
         for<'a> L: SparseHierarchyTypes<'a,
-            LevelMaskType = <Self as SparseHierarchyTypes<'a>>::LevelMaskType,
             DataType = <Self as SparseHierarchyTypes<'a>>::DataType
         >,
         L: SparseHierarchy<
+            LevelMask  = Self::LevelMask,
             LevelCount = Self::LevelCount,
         >,
     {

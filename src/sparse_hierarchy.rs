@@ -37,8 +37,8 @@ use crate::utils::{Borrowable, Take};
 /// }
 /// ``` 
 #[derive(Copy, Clone)]
-pub struct Index<LevelMaskType: BitBlock, LevelCount: ConstInteger>(
-    usize, PhantomData<(LevelMaskType, LevelCount)>
+pub struct Index<LevelMask: BitBlock, LevelCount: ConstInteger>(
+    usize, PhantomData<(LevelMask, LevelCount)>
 );
 
 impl<LevelMaskType: BitBlock, LevelCount: ConstInteger> 
@@ -80,14 +80,8 @@ for usize
     }
 }
 
-// TODO: SparseHierarchyBase with non-generic types?
-
 pub trait SparseHierarchyTypes<'this, ImplicitBounds = &'this Self>{
-    // TODO: Try remove LevelMaskType/LevelMask distinction. Use always value.
-    //       Benchmark.
-    type LevelMaskType: BitBlock;
-    type LevelMask: Borrow<Self::LevelMaskType> + Take<Self::LevelMaskType>;
-    
+    // TODO: Try remove DataType.
     type DataType;
     type Data: Borrow<Self::DataType> + Take<Self::DataType>;
 }
@@ -120,9 +114,9 @@ where
     /// Hierarchy levels count (without a data level).
     type LevelCount: ConstInteger;
     
-    /*type LevelMaskType: BitBlock;
-    type LevelMask: Borrow<Self::LevelMaskType> + Take<Self::LevelMaskType>;
+    type LevelMask: BitBlock;
  
+    /*
     // TODO: We may not need it any more
     type DataType;
     type Data: Borrow<Self::DataType> + Take<Self::DataType>;*/
@@ -158,11 +152,11 @@ where
 
     /// You can use `usize` or [Index] for `index`.
     #[inline]
-    fn get(&self, index: impl for<'any> Into<Index<<Self as SparseHierarchyTypes<'any>>::LevelMaskType, Self::LevelCount>>) 
+    fn get(&self, index: impl Into<Index<<Self as SparseHierarchy>::LevelMask, Self::LevelCount>>) 
         -> Option<<Self as SparseHierarchyTypes<'_>>::Data> 
     {
         let index: usize = index.into().into();
-        let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
+        let indices = level_indices::<Self::LevelMask, Self::LevelCount>(index);
         unsafe{ self.data(index, indices.as_ref()) }
     }
 
@@ -171,7 +165,7 @@ where
     /// Item at `index` must exist.
     #[inline]
     unsafe fn get_unchecked(&self, index: usize) -> <Self as SparseHierarchyTypes<'_>>::Data {
-        let indices = level_indices::<Self::LevelMaskType, Self::LevelCount>(index);
+        let indices = level_indices::<Self::LevelMask, Self::LevelCount>(index);
         self.data_unchecked(index, indices.as_ref())
     }
     
@@ -182,7 +176,7 @@ where
     /// Act as `const`.
     #[inline]
     /*const*/ fn index_range() -> RangeTo<usize> {
-        RangeTo{ end: Self::LevelMaskType::SIZE.pow(Self::LevelCount::VALUE as _) }
+        RangeTo{ end: Self::LevelMask::SIZE.pow(Self::LevelCount::VALUE as _) }
     }
 }
 
@@ -197,9 +191,10 @@ pub trait LazySparseHierarchy: SparseHierarchy {
         T: FromSparseHierarchy,
         T: SparseHierarchy<
             LevelCount = Self::LevelCount,
+            LevelMask  = Self::LevelMask,            
         >,
         for<'a> T: SparseHierarchyTypes<'a,
-            LevelMaskType = <Self as SparseHierarchyTypes<'a>>::LevelMaskType,
+            
             DataType = <Self as SparseHierarchyTypes<'a>>::DataType
         >,
     {
@@ -213,9 +208,9 @@ pub trait FromSparseHierarchy: SparseHierarchy {
     where
         T: SparseHierarchy<
             LevelCount = Self::LevelCount,
+            LevelMask  = Self::LevelMask,
         >,
         for<'a> T: SparseHierarchyTypes<'a,
-            LevelMaskType = <Self as SparseHierarchyTypes<'a>>::LevelMaskType,
             DataType = <Self as SparseHierarchyTypes<'a>>::DataType
         >;
 }
@@ -255,7 +250,7 @@ pub trait SparseHierarchyState {
         this: &'a Self::This,
         level_n: N, 
         level_index: usize,
-    ) -> <Self::This as SparseHierarchyTypes<'a>>::LevelMask;
+    ) -> <Self::This as SparseHierarchy>::LevelMask;
     
     /// Pointed node must exists
     unsafe fn select_level_node_unchecked<'a, N: ConstInteger>(
@@ -263,7 +258,7 @@ pub trait SparseHierarchyState {
         this: &'a Self::This,
         level_n: N, 
         level_index: usize
-    ) -> <Self::This as SparseHierarchyTypes<'a>>::LevelMask;
+    ) -> <Self::This as SparseHierarchy>::LevelMask;
     
     /// Item at index may not exist.
     unsafe fn data<'a>(
