@@ -1,10 +1,10 @@
 use std::ops::ControlFlow;
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
-use crate::{BitBlock, data_block_index, SparseHierarchyTypes};
+use crate::{BitBlock, data_block_index, MonoSparseHierarchy, SparseHierarchyStateTypes, SparseHierarchyTypes};
 use crate::bit_queue::BitQueue;
 use crate::const_utils::const_int::{const_for_rev, ConstInteger, ConstIntVisitor, ConstUsize};
 use crate::const_utils::const_array::ConstArrayType;
-use crate::utils::Take;
+use crate::utils::LendingIterator;
 use crate::utils::Array;
 
 // TODO: could be u8's
@@ -39,7 +39,7 @@ where
     /// [usize; T::LevelCount - 1]
     level_indices: LevelIndices<T>,
 
-    state: T::State,
+    state: <T as SparseHierarchyTypes<'a>>::State,
 }
 
 impl<'a, T> Iter<'a, T>
@@ -55,7 +55,7 @@ where
         let root_mask = unsafe{
             state.select_level_node_unchecked(container, ConstUsize::<0>, 0)
         };
-        let level0_iter = root_mask.take_or_clone().into_bits_iter();
+        let level0_iter = root_mask.into_bits_iter();
         
         level_iters.as_mut()[0] = level0_iter; 
         
@@ -73,14 +73,17 @@ where
     }
 }
 
-impl<'a, T> Iterator for Iter<'a, T>
+impl<'a, T> LendingIterator for Iter<'a, T>
 where
     T: SparseHierarchy,
 {
-    type Item = (usize/*index*/, <T as SparseHierarchyTypes<'a>>::Data);
+    type Item<'this>= (
+        usize/*index*/, 
+        <<T as SparseHierarchyTypes<'a>>::State as SparseHierarchyStateTypes<'this>>::Data
+    ) where Self:'this;
 
     #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
+    fn next(&mut self) -> Option<Self::Item<'_>> {
         let level_index = loop {
             // We're driven by top-level iterator.
             let last_level_iter = self.level_iters.as_mut().last_mut().unwrap();
@@ -120,7 +123,7 @@ where
                                 self.0
                                 .level_iters.as_mut()
                                 .get_unchecked_mut(level_depth.value())
-                            } = level_mask.take_or_clone().into_bits_iter(); 
+                            } = level_mask.into_bits_iter(); 
                             
                             ControlFlow::Break(())
                         } else {
@@ -142,4 +145,17 @@ where
         let block_index = data_block_index::<T::LevelCount, T::LevelMask>(&self.level_indices, level_index);
         Some((block_index, data_block))
     }    
+}
+
+
+impl<'a, T> Iterator for Iter<'a, T>
+where
+    T: MonoSparseHierarchy,
+{
+    type Item = (usize, <T as SparseHierarchyTypes<'a>>::Data);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        LendingIterator::next(self)
+    }
 }

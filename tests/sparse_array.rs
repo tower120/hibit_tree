@@ -6,6 +6,7 @@ use itertools::assert_equal;
 use rand::{Rng, SeedableRng};
 use rand::prelude::SliceRandom;
 use hi_sparse_array::{config, SparseHierarchy};
+use hi_sparse_array::utils::LendingIterator;
 
 #[derive(Default, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 struct Data(usize);
@@ -54,8 +55,18 @@ fn insert_test2(){
     for i in 0..COUNT{
         let v = a.get(i).unwrap();
         assert_eq!(v, &Data(i));
-    }    
-    
+    }
+
+    // with LendingIterator
+    let mut iter = a.iter();
+    let mut i = 0;
+    while let Some((key, value)) = LendingIterator::next(&mut iter) {
+        assert_eq!(key, value.0);
+        assert_eq!(key, i);
+        i += 1;
+    }
+
+    // with Iterator
     assert_equal(a.iter().map(|(key, value)| value.0), 0..COUNT);
 }
 

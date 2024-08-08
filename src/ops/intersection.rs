@@ -1,7 +1,8 @@
 use std::borrow::Borrow;
+use std::marker::PhantomData;
 use std::ops::BitAnd;
 use crate::const_utils::{ConstArray, ConstInteger};
-use crate::{LazySparseHierarchy, SparseHierarchyTypes};
+use crate::{LazySparseHierarchy, MonoSparseHierarchy, SparseHierarchyStateTypes, SparseHierarchyTypes};
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::utils::{Borrowable, Take};
 
@@ -10,16 +11,19 @@ pub struct Intersection<S0, S1>{
     s1: S1
 }
 
-impl<'a, S0, S1> SparseHierarchyTypes<'a> for Intersection<S0, S1>
+impl<'this, S0, S1> SparseHierarchyTypes<'this> for Intersection<S0, S1>
 where
     S0: Borrowable<Borrowed: SparseHierarchy>,
-    S1: Borrowable<Borrowed: SparseHierarchy>
+    S1: Borrowable<Borrowed: SparseHierarchy<
+        LevelCount = <S0::Borrowed as SparseHierarchy>::LevelCount,
+        LevelMask  = <S0::Borrowed as SparseHierarchy>::LevelMask,
+    >>,
 {
-    type DataType = (
-        <S0::Borrowed as SparseHierarchyTypes<'a>>::Data,
-        <S1::Borrowed as SparseHierarchyTypes<'a>>::Data
+    type Data = (
+        <S0::Borrowed as SparseHierarchyTypes<'this>>::Data,
+        <S1::Borrowed as SparseHierarchyTypes<'this>>::Data
     );
-    type Data = Self::DataType;
+    type State = State<'this, S0, S1>;
 }
 
 impl<S0, S1> SparseHierarchy for Intersection<S0, S1>
@@ -33,8 +37,7 @@ where
     const EXACT_HIERARCHY: bool = false;
     
     type LevelCount = <S0::Borrowed as SparseHierarchy>::LevelCount;
-    
-    type LevelMask = <S0::Borrowed as SparseHierarchy>::LevelMask;
+    type LevelMask  = <S0::Borrowed as SparseHierarchy>::LevelMask;
 
     #[inline]
     unsafe fn data(&self, index: usize, level_indices: &[usize]) 
@@ -56,20 +59,30 @@ where
         let d1 = self.s1.borrow().data_unchecked(index, level_indices);
         (d0, d1)
     }
-
-    type State = State<S0, S1>;
 }
 
-pub struct State<S0, S1>
+pub struct State<'src, S0, S1>
 where
     S0: Borrowable<Borrowed: SparseHierarchy>,
     S1: Borrowable<Borrowed: SparseHierarchy>,
 {
-    s0: <S0::Borrowed as SparseHierarchy>::State, 
-    s1: <S1::Borrowed as SparseHierarchy>::State,
+    s0: <S0::Borrowed as SparseHierarchyTypes<'src>>::State, 
+    s1: <S1::Borrowed as SparseHierarchyTypes<'src>>::State,
+    phantom: PhantomData<&'src Intersection<S0, S1>>
 }
 
-impl<S0, S1> SparseHierarchyState for State<S0, S1>
+impl<'this, 'src, S0, S1> SparseHierarchyStateTypes<'this> for State<'src, S0, S1>
+where
+    S0: Borrowable<Borrowed: SparseHierarchy>,
+    S1: Borrowable<Borrowed: SparseHierarchy>,
+{
+    type Data = (
+        <<S0::Borrowed as SparseHierarchyTypes<'src>>::State as SparseHierarchyStateTypes<'this>>::Data,
+        <<S1::Borrowed as SparseHierarchyTypes<'src>>::State as SparseHierarchyStateTypes<'this>>::Data
+    );
+}
+
+impl<'src, S0, S1> SparseHierarchyState<'src> for State<'src, S0, S1>
 where
     S0: Borrowable<Borrowed: SparseHierarchy>,
     S1: Borrowable<Borrowed: SparseHierarchy<
@@ -77,20 +90,21 @@ where
         LevelMask  = <S0::Borrowed as SparseHierarchy>::LevelMask,
     >>,
 {
-    type This = Intersection<S0, S1>;
+    type Src = Intersection<S0, S1>;
 
     #[inline]
-    fn new(this: &Self::This) -> Self {
+    fn new(this: &'src Self::Src) -> Self {
         Self{
             s0: SparseHierarchyState::new(this.s0.borrow()), 
             s1: SparseHierarchyState::new(this.s1.borrow()),
+            phantom: PhantomData
         }
     }
 
     #[inline]
-    unsafe fn select_level_node<'a, N: ConstInteger>(
-        &mut self, this: &'a Self::This, level_n: N, level_index: usize
-    ) -> <Self::This as SparseHierarchy>::LevelMask {
+    unsafe fn select_level_node<N: ConstInteger>(
+        &mut self, this: &'src Self::Src, level_n: N, level_index: usize
+    ) -> <Self::Src as SparseHierarchy>::LevelMask {
         // Putting "if" here is not justified for general case. 
         
         let mask0 = self.s0.select_level_node(
@@ -109,9 +123,9 @@ where
     }
 
     #[inline]
-    unsafe fn select_level_node_unchecked<'a, N: ConstInteger> (
-        &mut self, this: &'a Self::This, level_n: N, level_index: usize
-    ) -> <Self::This as SparseHierarchy>::LevelMask {
+    unsafe fn select_level_node_unchecked<N: ConstInteger> (
+        &mut self, this: &'src Self::Src, level_n: N, level_index: usize
+    ) -> <Self::Src as SparseHierarchy>::LevelMask {
         let mask0 = self.s0.select_level_node_unchecked(
             this.s0.borrow(), level_n, level_index
         );
@@ -128,8 +142,8 @@ where
     }
 
     #[inline]
-    unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize) 
-        -> Option<<Self::This as SparseHierarchyTypes<'a>>::Data> 
+    unsafe fn data<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
+        -> Option<<Self as SparseHierarchyStateTypes<'a>>::Data> 
     {
         let d0 = self.s0.data(this.s0.borrow(), level_index);
         let d1 = self.s1.data(this.s1.borrow(), level_index);
@@ -143,8 +157,8 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked<'a>(&self, this: &'a Self::This, level_index: usize) 
-        -> <Self::This as SparseHierarchyTypes<'a>>::Data 
+    unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
+        -> <Self as SparseHierarchyStateTypes<'a>>::Data 
     {
         let d0 = self.s0.data_unchecked(this.s0.borrow(), level_index);
         let d1 = self.s1.data_unchecked(this.s1.borrow(), level_index);
@@ -154,7 +168,7 @@ where
 
 impl<S0, S1> LazySparseHierarchy for Intersection<S0, S1>
 where
-    Intersection<S0, S1>: SparseHierarchy
+    Intersection<S0, S1>: MonoSparseHierarchy
 {}
 
 impl<S0, S1> Borrowable for Intersection<S0, S1>{ type Borrowed = Self; }

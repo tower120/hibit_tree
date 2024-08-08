@@ -2,7 +2,7 @@ use arrayvec::ArrayVec;
 use std::ops::ControlFlow::Continue;
 
 use crate::const_utils::{ConstInteger, ConstUsize};
-use crate::{BitBlock, FromSparseHierarchy, SparseHierarchy, SparseHierarchyState, SparseHierarchyTypes};
+use crate::{BitBlock, FromSparseHierarchy, MonoSparseHierarchy, SparseHierarchy, SparseHierarchyState, SparseHierarchyTypes};
 use crate::utils::Take;
 
 use super::node::{empty_node, NodeChild, NodePtr};
@@ -21,21 +21,21 @@ fn block_start<S: SparseHierarchy, N: ConstInteger>(index: usize) -> usize {
 }
 
 #[inline]
-unsafe fn make_terminal_node<L, F>(
-    other: &L, 
-    other_state: &mut L::State,
+unsafe fn make_terminal_node<'src, L, F>(
+    other: &'src L, 
+    other_state: &mut <L as SparseHierarchyTypes<'src>>::State,
     mask: Mask,
     cap: u8,
     key_acc: usize,
     mut push_data: F
 ) -> NodePtr
 where
-    L: SparseHierarchy<LevelMask = Mask>,
-    F: for<'a> FnMut(usize, <L as SparseHierarchyTypes<'a>>::DataType) -> DataIndex
+    L: MonoSparseHierarchy<LevelMask = Mask>,
+    F: for<'a> FnMut(usize, <L as SparseHierarchyTypes<'a>>::Data) -> DataIndex
 {
     let raw_node = NodePtr::raw_new::<DataIndex>(cap, mask);
     mask.traverse_bits(|index| {
-        let data = other_state.data_unchecked(other, index).take();
+        let data = other_state.data_unchecked(other, index);
         let key = key_acc + index; 
         let data_index = push_data(key, data);
         NodePtr::raw_push_within_capacity(raw_node, index, data_index);
@@ -46,17 +46,17 @@ where
 }
 
 #[inline(always)]
-unsafe fn from_exact_sparse_hierarchy<L, N, F>(
-    other: &L, 
-    other_state: &mut L::State, 
+unsafe fn from_exact_sparse_hierarchy<'src, L, N, F>(
+    other: &'src L, 
+    other_state: &mut <L as SparseHierarchyTypes<'src>>::State, 
     n: N,
     index: usize,
     key_acc: usize,    
     push_data: &mut F,
 ) -> NodePtr
 where
-    L: SparseHierarchy<LevelMask = Mask>,
-    F: for<'a> FnMut(usize, <L as SparseHierarchyTypes<'a>>::DataType) -> DataIndex,
+    L: MonoSparseHierarchy<LevelMask = Mask>,
+    F: for<'a> FnMut(usize, <L as SparseHierarchyTypes<'a>>::Data) -> DataIndex,
     N: ConstInteger,
 {
     assert!(L::EXACT_HIERARCHY);
@@ -91,17 +91,17 @@ where
 }
 
 #[inline(always)]
-unsafe fn from_sparse_hierarchy<L, N, F>(
-    other: &L, 
-    other_state: &mut L::State, 
+unsafe fn from_sparse_hierarchy<'src, L, N, F>(
+    other: &'src L, 
+    other_state: &mut <L as SparseHierarchyTypes<'src>>::State, 
     n: N,
     index: usize,
     key_acc: usize,    
     push_data: &mut F,
 ) -> Option<NodePtr>
 where
-    L: SparseHierarchy<LevelMask = Mask>,
-    F: for<'a> FnMut(usize, <L as SparseHierarchyTypes<'a>>::DataType) -> DataIndex,
+    L: MonoSparseHierarchy<LevelMask = Mask>,
+    F: for<'a> FnMut(usize, <L as SparseHierarchyTypes<'a>>::Data) -> DataIndex,
     N: ConstInteger,
 {
     let mask = other_state.select_level_node_unchecked(other, n, index)
@@ -134,21 +134,19 @@ where
     }
 }
 
-impl<T, const DEPTH: usize> FromSparseHierarchy for CompactSparseArray<T, DEPTH>
+impl<From, T, const DEPTH: usize> FromSparseHierarchy<From> for CompactSparseArray<T, DEPTH>
 where
-    ConstUsize<DEPTH>: ConstInteger
+    ConstUsize<DEPTH>: ConstInteger,
+    From: MonoSparseHierarchy<
+        LevelMask  = Mask,
+        LevelCount = ConstUsize<DEPTH>,
+    >,
+    for<'a> From: SparseHierarchyTypes<'a,
+        Data = T
+    >,    
 {
-    fn from_sparse_hierarchy<L>(other: &L) -> Self
-    where
-        for<'a> L: SparseHierarchyTypes<'a,
-            DataType = <Self as SparseHierarchyTypes<'a>>::DataType
-        >,
-        L: SparseHierarchy<
-            LevelMask  = Self::LevelMask,
-            LevelCount = Self::LevelCount,
-        >,
-    {
-        let mut data: Vec<<L::Borrowed as SparseHierarchyTypes<'_>>::DataType> = Vec::with_capacity(1);
+    fn from_sparse_hierarchy(other: &From) -> Self {
+        let mut data: Vec<<From as SparseHierarchyTypes<'_>>::Data> = Vec::with_capacity(1);
         unsafe{ data.set_len(1); }
         
         let mut keys = vec![usize::MAX];
@@ -160,10 +158,10 @@ where
             i as DataIndex
         };        
 
-        let mut other_state = <L::Borrowed as SparseHierarchy>::State::new(other);
+        let mut other_state = <From as SparseHierarchyTypes>::State::new(other);
 
         let root = unsafe {
-            if <L::Borrowed as SparseHierarchy>::EXACT_HIERARCHY {
+            if <From as SparseHierarchy>::EXACT_HIERARCHY {
                 from_exact_sparse_hierarchy(
                     other, &mut other_state, ConstUsize::<0>, 0, 0, &mut push_fn
                 )
