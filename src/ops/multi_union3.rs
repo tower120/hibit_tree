@@ -278,6 +278,7 @@ where
         let lvl_non_empty_states = self.lvls_non_empty_states.as_mut()
                                   .get_unchecked_mut(level_n.value()-1);
         lvl_non_empty_states.clear();
+        // TODO: use lvl_non_empty_states from previous level
         for i in 0..self.states.len() {
             let (array, array_state) = self.states.get_unchecked_mut(i);
             let mask = array_state.select_level_node(

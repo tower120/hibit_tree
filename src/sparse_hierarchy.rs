@@ -289,8 +289,24 @@ where
     >
 {} 
 
+// TODO: impl manually.
 impl<T> MonoSparseHierarchy for T
 where
     T: SparseHierarchy,
     T: for<'this> MonoSparseHierarchyTypes<'this>
 {}
+
+/*pub trait MultiSparseHierarchyTypes<'this, ImplicitBounds = &'this Self>
+    : SparseHierarchyTypes<'this, ImplicitBounds, 
+        Data: Iterator<Item=Self::IterItem>,
+        State: for<'a> SparseHierarchyStateTypes<'a, 
+            Data: Iterator<Item=Self::IterItem>
+        >,
+    >
+{
+    type IterItem;
+}
+pub trait MultiSparseHierarchy
+where
+    Self: for<'this> MultiSparseHierarchyTypes<'this>
+{}*/

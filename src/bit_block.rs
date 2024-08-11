@@ -7,8 +7,10 @@ use crate::utils::Array;
 pub trait BitBlock
     : Eq
     + BitAnd<Output = Self>
+    + BitAndAssign<Self>
     + for<'a> BitAndAssign<&'a Self>
     + BitOr<Output = Self>
+    + BitOrAssign<Self>
     + for<'a> BitOrAssign<&'a Self>
     + Sized + Clone + 'static
 {

@@ -11,3 +11,12 @@ pub use take::*;
 pub use borrowable::*;
 pub use function::*;
 pub use lending_iterator::*;
+
+/// Trait for &.
+pub trait Ref {
+    type Type;
+}
+
+impl<T> Ref for &T {
+    type Type = T;
+}
