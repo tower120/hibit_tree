@@ -15,14 +15,14 @@ pub struct MultiIntersection<Iter> {
 
 type IterItem<Iter> = <<Iter as Iterator>::Item as Ref>::Type;
 
-impl<'i, 'this, Iter, T> SparseHierarchyTypes<'this> for MultiIntersection<Iter>
+impl<'item, 'this, Iter, T> SparseHierarchyTypes<'this> for MultiIntersection<Iter>
 where
-    Iter: Iterator<Item = &'i T> + Clone,
-    T: SparseHierarchy + 'i
+    Iter: Iterator<Item = &'item T> + Clone,
+    T: SparseHierarchy + 'item
     //Iter: Iterator<Item: Ref<Type: SparseHierarchy>>
 {
-    type Data  = /*ResolveIter<'this, Iter>*/();
-    type State = MultiIntersectionState<'this, 'i, Iter>;
+    type Data  = ResolveIter<'item, Iter>;
+    type State = MultiIntersectionState<'this, 'item, Iter>;
 }
 
 impl<'i, Iter, T> SparseHierarchy for MultiIntersection<Iter>
@@ -39,7 +39,6 @@ where
     unsafe fn data(&self, index: usize, level_indices: &[usize]) 
         -> Option<<Self as SparseHierarchyTypes<'_>>::Data> 
     {
-        todo!();
         // There are few ways to do it:
         // 1. Iterate, get data() and build resolve value on the fly. As
         //    soon as None meet - throw away half-built resolve value and 
@@ -86,7 +85,7 @@ where
         // does not fit stack - overhead will probably be neglectable).
         //
         // But no "special cases" from user perspective.
-/*        {
+        {
             let mut datas: ArrayVec<_, N> = Default::default();
             for array in self.iter.clone(){
                 // TODO: This is only OK, if:
@@ -108,15 +107,11 @@ where
                     return None;
                 }
             }
-            let resolve = (self.f)(
-                MultiIntersectionResolveIter::stateless(
-                    ResolveIter {
-                        items: datas.into_iter()
-                    }
-                )
-            );
+            let resolve = ResolveIter {
+                items: datas.into_iter()
+            };
             Some(resolve)
-        }*/
+        }
 
         // Variant 3 implementation.
         // Performance degrades linearly with depth increase.
@@ -159,7 +154,7 @@ where
     }
 }
 
-//use data_resolve_v2::ResolveIter;
+use data_resolve_v2::ResolveIter;
 
 /*mod data_resolve_v1 {
     use super::*;
@@ -206,43 +201,32 @@ where
     }
 }
 */
-/*mod data_resolve_v2 {
+mod data_resolve_v2 {
     use super::*;
     
-    pub struct ResolveIter<'a, Iter>
+    pub struct ResolveIter<'item, Iter>
     where
-        Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + 'a,
+        Iter: Iterator<Item: Ref<Type: SparseHierarchy>>,
     {
-        pub items: arrayvec::IntoIter<<IterItem<Iter> as SparseHierarchyTypes<'a>>::Data, N>
-        //pub items: std::vec::IntoIter<<IterItem<Iter> as SparseHierarchy>::Data<'a>>
+        pub items: arrayvec::IntoIter<<IterItem<Iter> as SparseHierarchyTypes<'item>>::Data, N>
     }
-    impl<'a, Iter> Iterator for ResolveIter<'a, Iter>
+    impl<'item, Iter> Iterator for ResolveIter<'item, Iter>
     where
-        Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + 'a,
+        Iter: Iterator<Item: Ref<Type: SparseHierarchy>>,
     {
-        type Item = <IterItem<Iter> as SparseHierarchyTypes<'a>>::Data;
+        type Item = <IterItem<Iter> as SparseHierarchyTypes<'item>>::Data;
     
         #[inline]
         fn next(&mut self) -> Option<Self::Item> {
             self.items.next()
         }
 
-        // Do nothing for ArrayVec/Vec
-        /*#[inline]
-        fn fold<B, F>(self, init: B, f: F) -> B
-        where
-            Self: Sized,
-            F: FnMut(B, Self::Item) -> B,
-        {
-            self.items.fold(init, f)
-        }*/
-
         #[inline]
         fn size_hint(&self) -> (usize, Option<usize>) {
             self.items.size_hint()
         }
     }
-}*/
+}
 
 /*mod data_resolve_v3 {
     use super::*;
@@ -273,6 +257,7 @@ where
     }
 }
 */
+
 /*struct ResolveIterUnchecked<'a, Iter> {
     index: usize, 
     level_indices: &'a [usize],
@@ -315,35 +300,32 @@ where
 }*/
 
 const N: usize = 32;
-type StatesItem<'i, Iter> = <IterItem<Iter> as SparseHierarchyTypes<'i>>::State;
-    //(<Iter as Iterator>::Item, <IterItem<Iter> as SparseHierarchy>::State);
+type StatesItem<'item, Iter> = <IterItem<Iter> as SparseHierarchyTypes<'item>>::State;
 
 // TODO: rename to State
-pub struct MultiIntersectionState<'src, 'i, I>
+pub struct MultiIntersectionState<'src, 'item, I>
 where
     I: Iterator<Item: Ref<Type: SparseHierarchy>>
 {
-    states: ArrayVec<StatesItem<'i, I>, N>,    
+    states: ArrayVec<StatesItem<'item, I>, N>,    
     empty_below_n: usize,
     terminal_node_mask: <IterItem<I> as SparseHierarchy>::LevelMask,
     phantom_data: PhantomData<(&'src MultiIntersection<I>)>
 }
 
 
-impl<'this, 'src, 'i, Iter> SparseHierarchyStateTypes<'this> for MultiIntersectionState<'src, 'i, Iter>
+impl<'this, 'src, 'item, Iter> SparseHierarchyStateTypes<'this> for MultiIntersectionState<'src, 'item, Iter>
 where
     Iter: Iterator<Item: Ref<Type: SparseHierarchy>>
-    /*Iter: Iterator<Item = &'i T> + Clone,
-    T: SparseHierarchy + 'i*/
 {
-    type Data = StateResolveIter<'this, 'i, Iter>;
+    type Data = StateResolveIter<'this, 'item, Iter>;
 }
 
-impl<'src, 'i, Iter, T> SparseHierarchyState<'src> for MultiIntersectionState<'src, 'i, Iter>
+impl<'src, 'item, Iter, T> SparseHierarchyState<'src> for MultiIntersectionState<'src, 'item, Iter>
 where
     //Iter: Iterator<Item: Ref<Type: SparseHierarchy>> + Clone
-    Iter: Iterator<Item = &'i T> + Clone,
-    T: SparseHierarchy + 'i
+    Iter: Iterator<Item = &'item T> + Clone,
+    T: SparseHierarchy + 'item
 {
     type Src = MultiIntersection<Iter>;
 
@@ -447,26 +429,23 @@ where
     unsafe fn data_unchecked<'a>(
         &'a self, src: &'src Self::Src, level_index: usize
     ) -> <Self as SparseHierarchyStateTypes<'a>>::Data {
-        //()
         StateResolveIter { 
             level_index,
             array_iter: src.iter.clone(),
-            states_iter: self.states.iter(), 
-            //phantom_data: PhantomData 
+            states_iter: self.states.iter(),
         }
     }
 }
 
 // TODO: rename
 // States slice to Data iterator adapter.
-pub struct StateResolveIter<'state, 'i, I>
+pub struct StateResolveIter<'state, 'item, I>
 where
     I: Iterator<Item: Ref<Type: SparseHierarchy>>
 {
     level_index: usize,
     array_iter: I,
-    states_iter: slice::Iter<'state, StatesItem<'i, I>>,
-    //phantom_data: PhantomData<(&'state ())>
+    states_iter: slice::Iter<'state, StatesItem<'item, I>>,
 }
 
 /// Iterator for [MultiIntersection] resolve function.
@@ -474,12 +453,12 @@ where
 /// Prefer using [fold]-based[^1] operations over [next]-ing.
 ///
 /// [^1]: Such as [for_each], [sum], etc... 
-impl<'state, 'i, I, T> Iterator for StateResolveIter<'state, 'i, I>
+impl<'state, 'item, I, T> Iterator for StateResolveIter<'state, 'item, I>
 where
-    I: Iterator<Item = &'i T> + Clone,
-    T: SparseHierarchy + 'i
+    I: Iterator<Item = &'item T> + Clone,
+    T: SparseHierarchy + 'item
 {
-    type Item = <StatesItem<'i, I> as SparseHierarchyStateTypes<'state>>::Data;
+    type Item = <StatesItem<'item, I> as SparseHierarchyStateTypes<'state>>::Data;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -515,10 +494,11 @@ where
     }
 }
 
-/*impl<'a, I> ExactSizeIterator for StateResolveIter<'a, I>
+impl<'state, 'item, I, T> ExactSizeIterator for StateResolveIter<'state, 'item, I>
 where
-    I: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>>
-{}*/
+    I: Iterator<Item = &'item T> + Clone,
+    T: SparseHierarchy + 'item
+{}
 
 /*impl<Iter> LazySparseHierarchy for MultiIntersection<Iter>
 where
@@ -531,7 +511,7 @@ impl<Iter> Borrowable for MultiIntersection<Iter>{ type Borrowed = Self; }
 pub fn multi_intersection<Iter>(iter: Iter) 
     -> MultiIntersection<Iter>
 where
-    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + Clone,
+    Iter: Iterator<Item: Ref<Type:SparseHierarchy>> + Clone,
 {
     MultiIntersection{ iter }
 }
@@ -543,7 +523,6 @@ mod tests{
     use crate::sparse_hierarchy::SparseHierarchy;
     use crate::utils::LendingIterator;
     use super::multi_intersection;
-    
 
     #[test]
     fn smoke_test(){
@@ -578,10 +557,14 @@ mod tests{
             (15, vec![arrays[0].get(15).unwrap(), arrays[1].get(15).unwrap(), arrays[2].get(15).unwrap()] ),
         ]);*/
         
-        /*assert_equal(intersection.iter(), [(15, 45)]);
-        assert_eq!(unsafe{ intersection.get_unchecked(15) }, 45);
-        assert_eq!(unsafe{ intersection.get(15) }, Some(45));
-        assert_eq!(unsafe{ intersection.get(200) }, None);*/
+        //assert_equal(intersection.iter(), [(15, 45)]);
+        //assert_eq!(unsafe{ intersection.get_unchecked(15) }, 45);
+        
+        assert_equal( 
+            intersection.get(15).unwrap(),
+            vec![arrays[0].get(15).unwrap(), arrays[1].get(15).unwrap(), arrays[2].get(15).unwrap()]
+        );
+        assert!( intersection.get(200).is_none() );
     }
 
 }
