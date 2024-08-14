@@ -296,7 +296,7 @@ where
     T: for<'this> MonoSparseHierarchyTypes<'this>
 {}
 
-/*pub trait MultiSparseHierarchyTypes<'this, ImplicitBounds = &'this Self>
+pub trait MultiSparseHierarchyTypes<'this, ImplicitBounds = &'this Self>
     : SparseHierarchyTypes<'this, ImplicitBounds, 
         Data: Iterator<Item=Self::IterItem>,
         State: for<'a> SparseHierarchyStateTypes<'a, 
@@ -306,7 +306,8 @@ where
 {
     type IterItem;
 }
-pub trait MultiSparseHierarchy
+
+pub trait MultiSparseHierarchy: SparseHierarchy
 where
     Self: for<'this> MultiSparseHierarchyTypes<'this>
-{}*/
+{}

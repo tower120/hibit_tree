@@ -106,16 +106,16 @@ where
 
     #[inline]
     unsafe fn select_level_node<N: ConstInteger>(
-        &mut self, this: &'src Self::Src, level_n: N, level_index: usize
+        &mut self, src: &'src Self::Src, level_n: N, level_index: usize
     ) -> <Self::Src as SparseHierarchy>::LevelMask {
-        self.0.select_level_node(this.s.borrow(), level_n, level_index)
+        self.0.select_level_node(src.s.borrow(), level_n, level_index)
     }
 
     #[inline]
     unsafe fn select_level_node_unchecked<N: ConstInteger>(
-        &mut self, this: &'src Self::Src, level_n: N, level_index: usize
+        &mut self, src: &'src Self::Src, level_n: N, level_index: usize
     ) -> <Self::Src as SparseHierarchy>::LevelMask {
-        self.0.select_level_node_unchecked(this.s.borrow(), level_n, level_index)
+        self.0.select_level_node_unchecked(src.s.borrow(), level_n, level_index)
     }
 
     #[inline]

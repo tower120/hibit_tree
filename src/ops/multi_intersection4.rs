@@ -4,7 +4,7 @@ use std::mem::MaybeUninit;
 use std::ptr::NonNull;
 use std::slice;
 use arrayvec::ArrayVec;
-use crate::{BitBlock, LazySparseHierarchy, SparseHierarchyStateTypes, SparseHierarchyTypes};
+use crate::{BitBlock, LazySparseHierarchy, MonoSparseHierarchy, MultiSparseHierarchy, MultiSparseHierarchyTypes, SparseHierarchyData, SparseHierarchyStateTypes, SparseHierarchyTypes};
 use crate::const_utils::{ConstArray, ConstCopyArrayType, ConstInteger};
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::utils::{Array, Borrowable, Ref, Take};
@@ -499,6 +499,20 @@ where
     I: Iterator<Item = &'item T> + Clone,
     T: SparseHierarchy + 'item
 {}
+
+impl<'item, 'this, Iter, T> MultiSparseHierarchyTypes<'this> for MultiIntersection<Iter>
+where
+    Iter: Iterator<Item = &'item T> + Clone,
+    T: MonoSparseHierarchy + 'item
+{ 
+    type IterItem = SparseHierarchyData<'item, T>; 
+}
+
+impl<'item, Iter, T> MultiSparseHierarchy for MultiIntersection<Iter>
+where
+    Iter: Iterator<Item = &'item T> + Clone,
+    T: MonoSparseHierarchy + 'item
+{} 
 
 /*impl<Iter> LazySparseHierarchy for MultiIntersection<Iter>
 where
