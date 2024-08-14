@@ -25,8 +25,8 @@ type LevelIterators<T: SparseHierarchy> =
     >;
 
 /// [SparseHierarchy] iterator.
-/// 
-/// For non-[EXACT_HIERARCHY], iterator may return empty items. 
+///  
+/// This is [LendingIterator], that also [Iterator] for [MonoSparseHierarchy]. 
 pub struct Iter<'a, T>
 where
     T: SparseHierarchy,

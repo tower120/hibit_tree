@@ -20,6 +20,7 @@ where
     >,
 {
     type Data = I::Output;
+    type DataUnchecked = Self::Data;
     type State = State<'this, S, I, F>;
 }
 
@@ -50,10 +51,14 @@ where
         }
     }
 
+    #[inline]
     unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
-        -> <Self as SparseHierarchyTypes<'_>>::Data 
+        -> <Self as SparseHierarchyTypes<'_>>::DataUnchecked 
     {
-        todo!()
+        let data_iter = self.s.data_unchecked(index, level_indices);
+        let init = self.init.exec();
+        let out = data_iter.fold(init, |init, data| self.f.exec(init, data) );
+        out
     }
 }
 
@@ -174,6 +179,7 @@ mod tests{
         assert_eq!(intersect.get(10), None);
         assert_eq!(intersect.get(15), Some(45));
         assert_eq!(intersect.get(30), None);
+        assert_eq!(unsafe{ intersect.get_unchecked(15) }, 45);
         assert_equal(intersect.iter(), [(15, 45)]);
     }
 }

@@ -83,27 +83,46 @@ for
 
 pub trait SparseHierarchyTypes<'this, ImplicitBounds = &'this Self>{
     type Data;
+    type DataUnchecked;
     type State: SparseHierarchyState<'this, Src=Self>;
 }
 
 /// 
-/// TODO: Change description
+/// TODO: Add more description
+/// 
+/// SparseHierarchy is a base trait for [MonoSparseHierarchy] and [MultiSparseHierarchy],
+/// which you will use most of the time. Only multi_* operations over non-[MonoSparseHierarchy]'ies
+/// return bare SparseHierarchy.
 ///
-/// # Design notes
+/// This split is needed, because multi_* operations ([MultiSparseHierarchy]'ies) 
+/// return Iterators, that produce values on the fly. [data()], [data_unchecked()] 
+/// and [iter()] - all get source data from different functions, and also
+/// process it in different ways. Alternative to this would be collect all items
+/// into intermediate container, and then return it to the user. That is what
+/// [multi_fold] do - aggregates iterator into one value, and thus makes 
+/// [MultiSparseHierarchy] Mono again(!).
+///
+/// # SparseHierarchyTypes
 /// 
-/// As you can see, SparseHierarchy have lifetime parameter - this is workaround
-/// for Rust's basically non-usable GATs [^gat_problems].
-/// All it functions work with `&'a self` - so most of the time it will be just
-/// auto-deducted.
+/// SparseHierarchy "inherits" SparseHierarchyTypes with lifetime argument. 
+/// This is workaround for Rust's basically non-usable GATs[^gat_problems].
 /// 
-/// [^gat_problems] With GAT's we always end up with this https://blog.rust-lang.org/2022/10/28/gats-stabilization.html#implied-static-requirement-from-higher-ranked-trait-bounds
+/// If you need concrete types - use [SparseHierarchyData] and 
+/// [SparseHierarchyDataUnchecked] helpers. Or get them from [SparseHierarchyTypes],
+/// as if it were super-trait:
+/// ```
+/// let i: <MySparseContainer as SparseHierarchyTypes>::Data = my_sparse_container.get(1).unwrap();
+/// ```
+/// ```
+/// type MyData = <MySparseContainer as SparseHierarchyTypes<'i>>::Data; 
+/// ```
+/// 
+/// Same technique used for other SparseHierarchy related traits.
+/// 
+/// [^gat_problems]: With GAT's we always end up with this <https://blog.rust-lang.org/2022/10/28/gats-stabilization.html#implied-static-requirement-from-higher-ranked-trait-bounds>
 /// error.
-/// We use this technique https://sabrinajewson.org/blog/the-better-alternative-to-lifetime-gats#hrtb-supertrait
-/// as workaround. We don't use currently `self`, and it does not interference with type deduction 
-/// (since we expect users to work heavily with [map] closures - that is ergonomically important).
-// 
-// We need xxxxType for each concrete level_block/mask type to avoid the need for use `for<'a>`,
-// which is still not working (at Rust level) in cases, where we need it most.
+/// We use this technique <https://sabrinajewson.org/blog/the-better-alternative-to-lifetime-gats#the-better-gats> 
+/// as a workaround.
 pub trait SparseHierarchy: Sized + Borrowable<Borrowed=Self>
 where
 	Self: for<'this> SparseHierarchyTypes<'this>,
@@ -124,7 +143,8 @@ where
     /// 
     /// [^1]: It is not just `[usize; LevelCount::VALUE]` due to troublesome 
     ///       Rust const expressions in generic context. 
-    unsafe fn data(&self, index: usize, level_indices: &[usize]) -> Option<<Self as SparseHierarchyTypes<'_>>::Data>;
+    unsafe fn data(&self, index: usize, level_indices: &[usize]) 
+        -> Option<<Self as SparseHierarchyTypes<'_>>::Data>;
  
     /// # Safety
     /// 
@@ -135,7 +155,8 @@ where
     /// 
     /// [^1]: It is not just `[usize; LevelCount::VALUE]` due to troublesome 
     ///       Rust const expressions in generic context. 
-    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) -> <Self as SparseHierarchyTypes<'_>>::Data;
+    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
+        -> <Self as SparseHierarchyTypes<'_>>::DataUnchecked;
     
     #[inline]
     fn iter(&self) -> Iter<Self>{
@@ -156,7 +177,9 @@ where
     ///
     /// Item at `index` must exist.
     #[inline]
-    unsafe fn get_unchecked(&self, index: usize) -> <Self as SparseHierarchyTypes<'_>>::Data {
+    unsafe fn get_unchecked(&self, index: usize) 
+        -> <Self as SparseHierarchyTypes<'_>>::DataUnchecked 
+    {
         let indices = level_indices::<Self::LevelMask, Self::LevelCount>(index);
         self.data_unchecked(index, indices.as_ref())
     }
@@ -195,6 +218,8 @@ pub trait FromSparseHierarchy<From: MonoSparseHierarchy> {
 
 pub trait SparseHierarchyStateTypes<'this, ImplicitBounds = &'this Self>{
     type Data;
+    // Looks like we don't need DataUnchecked in State yet.
+    // (unchecked versions return Data)
 }
 
 /// Stateful [SparseHierarchy] interface.
@@ -261,13 +286,11 @@ where
 }
 
 pub type SparseHierarchyData<'a, T> = <T as SparseHierarchyTypes<'a>>::Data;
+pub type SparseHierarchyDataUnchecked<'a, T> = <T as SparseHierarchyTypes<'a>>::DataUnchecked;
 
-// ??
-pub type SparseHierarchyStateData<'src, 'a, T> = 
-    <<T as SparseHierarchyTypes<'src>>::State as SparseHierarchyStateTypes<'a>>::Data;
-
-/*pub*/ trait MonoSparseHierarchyTypes<'this, ImplicitBounds = &'this Self>
+pub trait MonoSparseHierarchyTypes<'this, ImplicitBounds = &'this Self>
     : SparseHierarchyTypes<'this, ImplicitBounds,
+        DataUnchecked = <Self as SparseHierarchyTypes<'this, ImplicitBounds>>::Data, 
         State: for<'a> SparseHierarchyStateTypes<'a, 
             Data = Self::Data
         >,
@@ -275,6 +298,12 @@ pub type SparseHierarchyStateData<'src, 'a, T> =
 {}
 
 // TODO: better naming?
+
+/// [SparseHierarchy] where all operations return same type - [Self::Data].
+/// 
+/// Think of it as of "the usual" [SparseHierarchy].  
+/// 
+/// All containers and all "non-multi" operations results are MonoSparseHierarchy. 
 pub trait MonoSparseHierarchy: SparseHierarchy
 where
     Self: for<'this> MonoSparseHierarchyTypes<'this>
@@ -282,7 +311,8 @@ where
 
 impl<'this, T> MonoSparseHierarchyTypes<'this> for T
 where
-    T: SparseHierarchyTypes<'this, /*ImplicitBounds,*/
+    T: SparseHierarchyTypes<'this,
+        DataUnchecked = <Self as SparseHierarchyTypes<'this>>::Data,
         State: for<'a> SparseHierarchyStateTypes<'a, 
             Data = Self::Data
         >,
@@ -299,6 +329,7 @@ where
 pub trait MultiSparseHierarchyTypes<'this, ImplicitBounds = &'this Self>
     : SparseHierarchyTypes<'this, ImplicitBounds, 
         Data: Iterator<Item=Self::IterItem>,
+        DataUnchecked: Iterator<Item=Self::IterItem>,
         State: for<'a> SparseHierarchyStateTypes<'a, 
             Data: Iterator<Item=Self::IterItem>
         >,
@@ -307,6 +338,13 @@ pub trait MultiSparseHierarchyTypes<'this, ImplicitBounds = &'this Self>
     type IterItem;
 }
 
+/// [SparseHierarchy], that returns `impl Iterator<Self::IterItem>`
+/// for all operations.
+/// 
+/// `multi_*` operations return [MultiSparseHierarchy]'ies.
+/// 
+/// You can convert MultiSparseHierarchy to [MonoSparseHierarchy],
+/// with [multi_fold()]. 
 pub trait MultiSparseHierarchy: SparseHierarchy
 where
     Self: for<'this> MultiSparseHierarchyTypes<'this>

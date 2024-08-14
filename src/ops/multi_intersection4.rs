@@ -5,10 +5,13 @@ use std::ptr::NonNull;
 use std::slice;
 use arrayvec::ArrayVec;
 use crate::{BitBlock, LazySparseHierarchy, MonoSparseHierarchy, MultiSparseHierarchy, MultiSparseHierarchyTypes, SparseHierarchyData, SparseHierarchyStateTypes, SparseHierarchyTypes};
-use crate::const_utils::{ConstArray, ConstCopyArrayType, ConstInteger};
+use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 use crate::utils::{Array, Borrowable, Ref, Take};
 
+/// Intersection between all iterator items.
+///
+/// All returned iterators are [ExactSizeIterator]. 
 pub struct MultiIntersection<Iter> {
     iter: Iter,
 }
@@ -19,9 +22,9 @@ impl<'item, 'this, Iter, T> SparseHierarchyTypes<'this> for MultiIntersection<It
 where
     Iter: Iterator<Item = &'item T> + Clone,
     T: SparseHierarchy + 'item
-    //Iter: Iterator<Item: Ref<Type: SparseHierarchy>>
 {
     type Data  = ResolveIter<'item, Iter>;
+    type DataUnchecked = ResolveIterUnchecked<Iter>;
     type State = MultiIntersectionState<'this, 'item, Iter>;
 }
 
@@ -138,19 +141,14 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
-        -> <Self as SparseHierarchyTypes<'_>>::Data
+    unsafe fn data_unchecked<'a>(&'a self, index: usize, level_indices: &'a [usize]) 
+        -> <Self as SparseHierarchyTypes<'a>>::DataUnchecked
     {
-        todo!()
-        /*(self.f)(
-            MultiIntersectionResolveIter::stateless_unchecked(
-                ResolveIterUnchecked {
-                    index, 
-                    level_indices, 
-                    iter: self.iter.clone(), 
-                }
-            )
-        )*/
+        ResolveIterUnchecked {
+            index, 
+            level_indices: Array::from_fn(|i| unsafe{ *level_indices.get_unchecked(i) }), 
+            iter: self.iter.clone(),
+        }
     }
 }
 
@@ -204,6 +202,8 @@ use data_resolve_v2::ResolveIter;
 mod data_resolve_v2 {
     use super::*;
     
+    // Theoretically we could "somehow" extract 'item lifetime from Iter.
+    // But for the sake of sanity - we just pass it.
     pub struct ResolveIter<'item, Iter>
     where
         Iter: Iterator<Item: Ref<Type: SparseHierarchy>>,
@@ -226,6 +226,11 @@ mod data_resolve_v2 {
             self.items.size_hint()
         }
     }
+    
+    impl<'item, Iter> ExactSizeIterator for ResolveIter<'item, Iter>
+    where
+        Iter: Iterator<Item: Ref<Type: SparseHierarchy>>
+    {}
 }
 
 /*mod data_resolve_v3 {
@@ -258,25 +263,30 @@ mod data_resolve_v2 {
 }
 */
 
-/*struct ResolveIterUnchecked<'a, Iter> {
+pub struct ResolveIterUnchecked<Iter> 
+where
+    Iter: Iterator<Item: Ref<Type: SparseHierarchy>>,
+{
     index: usize, 
-    level_indices: &'a [usize],
+    // This is copy from level_indices &[usize]. 
+    // Compiler optimize away the very act of cloning and directly use &[usize].
+    // At least, if value used immediately, and not stored for latter use. 
+    level_indices: ConstArrayType<usize, <IterItem<Iter> as SparseHierarchy>::LevelCount>,
     iter: Iter,
 }
-impl<'a, Iter> Iterator for ResolveIterUnchecked<'a, Iter>
+impl<'item, Iter, T> Iterator for ResolveIterUnchecked<Iter>
 where
-    Iter: Iterator<Item: Borrowable<Borrowed: SparseHierarchy>> + 'a,
+    Iter: Iterator<Item = &'item T> + Clone,
+    T: SparseHierarchy + 'item,
 {
-    type Item = <IterItem<Iter> as SparseHierarchyTypes<'a>>::Data;
+    type Item = <IterItem<Iter> as SparseHierarchyTypes<'item>>::DataUnchecked;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
             .next()
             .map(|array| unsafe {
-                // TODO: reuse as fn?
-                let array = NonNull::from(array.borrow()); // drop borrow lifetime
-                array.as_ref().data_unchecked(self.index, self.level_indices)
+                array.data_unchecked(self.index, self.level_indices.as_ref())
             })
     }
 
@@ -287,8 +297,7 @@ where
         F: FnMut(B, Self::Item) -> B,
     {
         self.iter.fold(init, |init, array| unsafe {
-            let array = NonNull::from(array.borrow()); // drop borrow lifetime
-            let data = array.as_ref().data_unchecked(self.index, self.level_indices);
+            let data = array.data_unchecked(self.index, self.level_indices.as_ref());
             f(init, data)
         })
     }
@@ -297,7 +306,13 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.iter.size_hint()
     }
-}*/
+}
+
+impl<'item, Iter, T> ExactSizeIterator for ResolveIterUnchecked<Iter>
+where
+    Iter: Iterator<Item = &'item T> + Clone,
+    T: SparseHierarchy + 'item,
+{}
 
 const N: usize = 32;
 type StatesItem<'item, Iter> = <IterItem<Iter> as SparseHierarchyTypes<'item>>::State;
@@ -323,7 +338,6 @@ where
 
 impl<'src, 'item, Iter, T> SparseHierarchyState<'src> for MultiIntersectionState<'src, 'item, Iter>
 where
-    //Iter: Iterator<Item: Ref<Type: SparseHierarchy>> + Clone
     Iter: Iterator<Item = &'item T> + Clone,
     T: SparseHierarchy + 'item
 {
@@ -566,19 +580,12 @@ mod tests{
             println!("{:?}", values);
         }
         
-        /*let v: Vec<_> = intersection.iter().map(|(index, items)| (index, items.collect::<Vec<_>>()) ).collect();
-        assert_equal(v, [
-            (15, vec![arrays[0].get(15).unwrap(), arrays[1].get(15).unwrap(), arrays[2].get(15).unwrap()] ),
-        ]);*/
-        
-        //assert_equal(intersection.iter(), [(15, 45)]);
-        //assert_eq!(unsafe{ intersection.get_unchecked(15) }, 45);
-        
         assert_equal( 
             intersection.get(15).unwrap(),
             vec![arrays[0].get(15).unwrap(), arrays[1].get(15).unwrap(), arrays[2].get(15).unwrap()]
         );
         assert!( intersection.get(200).is_none() );
+        assert_equal(unsafe{ intersection.get_unchecked(15) }, intersection.get(15).unwrap());
     }
 
 }

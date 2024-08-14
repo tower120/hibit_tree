@@ -310,6 +310,7 @@ where
     ConstUsize<DEPTH>: ConstInteger
 {
     type Data = &'a T;
+    type DataUnchecked = &'a T;
     type State = State<'a, T, DEPTH>;    
 }
 

@@ -20,3 +20,14 @@ pub trait Ref {
 impl<T> Ref for &T {
     type Type = T;
 }
+
+/// Trait for &'a
+pub trait RefLt<'a>: Ref {
+    fn get_ref(self) -> &'a Self::Type;
+}
+
+impl<'a, T> RefLt<'a> for &'a T {
+    fn get_ref(self) -> &'a Self::Type{
+        self
+    }
+}

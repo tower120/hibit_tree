@@ -23,6 +23,12 @@ where
         <S0::Borrowed as SparseHierarchyTypes<'this>>::Data,
         <S1::Borrowed as SparseHierarchyTypes<'this>>::Data
     );
+    
+    type DataUnchecked = (
+        <S0::Borrowed as SparseHierarchyTypes<'this>>::DataUnchecked,
+        <S1::Borrowed as SparseHierarchyTypes<'this>>::DataUnchecked
+    );
+    
     type State = State<'this, S0, S1>;
 }
 
@@ -53,7 +59,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
-        -> <Self as SparseHierarchyTypes<'_>>::Data 
+        -> <Self as SparseHierarchyTypes<'_>>::DataUnchecked
     {
         let d0 = self.s0.borrow().data_unchecked(index, level_indices);
         let d1 = self.s1.borrow().data_unchecked(index, level_indices);

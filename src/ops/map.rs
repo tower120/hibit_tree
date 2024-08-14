@@ -38,6 +38,7 @@ where
     F: for<'a> MapFunction<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data> 
 {
     type Data = <F as MapFunction<'this, <S::Borrowed as SparseHierarchyTypes<'this>>::Data>>::Output;
+    type DataUnchecked = Self::Data;
     type State = State<'this, S, F>;
 }
 
@@ -65,7 +66,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
-        -> <Self as SparseHierarchyTypes<'_>>::Data 
+        -> <Self as SparseHierarchyTypes<'_>>::DataUnchecked 
     {
         let data = self.s.borrow().data_unchecked(index, level_indices);
         self.f.exec(data)
