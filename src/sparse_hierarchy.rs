@@ -202,7 +202,7 @@ where
 pub trait LazySparseHierarchy: SparseHierarchy {
     /// Make a concrete collection from a lazy/virtual one.
     #[inline]
-    fn materialize<T>(&self) -> T
+    fn materialize<T>(self) -> T
     where
         T: FromSparseHierarchy<Self>
     {
@@ -212,7 +212,7 @@ pub trait LazySparseHierarchy: SparseHierarchy {
 
 /// Construct a [SparseHierarchy] collection from any [SparseHierarchy].
 pub trait FromSparseHierarchy<From: SparseHierarchy> {
-    fn from_sparse_hierarchy(from: &From) -> Self;
+    fn from_sparse_hierarchy(from: From) -> Self;
 }
 
 pub trait SparseHierarchyStateTypes<'this, ImplicitBounds = &'this Self>{

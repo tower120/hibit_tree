@@ -152,8 +152,8 @@ where
         >,
     >,    
 {
-    fn from_sparse_hierarchy(other: &From) -> Self {
-        let mut other_state = <From as SparseHierarchyTypes>::State::new(other);        
+    fn from_sparse_hierarchy(other: From) -> Self {
+        let mut other_state = <From as SparseHierarchyTypes>::State::new(&other);        
         let mut data: Vec<T> = Vec::with_capacity(1);
         unsafe{ data.set_len(1); }
         
@@ -169,11 +169,11 @@ where
         let root = unsafe {
             if <From as SparseHierarchy>::EXACT_HIERARCHY {
                 from_exact_sparse_hierarchy(
-                    other, &mut other_state, ConstUsize::<0>, 0, 0, &mut push_fn
+                    &other, &mut other_state, ConstUsize::<0>, 0, 0, &mut push_fn
                 )
             } else {
                 from_sparse_hierarchy(
-                    other, &mut other_state, ConstUsize::<0>, 0, 0, &mut push_fn
+                    &other, &mut other_state, ConstUsize::<0>, 0, 0, &mut push_fn
                 ).unwrap_unchecked()
             }
         };
