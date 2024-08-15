@@ -196,11 +196,10 @@ where
 }
 
 
-// TODO: materialize can actually work with non-monolithic too.
 /// [SparseHierarchy] that is not a concrete collection.
 /// 
 /// Most results of operations are.
-pub trait LazySparseHierarchy: MonoSparseHierarchy {
+pub trait LazySparseHierarchy: SparseHierarchy {
     /// Make a concrete collection from a lazy/virtual one.
     #[inline]
     fn materialize<T>(&self) -> T
@@ -212,7 +211,7 @@ pub trait LazySparseHierarchy: MonoSparseHierarchy {
 }
 
 /// Construct a [SparseHierarchy] collection from any [SparseHierarchy].
-pub trait FromSparseHierarchy<From: MonoSparseHierarchy> {
+pub trait FromSparseHierarchy<From: SparseHierarchy> {
     fn from_sparse_hierarchy(from: &From) -> Self;
 }
 

@@ -58,6 +58,7 @@ pub type _64x6 = w64::d6;
 pub type _64x7 = w64::d7;
 pub type _64x8 = w64::d8;*/
 
+/*
 /// Hierarchy, with blocks that use SBO[^sbo] for child array.
 ///
 /// Approximately x2 slower[^slower] then full-sized blocks, but almost x10 smaller.  
@@ -114,3 +115,4 @@ pub(crate) mod sbo {
         );
     }
 }
+*/
