@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use crate::{MultiSparseHierarchy, MultiSparseHierarchyTypes, SparseHierarchy, SparseHierarchyState, SparseHierarchyStateTypes, SparseHierarchyTypes};
+use crate::{LazySparseHierarchy, MultiSparseHierarchy, MultiSparseHierarchyTypes, SparseHierarchy, SparseHierarchyState, SparseHierarchyStateTypes, SparseHierarchyTypes};
 use crate::const_utils::ConstInteger;
 use crate::utils::{BinaryFunction, Borrowable, NullaryFunction, UnaryFunction};
 
@@ -135,6 +135,18 @@ where
 }
 
 impl<S, I, F> Borrowable for MultiFold<S, I, F>{ type Borrowed = Self; }
+
+impl<S, I, F> LazySparseHierarchy for MultiFold<S, I, F>
+where 
+    MultiFold<S, I, F>: SparseHierarchy,
+    /*S: MultiSparseHierarchy,
+    I: NullaryFunction,
+    F: for<'a> BinaryFunction<
+        I::Output, 
+        <S as MultiSparseHierarchyTypes<'a>>::IterItem,
+        Output = I::Output
+    >,*/
+{}
 
 #[inline]
 pub fn multi_fold<S, I, F>(s: S, init: I, f: F) -> MultiFold<S, I, F>

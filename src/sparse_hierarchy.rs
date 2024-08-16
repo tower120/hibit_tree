@@ -1,11 +1,12 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::RangeTo;
-use crate::BitBlock;
+use crate::{multi_fold, BitBlock};
 use crate::const_utils::{ConstArray, ConstInteger};
 use crate::iter::Iter;
 use crate::level_indices;
-use crate::utils::{Borrowable, Take};
+use crate::ops::MultiFold;
+use crate::utils::{BinaryFunction, Borrowable, NullaryFunction, Take};
 
 // Should be just <const WIDTH: usize, const DEPTH: usize>, but RUST not yet
 // support that for our case.
@@ -318,7 +319,7 @@ where
     >
 {} 
 
-// TODO: impl manually.
+// TODO: impl manually?
 impl<T> MonoSparseHierarchy for T
 where
     T: SparseHierarchy,
@@ -347,4 +348,18 @@ pub trait MultiSparseHierarchyTypes<'this, ImplicitBounds = &'this Self>
 pub trait MultiSparseHierarchy: SparseHierarchy
 where
     Self: for<'this> MultiSparseHierarchyTypes<'this>
-{}
+{
+    // TODO: map_fold?
+    #[inline]
+    fn fold<I, F>(self, init: I, f: F) -> MultiFold<Self, I, F>
+    where 
+        I: NullaryFunction,
+        F: for<'a> BinaryFunction<
+            I::Output, 
+            <Self as MultiSparseHierarchyTypes<'a>>::IterItem,
+            Output = I::Output
+        >,    
+    {
+        multi_fold(self, init, f)
+    }
+}

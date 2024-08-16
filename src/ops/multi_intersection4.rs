@@ -528,10 +528,10 @@ where
     T: MonoSparseHierarchy + 'item
 {} 
 
-/*impl<Iter> LazySparseHierarchy for MultiIntersection<Iter>
+impl<Iter> LazySparseHierarchy for MultiIntersection<Iter>
 where
     MultiIntersection<Iter>: SparseHierarchy
-{}*/
+{}
 
 impl<Iter> Borrowable for MultiIntersection<Iter>{ type Borrowed = Self; }
 
