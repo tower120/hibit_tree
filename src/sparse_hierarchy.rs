@@ -252,7 +252,7 @@ where
 {
     type Src: SparseHierarchy;
     
-    fn new(this: &'src Self::Src) -> Self;
+    fn new(src: &'src Self::Src) -> Self;
     
     /// Item at index may not exist. Will return empty mask in such case.
     unsafe fn select_level_node<N: ConstInteger>(

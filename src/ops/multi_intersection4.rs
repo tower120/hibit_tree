@@ -17,6 +17,7 @@ pub struct MultiIntersection<Iter> {
 }
 
 type IterItem<Iter> = <<Iter as Iterator>::Item as Ref>::Type;
+type IterItemState<'item, Iter> = <IterItem<Iter> as SparseHierarchyTypes<'item>>::State;
 
 impl<'item, 'this, Iter, T> SparseHierarchyTypes<'this> for MultiIntersection<Iter>
 where
@@ -315,7 +316,7 @@ where
 {}
 
 const N: usize = 32;
-type StatesItem<'item, Iter> = <IterItem<Iter> as SparseHierarchyTypes<'item>>::State;
+type StatesItem<'item, Iter> = IterItemState<'item, Iter>; 
 
 // TODO: rename to State
 pub struct MultiIntersectionState<'src, 'item, I>
@@ -472,7 +473,7 @@ where
     I: Iterator<Item = &'item T> + Clone,
     T: SparseHierarchy + 'item
 {
-    type Item = <StatesItem<'item, I> as SparseHierarchyStateTypes<'state>>::Data;
+    type Item = <IterItemState<'item, I> as SparseHierarchyStateTypes<'state>>::Data;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
