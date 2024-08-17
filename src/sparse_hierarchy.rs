@@ -286,7 +286,7 @@ where
 }
 
 pub type SparseHierarchyData<'a, T> = <T as SparseHierarchyTypes<'a>>::Data;
-pub type SparseHierarchyDataUnchecked<'a, T> = <T as SparseHierarchyTypes<'a>>::DataUnchecked;
+pub type MultiSparseHierarchyIterItem<'a, T> = <T as MultiSparseHierarchyTypes<'a>>::IterItem;
 
 pub trait MonoSparseHierarchyTypes<'this, ImplicitBounds = &'this Self>
     : SparseHierarchyTypes<'this, ImplicitBounds,

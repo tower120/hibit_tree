@@ -2,8 +2,7 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::slice;
 use arrayvec::ArrayVec;
-use rand::distributions::uniform::SampleBorrow;
-use crate::{BitBlock, SparseHierarchy, SparseHierarchyState, SparseHierarchyStateTypes, SparseHierarchyTypes};
+use crate::{BitBlock, LazySparseHierarchy, MonoSparseHierarchy, MultiSparseHierarchy, MultiSparseHierarchyTypes, SparseHierarchy, SparseHierarchyData, SparseHierarchyState, SparseHierarchyStateTypes, SparseHierarchyTypes};
 use crate::const_utils::{ConstArrayType, ConstInteger};
 use crate::utils::{Array, Borrowable, Ref};
 
@@ -19,8 +18,8 @@ where
     Iter: Iterator<Item = &'item T> + Clone,
     T: SparseHierarchy + 'item
 {
-    type Data  = /*ResolveIter<'item, Iter>*/();
-    type DataUnchecked = /*ResolveIterUnchecked<Iter>*/();
+    type Data  = DataIter<'item, Iter>;
+    type DataUnchecked = DataUncheckedIter<Iter>;
     type State = MultiUnionState<'this, 'item, Iter>;
 }
 
@@ -34,12 +33,86 @@ where
     type LevelCount = T::LevelCount;
     type LevelMask  = T::LevelMask;
 
-    unsafe fn data(&self, index: usize, level_indices: &[usize]) -> Option<<Self as SparseHierarchyTypes<'_>>::Data> {
-        todo!()
+    #[inline]
+    unsafe fn data(&self, index: usize, level_indices: &[usize]) 
+        -> Option<<Self as SparseHierarchyTypes<'_>>::Data> 
+    {
+        // Gather items - then return as iter.
+        let mut datas: ArrayVec<_, N> = Default::default();
+        for array in self.iter.clone(){
+            let array = NonNull::from(array.borrow()); // drop borrow lifetime
+            let data = unsafe{ array.as_ref().data(index, level_indices) };
+            if let Some(data) = data {
+                datas.push(data);
+            }
+        }
+        if datas.is_empty(){
+            return None;
+        }
+        
+        Some(datas.into_iter())
     }
 
-    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) -> <Self as SparseHierarchyTypes<'_>>::DataUnchecked {
-        todo!()
+    #[inline]
+    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize])
+        -> <Self as SparseHierarchyTypes<'_>>::DataUnchecked 
+    {
+        DataUncheckedIter {
+            iter: self.iter.clone(),
+            index,
+            level_indices: Array::from_fn(|i| unsafe{ *level_indices.get_unchecked(i) }),
+        }
+    }
+}
+
+pub type DataIter<'item, Iter> = arrayvec::IntoIter<<IterItem<Iter> as SparseHierarchyTypes<'item>>::Data, N>;
+
+pub struct DataUncheckedIter<Iter>
+where
+    Iter: Iterator<Item: Ref<Type: SparseHierarchy>>,
+{
+    iter: Iter,
+    index: usize, 
+    // This is copy from level_indices &[usize]. 
+    // Compiler optimize away the very act of cloning and directly use &[usize].
+    // At least, if value used immediately, and not stored for latter use. 
+    level_indices: ConstArrayType<usize, <IterItem<Iter> as SparseHierarchy>::LevelCount>,
+}
+impl<'item, Iter, T> Iterator for DataUncheckedIter<Iter>
+where
+    Iter: Iterator<Item = &'item T> + Clone,
+    T: SparseHierarchy + 'item,
+{
+    type Item = </*IterItem<Iter>*/T as SparseHierarchyTypes<'item>>::Data;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.find_map(|array|{
+            unsafe{
+                array.data(self.index, self.level_indices.as_ref())
+            }
+        })
+    }
+
+    #[inline]
+    fn fold<B, F>(self, mut init: B, mut f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        for array in self.iter {
+            unsafe{
+                if let Some(item) = array.data(self.index, self.level_indices.as_ref()){
+                    init = f(init, item)    
+                }
+            }
+        }
+        init
+    }
+    
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, self.iter.size_hint().1)
     }
 }
 
@@ -229,6 +302,25 @@ where
     }
 }
 
+impl<Iter> LazySparseHierarchy for MultiUnion<Iter>
+where
+    MultiUnion<Iter>: SparseHierarchy
+{}
+
+impl<'item, 'this, Iter, T> MultiSparseHierarchyTypes<'this> for MultiUnion<Iter>
+where
+    Iter: Iterator<Item = &'item T> + Clone,
+    T: MonoSparseHierarchy + 'item
+{ 
+    type IterItem = SparseHierarchyData<'item, T>; 
+}
+
+impl<'item, Iter, T> MultiSparseHierarchy for MultiUnion<Iter>
+where
+    Iter: Iterator<Item = &'item T> + Clone,
+    T: MonoSparseHierarchy + 'item
+{}
+
 impl<Iter> Borrowable for MultiUnion<Iter>{ type Borrowed = Self; }
 
 #[inline]
@@ -292,11 +384,21 @@ mod tests{
             ],
             vec![arrays[2].get(300).unwrap()],
         ]);
+
+        assert_equal( 
+            union.get(10).unwrap(),
+            vec![arrays[0].get(10).unwrap()]
+        );
         
-        /*assert_eq!(unsafe{union.get_unchecked(10)}, 10);
-        assert_eq!(unsafe{union.get_unchecked(15)}, 45);
-        assert_eq!(unsafe{union.get(15)}, Some(45));
-        assert_eq!(unsafe{union.get(25)}, None);*/
+        assert_equal( 
+            union.get(15).unwrap(),
+            vec![arrays[0].get(15).unwrap(), arrays[1].get(15).unwrap(), arrays[2].get(15).unwrap()]
+        );
+        
+        assert!(union.get(25).is_none());
+        
+        assert_equal(unsafe{ union.get_unchecked(10) }, union.get(10).unwrap());
+        assert_equal(unsafe{ union.get_unchecked(15) }, union.get(15).unwrap());
     }
 
 }

@@ -111,10 +111,8 @@ where
                     return None;
                 }
             }
-            let resolve = ResolveIter {
-                items: datas.into_iter()
-            };
-            Some(resolve)
+            
+            Some(datas.into_iter())
         }
 
         // Variant 3 implementation.
@@ -153,7 +151,9 @@ where
     }
 }
 
-use data_resolve_v2::ResolveIter;
+type ResolveIter<'item, Iter> = arrayvec::IntoIter<<IterItem<Iter> as SparseHierarchyTypes<'item>>::Data, N>; 
+
+/*use data_resolve_v2::ResolveIter;
 
 /*mod data_resolve_v1 {
     use super::*;
@@ -232,7 +232,7 @@ mod data_resolve_v2 {
     where
         Iter: Iterator<Item: Ref<Type: SparseHierarchy>>
     {}
-}
+}*/
 
 /*mod data_resolve_v3 {
     use super::*;
@@ -280,7 +280,7 @@ where
     Iter: Iterator<Item = &'item T> + Clone,
     T: SparseHierarchy + 'item,
 {
-    type Item = <IterItem<Iter> as SparseHierarchyTypes<'item>>::DataUnchecked;
+    type Item = </*IterItem<Iter>*/T as SparseHierarchyTypes<'item>>::DataUnchecked;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

@@ -6,7 +6,7 @@ pub(crate) mod multi_intersection2;*/
 //pub(crate) mod multi_intersection3;
 pub(crate) mod multi_intersection4;
 pub(crate) mod multi_fold;
-mod multi_union4;
+pub(crate) mod multi_union4;
 // TODO: hide. dev only
 //pub mod multi_intersection_fold;
 
@@ -17,4 +17,5 @@ pub use intersection::Intersection;
 pub use multi_intersection2::{MultiIntersection, MultiIntersectionResolveIter};
 pub use multi_union3::{MultiUnion, MultiUnionResolveIter};*/
 
-pub use multi_intersection4::{MultiIntersection, StateResolveIter};
+pub use multi_intersection4::{MultiIntersection/*, StateResolveIter*/};
+pub use multi_union4::{MultiUnion};
