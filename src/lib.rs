@@ -112,7 +112,7 @@ pub use ops::intersection::intersection;
 /*pub use ops::union::union;
 pub use ops::multi_union3::multi_union;
 pub use ops::multi_intersection2::multi_intersection;*/
-pub use ops::multi_intersection4::multi_intersection;
+pub use ops::_multi_intersection4::multi_intersection;
 pub use ops::_multi_union4::multi_union;
 
 use std::borrow::Borrow;

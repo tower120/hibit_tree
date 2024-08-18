@@ -11,7 +11,7 @@ use crate::utils::{Array, Borrowable, Ref, Take};
 
 /// Intersection between all iterator items.
 ///
-/// All returned iterators are [ExactSizeIterator]. 
+/// All data iterators are [ExactSizeIterator]. 
 pub struct MultiIntersection<Iter> {
     iter: Iter,
 }
@@ -24,9 +24,9 @@ where
     Iter: Iterator<Item = &'item T> + Clone,
     T: SparseHierarchy + 'item
 {
-    type Data  = ResolveIter<'item, Iter>;
-    type DataUnchecked = ResolveIterUnchecked<Iter>;
-    type State = MultiIntersectionState<'this, 'item, Iter>;
+    type Data  = Data<'item, Iter>;
+    type DataUnchecked = DataUnchecked<Iter>;
+    type State = State<'this, 'item, Iter>;
 }
 
 impl<'i, Iter, T> SparseHierarchy for MultiIntersection<Iter>
@@ -143,7 +143,7 @@ where
     unsafe fn data_unchecked<'a>(&'a self, index: usize, level_indices: &'a [usize]) 
         -> <Self as SparseHierarchyTypes<'a>>::DataUnchecked
     {
-        ResolveIterUnchecked {
+        DataUnchecked {
             index, 
             level_indices: Array::from_fn(|i| unsafe{ *level_indices.get_unchecked(i) }), 
             iter: self.iter.clone(),
@@ -151,7 +151,7 @@ where
     }
 }
 
-type ResolveIter<'item, Iter> = arrayvec::IntoIter<<IterItem<Iter> as SparseHierarchyTypes<'item>>::Data, N>; 
+pub type Data<'item, Iter> = arrayvec::IntoIter<<IterItem<Iter> as SparseHierarchyTypes<'item>>::Data, N>; 
 
 /*use data_resolve_v2::ResolveIter;
 
@@ -264,7 +264,7 @@ mod data_resolve_v2 {
 }
 */
 
-pub struct ResolveIterUnchecked<Iter> 
+pub struct DataUnchecked<Iter> 
 where
     Iter: Iterator<Item: Ref<Type: SparseHierarchy>>,
 {
@@ -275,7 +275,7 @@ where
     level_indices: ConstArrayType<usize, <IterItem<Iter> as SparseHierarchy>::LevelCount>,
     iter: Iter,
 }
-impl<'item, Iter, T> Iterator for ResolveIterUnchecked<Iter>
+impl<'item, Iter, T> Iterator for DataUnchecked<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
     T: SparseHierarchy + 'item,
@@ -309,7 +309,7 @@ where
     }
 }
 
-impl<'item, Iter, T> ExactSizeIterator for ResolveIterUnchecked<Iter>
+impl<'item, Iter, T> ExactSizeIterator for DataUnchecked<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
     T: SparseHierarchy + 'item,
@@ -318,8 +318,7 @@ where
 const N: usize = 32;
 type StatesItem<'item, Iter> = IterItemState<'item, Iter>; 
 
-// TODO: rename to State
-pub struct MultiIntersectionState<'src, 'item, I>
+pub struct State<'src, 'item, I>
 where
     I: Iterator<Item: Ref<Type: SparseHierarchy>>
 {
@@ -329,15 +328,14 @@ where
     phantom_data: PhantomData<(&'src MultiIntersection<I>)>
 }
 
-
-impl<'this, 'src, 'item, Iter> SparseHierarchyStateTypes<'this> for MultiIntersectionState<'src, 'item, Iter>
+impl<'this, 'src, 'item, Iter> SparseHierarchyStateTypes<'this> for State<'src, 'item, Iter>
 where
     Iter: Iterator<Item: Ref<Type: SparseHierarchy>>
 {
-    type Data = StateResolveIter<'this, 'item, Iter>;
+    type Data = StateData<'this, 'item, Iter>;
 }
 
-impl<'src, 'item, Iter, T> SparseHierarchyState<'src> for MultiIntersectionState<'src, 'item, Iter>
+impl<'src, 'item, Iter, T> SparseHierarchyState<'src> for State<'src, 'item, Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
     T: SparseHierarchy + 'item
@@ -444,7 +442,7 @@ where
     unsafe fn data_unchecked<'a>(
         &'a self, src: &'src Self::Src, level_index: usize
     ) -> <Self as SparseHierarchyStateTypes<'a>>::Data {
-        StateResolveIter { 
+        StateData { 
             level_index,
             array_iter: src.iter.clone(),
             states_iter: self.states.iter(),
@@ -452,9 +450,7 @@ where
     }
 }
 
-// TODO: rename
-// States slice to Data iterator adapter.
-pub struct StateResolveIter<'state, 'item, I>
+pub struct StateData<'state, 'item, I>
 where
     I: Iterator<Item: Ref<Type: SparseHierarchy>>
 {
@@ -468,7 +464,7 @@ where
 /// Prefer using [fold]-based[^1] operations over [next]-ing.
 ///
 /// [^1]: Such as [for_each], [sum], etc... 
-impl<'state, 'item, I, T> Iterator for StateResolveIter<'state, 'item, I>
+impl<'state, 'item, I, T> Iterator for StateData<'state, 'item, I>
 where
     I: Iterator<Item = &'item T> + Clone,
     T: SparseHierarchy + 'item
@@ -509,7 +505,7 @@ where
     }
 }
 
-impl<'state, 'item, I, T> ExactSizeIterator for StateResolveIter<'state, 'item, I>
+impl<'state, 'item, I, T> ExactSizeIterator for StateData<'state, 'item, I>
 where
     I: Iterator<Item = &'item T> + Clone,
     T: SparseHierarchy + 'item

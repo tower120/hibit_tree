@@ -18,8 +18,8 @@ where
     Iter: Iterator<Item = &'item T> + Clone,
     T: SparseHierarchy + 'item
 {
-    type Data  = DataIter<'item, Iter>;
-    type DataUnchecked = DataUncheckedIter<Iter>;
+    type Data  = Data<'item, Iter>;
+    type DataUnchecked = DataUnchecked<Iter>;
     type State = State<'this, 'item, Iter>;
 }
 
@@ -57,7 +57,7 @@ where
     unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize])
         -> <Self as SparseHierarchyTypes<'_>>::DataUnchecked 
     {
-        DataUncheckedIter {
+        DataUnchecked {
             iter: self.iter.clone(),
             index,
             level_indices: Array::from_fn(|i| unsafe{ *level_indices.get_unchecked(i) }),
@@ -65,9 +65,9 @@ where
     }
 }
 
-pub type DataIter<'item, Iter> = arrayvec::IntoIter<<IterItem<Iter> as SparseHierarchyTypes<'item>>::Data, N>;
+pub type Data<'item, Iter> = arrayvec::IntoIter<<IterItem<Iter> as SparseHierarchyTypes<'item>>::Data, N>;
 
-pub struct DataUncheckedIter<Iter>
+pub struct DataUnchecked<Iter>
 where
     Iter: Iterator<Item: Ref<Type: SparseHierarchy>>,
 {
@@ -78,7 +78,7 @@ where
     // At least, if value used immediately, and not stored for latter use. 
     level_indices: ConstArrayType<usize, <IterItem<Iter> as SparseHierarchy>::LevelCount>,
 }
-impl<'item, Iter, T> Iterator for DataUncheckedIter<Iter>
+impl<'item, Iter, T> Iterator for DataUnchecked<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
     T: SparseHierarchy + 'item,
@@ -141,7 +141,7 @@ impl<'this, 'src, 'item, Iter> SparseHierarchyStateTypes<'this> for State<'src, 
 where
     Iter: Iterator<Item: Ref<Type: SparseHierarchy>> + Clone
 {
-    type Data = StateDataIter<'this, 'item, Iter>;
+    type Data = StateData<'this, 'item, Iter>;
 }
 
 impl<'src, 'item, Iter, T> SparseHierarchyState<'src> for State<'src, 'item, Iter>
@@ -235,7 +235,7 @@ where
             return None;
         }
         
-        Some(StateDataIter {
+        Some(StateData {
             lvl_non_empty_states: lvl_non_empty_states.iter(),
             states: &self.states,
             level_index,
@@ -250,7 +250,7 @@ where
     }
 }
 
-pub struct StateDataIter<'state, 'item, I>
+pub struct StateData<'state, 'item, I>
 where
     I: Iterator<Item: Ref<Type: SparseHierarchy>>
 {
@@ -259,7 +259,7 @@ where
     level_index: usize,
 }
 
-impl<'state, 'item, I, T> Iterator for StateDataIter<'state, 'item, I>
+impl<'state, 'item, I, T> Iterator for StateData<'state, 'item, I>
 where
     I: Iterator<Item = &'item T> + Clone,
     T: SparseHierarchy + 'item
