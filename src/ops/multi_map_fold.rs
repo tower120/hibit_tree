@@ -3,13 +3,13 @@ use crate::{LazySparseHierarchy, MultiSparseHierarchy, MultiSparseHierarchyTypes
 use crate::const_utils::ConstInteger;
 use crate::utils::{BinaryFunction, Borrowable, NullaryFunction, UnaryFunction};
 
-pub struct MultiFold<S, I, F>{
+pub struct MultiMapFold<S, I, F>{
     s: S,
     init: I,
     f: F
 }
 
-impl<'this, S, I, F> SparseHierarchyTypes<'this> for MultiFold<S, I, F>
+impl<'this, S, I, F> SparseHierarchyTypes<'this> for MultiMapFold<S, I, F>
 where
     S: MultiSparseHierarchy,
     I: NullaryFunction,
@@ -24,7 +24,7 @@ where
     type State = State<'this, S, I, F>;
 }
 
-impl<S, I, F> SparseHierarchy for MultiFold<S, I, F>
+impl<S, I, F> SparseHierarchy for MultiMapFold<S, I, F>
 where
     S: MultiSparseHierarchy,
     I: NullaryFunction,
@@ -64,7 +64,7 @@ where
 
 pub struct State<'src, S, I, F> (
     <S as SparseHierarchyTypes<'src>>::State,
-    PhantomData<&'src MultiFold<S, I, F>>
+    PhantomData<&'src MultiMapFold<S, I, F>>
 ) where
     S: SparseHierarchy;
 
@@ -86,7 +86,7 @@ where
         Output = I::Output
     >,
 {
-    type Src = MultiFold<S, I, F>;
+    type Src = MultiMapFold<S, I, F>;
 
     #[inline]
     fn new(this: &'src Self::Src) -> Self {
@@ -134,11 +134,11 @@ where
     }
 }
 
-impl<S, I, F> Borrowable for MultiFold<S, I, F>{ type Borrowed = Self; }
+impl<S, I, F> Borrowable for MultiMapFold<S, I, F>{ type Borrowed = Self; }
 
-impl<S, I, F> LazySparseHierarchy for MultiFold<S, I, F>
-where 
-    MultiFold<S, I, F>: SparseHierarchy,
+impl<S, I, F> LazySparseHierarchy for MultiMapFold<S, I, F>
+where
+    MultiMapFold<S, I, F>: SparseHierarchy,
     /*S: MultiSparseHierarchy,
     I: NullaryFunction,
     F: for<'a> BinaryFunction<
@@ -149,7 +149,7 @@ where
 {}
 
 #[inline]
-pub fn multi_fold<S, I, F>(s: S, init: I, f: F) -> MultiFold<S, I, F>
+pub fn multi_map_fold<S, I, F>(s: S, init: I, f: F) -> MultiMapFold<S, I, F>
 where 
     S: MultiSparseHierarchy,
     I: NullaryFunction,
@@ -159,7 +159,7 @@ where
         Output = I::Output
     >,
 {
-    MultiFold{s, init, f}   
+    MultiMapFold {s, init, f}   
 }
 
 #[cfg(test)]
@@ -187,7 +187,7 @@ mod tests{
         
         let arrays = vec![a1, a2, a3];
         let intersect = multi_intersection(arrays.iter());
-        let intersect = multi_fold(intersect, ||0, |a, v| a+v );
+        let intersect = multi_map_fold(intersect, ||0, |a, v| a+v );
         assert_eq!(intersect.get(10), None);
         assert_eq!(intersect.get(15), Some(45));
         assert_eq!(intersect.get(30), None);

@@ -1,11 +1,11 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::RangeTo;
-use crate::{multi_fold, BitBlock};
+use crate::{multi_map_fold, BitBlock};
 use crate::const_utils::{ConstArray, ConstInteger};
 use crate::iter::Iter;
 use crate::level_indices;
-use crate::ops::MultiFold;
+use crate::ops::{Map, MapFunction, MultiMapFold};
 use crate::utils::{BinaryFunction, Borrowable, NullaryFunction, Take};
 
 // Should be just <const WIDTH: usize, const DEPTH: usize>, but RUST not yet
@@ -100,7 +100,7 @@ pub trait SparseHierarchyTypes<'this, ImplicitBounds = &'this Self>{
 /// and [iter()] - all get source data from different functions, and also
 /// process it in different ways. Alternative to this would be collect all items
 /// into intermediate container, and then return it to the user. That is what
-/// [multi_fold] do - aggregates iterator into one value, and thus makes 
+/// [multi_map_fold] do - aggregates iterator into one value, and thus makes 
 /// [MultiSparseHierarchy] Mono again(!).
 ///
 /// # SparseHierarchyTypes
@@ -307,7 +307,23 @@ pub trait MonoSparseHierarchyTypes<'this, ImplicitBounds = &'this Self>
 pub trait MonoSparseHierarchy: SparseHierarchy
 where
     Self: for<'this> MonoSparseHierarchyTypes<'this>
-{}
+{
+    #[inline]
+    fn map<F>(self, f: F) -> Map<Self, F>
+    where
+        F: for<'a> MapFunction<'a, <Self as SparseHierarchyTypes<'a>>::Data>
+    {
+        crate::map(self, f)
+    }
+    
+    #[inline]
+    fn map_ref<F>(&self, f: F) -> Map<&Self, F>
+    where
+        F: for<'a> MapFunction<'a, <Self as SparseHierarchyTypes<'a>>::Data>
+    {
+        crate::map(self, f)
+    }
+}
 
 impl<'this, T> MonoSparseHierarchyTypes<'this> for T
 where
@@ -344,14 +360,13 @@ pub trait MultiSparseHierarchyTypes<'this, ImplicitBounds = &'this Self>
 /// `multi_*` operations return [MultiSparseHierarchy]'ies.
 /// 
 /// You can convert MultiSparseHierarchy to [MonoSparseHierarchy],
-/// with [multi_fold()]. 
+/// with [multi_map_fold()]. 
 pub trait MultiSparseHierarchy: SparseHierarchy
 where
     Self: for<'this> MultiSparseHierarchyTypes<'this>
 {
-    // TODO: map_fold?
     #[inline]
-    fn fold<I, F>(self, init: I, f: F) -> MultiFold<Self, I, F>
+    fn map_fold<I, F>(self, init: I, f: F) -> MultiMapFold<Self, I, F>
     where 
         I: NullaryFunction,
         F: for<'a> BinaryFunction<
@@ -360,6 +375,6 @@ where
             Output = I::Output
         >,    
     {
-        multi_fold(self, init, f)
+        multi_map_fold(self, init, f)
     }
 }

@@ -107,11 +107,11 @@ pub use compact_sparse_array::CompactSparseArray;
 pub use sparse_hierarchy::*;
 pub use iter::*;
 pub use ops::map::map;
-pub use ops::multi_fold::multi_fold;
+pub use ops::multi_map_fold::multi_map_fold;
 pub use ops::intersection::intersection;
 pub use ops::union::union;
-pub use ops::_multi_intersection4::multi_intersection;
-pub use ops::_multi_union4::multi_union;
+pub use ops::_multi_intersection::multi_intersection;
+pub use ops::_multi_union::multi_union;
 
 use std::borrow::Borrow;
 use std::ops::BitAnd;
