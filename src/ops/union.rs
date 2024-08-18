@@ -4,172 +4,127 @@ use std::hint::unreachable_unchecked;
 use std::ops::{BitAnd, BitOr};
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
-use crate::{BitBlock, LazySparseHierarchy};
+use crate::{BitBlock, LazySparseHierarchy, SparseHierarchyStateTypes, SparseHierarchyTypes};
 use crate::bit_queue::BitQueue;
 use crate::utils::{Array, Borrowable, Take};
 
-/*// Not used now
-trait OptionBorrow<T>{
-    fn option_borrow(&self) -> Option<&T>; 
-}
-impl<T> OptionBorrow<T> for Option<&T>{
-    fn option_borrow(&self) -> Option<&T> {
-        *self
-    }
-}
-impl<T> OptionBorrow<T> for Option<T>{
-    fn option_borrow(&self) -> Option<&T> {
-        self.as_ref()
-    }
-}*/
-
-#[inline]
-fn get_data<T0, T1, F, R>(d0: Option<impl Borrow<T0>>, d1: Option<impl Borrow<T1>>, f: &F) 
-    -> Option<R>
-where
-    F: Fn(Option<&T0>, Option<&T1>) -> R,
-{
-    let d0_is_none = d0.is_none(); 
-    let d1_is_none = d1.is_none();
-    if d0_is_none & d1_is_none{
-        return None;
-    }
-    
-    // Looks like compiler optimize away these re-borrow transformations.
-    let o0;
-    let o1;
-    if d0_is_none {
-        o0 = None;
-        
-        // we know that d1 exists.
-        o1 = if let Some(d) = &d1 {
-            Some(d.borrow())
-        } else { unsafe {unreachable_unchecked()} };
-    } else if d1_is_none {
-        // we know that d0 exists.
-        o0 = if let Some(d) = &d0 {
-            Some(d.borrow())
-        } else { unsafe {unreachable_unchecked()} };
-        
-        o1 = None;
-    } else {
-        // both exists
-        o0 = if let Some(d) = &d0 {
-            Some(d.borrow())
-        } else { unsafe {unreachable_unchecked()} };
-        
-        o1 = if let Some(d) = &d1 {
-            Some(d.borrow())
-        } else { unsafe {unreachable_unchecked()} };
-    }
-    
-    Some(f(o0, o1))    
-}
-
-pub struct Union<S0, S1, F>{
+pub struct Union<S0, S1>{
     s0: S0,
     s1: S1,
-    f: F,
 }
 
-impl<S0, S1, F, T> SparseHierarchy for Union<S0, S1, F>
+impl<'this, S0, S1> SparseHierarchyTypes<'this> for Union<S0, S1>
 where
-    S0: Borrowable<Borrowed: SparseHierarchy<DataType: Clone>>,
+    S0: Borrowable<Borrowed: SparseHierarchy>,
     S1: Borrowable<Borrowed: SparseHierarchy<
-        LevelCount    = <S0::Borrowed as SparseHierarchy>::LevelCount,
-        LevelMaskType = <S0::Borrowed as SparseHierarchy>::LevelMaskType,
+        LevelCount = <S0::Borrowed as SparseHierarchy>::LevelCount,
+        LevelMask  = <S0::Borrowed as SparseHierarchy>::LevelMask,
     >>,
+{
+    type Data = (
+        Option<<S0::Borrowed as SparseHierarchyTypes<'this>>::Data>,
+        Option<<S1::Borrowed as SparseHierarchyTypes<'this>>::Data>
+    );
     
-    F: Fn(
-        Option<&<S0::Borrowed as SparseHierarchy>::DataType>,
-        Option<&<S1::Borrowed as SparseHierarchy>::DataType>,
-    ) -> T,
+    type DataUnchecked = Self::Data;
+    
+    type State = State<'this, S0, S1>;
+}
+
+impl<S0, S1> SparseHierarchy for Union<S0, S1>
+where
+    S0: Borrowable<Borrowed: SparseHierarchy>,
+    S1: Borrowable<Borrowed: SparseHierarchy<
+        LevelCount = <S0::Borrowed as SparseHierarchy>::LevelCount,
+        LevelMask  = <S0::Borrowed as SparseHierarchy>::LevelMask,
+    >>,
 {
     /// true if S0 & S1 are EXACT_HIERARCHY.
     const EXACT_HIERARCHY: bool = <S0::Borrowed as SparseHierarchy>::EXACT_HIERARCHY 
                                 & <S1::Borrowed as SparseHierarchy>::EXACT_HIERARCHY;
     
     type LevelCount = <S0::Borrowed as SparseHierarchy>::LevelCount;
-    
-    type LevelMaskType = <S0::Borrowed as SparseHierarchy>::LevelMaskType;
-    type LevelMask<'a> = Self::LevelMaskType where Self:'a;
-    
-    type DataType = T;
-    type Data<'a> = T where Self: 'a;
+    type LevelMask  = <S0::Borrowed as SparseHierarchy>::LevelMask;
 
     #[inline]
-    unsafe fn data(&self, index: usize, level_indices: &[usize])
-        -> Option<Self::Data<'_>> 
+    unsafe fn data(&self, index: usize, level_indices: &[usize]) 
+        -> Option<<Self as SparseHierarchyTypes<'_>>::Data> 
     {
         let d0 = self.s0.borrow().data(index, level_indices);
         let d1 = self.s1.borrow().data(index, level_indices);
-        get_data(d0, d1, &self.f)
-    }
-
-    #[inline]
-    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
-        -> Self::Data<'_> 
-    {
-        self.data(index, level_indices).unwrap_unchecked()
-    }
-
-    type State = State<S0, S1, F>;
-}
-
-/// [S::Mask; S::DEPTH]
-type Masks<S> = ConstArrayType<
-    <<S as Borrowable>::Borrowed as SparseHierarchy>::LevelMaskType,
-    <<S as Borrowable>::Borrowed as SparseHierarchy>::LevelCount,
->;
-
-pub struct State<S0, S1, F>
-where
-    S0: Borrowable<Borrowed: SparseHierarchy>,
-    S1: Borrowable<Borrowed: SparseHierarchy>,
-{
-    s0: <S0::Borrowed as SparseHierarchy>::State, 
-    s1: <S1::Borrowed as SparseHierarchy>::State,
-    
-    phantom_data: PhantomData<(S0, S1, F)>
-}
-
-impl<S0, S1, F, T> SparseHierarchyState for State<S0, S1, F>
-where
-    S0: Borrowable<Borrowed: SparseHierarchy<DataType: Clone>>,
-    S1: Borrowable<Borrowed: SparseHierarchy<
-        LevelCount    = <S0::Borrowed as SparseHierarchy>::LevelCount,
-        LevelMaskType = <S0::Borrowed as SparseHierarchy>::LevelMaskType,
-    >>,
-    
-    F: Fn(
-        Option<&<S0::Borrowed as SparseHierarchy>::DataType>,
-        Option<&<S1::Borrowed as SparseHierarchy>::DataType>,
-    ) -> T,
-{
-    type This = Union<S0, S1, F>;
-
-    #[inline]
-    fn new(this: &Self::This) -> Self {
-        Self{
-            s0: SparseHierarchyState::new(this.s0.borrow()), 
-            s1: SparseHierarchyState::new(this.s1.borrow()),
-            
-            phantom_data: PhantomData
+        if d0.is_none() & d1.is_none(){
+            None
+        } else {
+            Some((d0, d1))
         }
     }
 
     #[inline]
-    unsafe fn select_level_node<'a, N: ConstInteger>(
-        &mut self, this: &'a Self::This, level_n: N, level_index: usize
-    ) -> <Self::This as SparseHierarchy>::LevelMask<'a> {
+    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
+        -> <Self as SparseHierarchyTypes<'_>>::Data
+    {
+        self.data(index, level_indices).unwrap_unchecked()
+    }
+}
+
+/// [S::Mask; S::DEPTH]
+type Masks<S> = ConstArrayType<
+    <<S as Borrowable>::Borrowed as SparseHierarchy>::LevelMask,
+    <<S as Borrowable>::Borrowed as SparseHierarchy>::LevelCount,
+>;
+
+pub struct State<'src, S0, S1>
+where
+    S0: Borrowable<Borrowed: SparseHierarchy>,
+    S1: Borrowable<Borrowed: SparseHierarchy>,
+{
+    s0: <S0::Borrowed as SparseHierarchyTypes<'src>>::State, 
+    s1: <S1::Borrowed as SparseHierarchyTypes<'src>>::State,
+    phantom: PhantomData<&'src Union<S0, S1>>
+}
+
+impl<'this, 'src, S0, S1> SparseHierarchyStateTypes<'this> for State<'src, S0, S1>
+where
+    S0: Borrowable<Borrowed: SparseHierarchy>,
+    S1: Borrowable<Borrowed: SparseHierarchy>,
+{
+    type Data = (
+        Option<<<S0::Borrowed as SparseHierarchyTypes<'src>>::State as SparseHierarchyStateTypes<'this>>::Data>,
+        Option<<<S1::Borrowed as SparseHierarchyTypes<'src>>::State as SparseHierarchyStateTypes<'this>>::Data>
+    );
+}
+
+impl<'src, S0, S1> SparseHierarchyState<'src> for State<'src, S0, S1>
+where
+    S0: Borrowable<Borrowed: SparseHierarchy>,
+    S1: Borrowable<Borrowed: SparseHierarchy<
+        LevelCount = <S0::Borrowed as SparseHierarchy>::LevelCount,
+        LevelMask  = <S0::Borrowed as SparseHierarchy>::LevelMask,
+    >>
+{
+    type Src = Union<S0, S1>;
+
+    #[inline]
+    fn new(src: &'src Self::Src) -> Self {
+        Self{
+            s0: SparseHierarchyState::new(src.s0.borrow()), 
+            s1: SparseHierarchyState::new(src.s1.borrow()),
+            phantom: PhantomData
+        }
+    }
+
+    #[inline]
+    unsafe fn select_level_node<N: ConstInteger>(
+        &mut self, this: &'src Self::Src, level_n: N, level_index: usize
+    ) -> <Self::Src as SparseHierarchy>::LevelMask {
         // unchecked version already deal with non-existent elements
         self.select_level_node_unchecked(this, level_n, level_index)
     }
 
     #[inline]
-    unsafe fn select_level_node_unchecked<'a, N: ConstInteger> (
-        &mut self, this: &'a Self::This, level_n: N, level_index: usize
-    ) -> <Self::This as SparseHierarchy>::LevelMask<'a> {
+    unsafe fn select_level_node_unchecked<N: ConstInteger> (
+        &mut self, this: &'src Self::Src, level_n: N, level_index: usize
+    ) -> <Self::Src as SparseHierarchy>::LevelMask {
         let mask0 = self.s0.select_level_node(
             this.s0.borrow(), level_n, level_index,
         );
@@ -187,59 +142,59 @@ where
     }
 
     #[inline]
-    unsafe fn data<'a>(&self, this: &'a Self::This, level_index: usize) 
-        -> Option<<Self::This as SparseHierarchy>::Data<'a>> 
+    unsafe fn data<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
+        -> Option<<Self as SparseHierarchyStateTypes<'a>>::Data> 
     {
         let d0 = self.s0.data(this.s0.borrow(), level_index);
         let d1 = self.s1.data(this.s1.borrow(), level_index);
-        get_data(d0, d1, &this.f)
+        if d0.is_none() & d1.is_none(){
+            None
+        } else {
+            Some((d0, d1))
+        }
     }
 
     #[inline]
-    unsafe fn data_unchecked<'a>(&self, this: &'a Self::This, level_index: usize) 
-        -> <Self::This as SparseHierarchy>::Data<'a> 
+    unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
+        -> <Self as SparseHierarchyStateTypes<'a>>::Data 
     {
         self.data(this, level_index).unwrap_unchecked()
     }
 }
 
-impl<S0, S1, F> LazySparseHierarchy for Union<S0, S1, F>
+impl<S0, S1> LazySparseHierarchy for Union<S0, S1>
 where
-    Union<S0, S1, F>: SparseHierarchy
+    Union<S0, S1>: SparseHierarchy
 {}
 
-impl<S0, S1, F> Borrowable for Union<S0, S1, F>{ type Borrowed = Self; }
+impl<S0, S1> Borrowable for Union<S0, S1>{ type Borrowed = Self; }
 
 #[inline]
-pub fn union<S0, S1, F, T>(s0: S0, s1: S1, f: F) -> Union<S0, S1, F>
+pub fn union<S0, S1>(s0: S0, s1: S1) -> Union<S0, S1>
 where
     // bounds needed here for F's arguments auto-deduction
     S0: Borrowable<Borrowed: SparseHierarchy>,
     S1: Borrowable<Borrowed: SparseHierarchy<
-        LevelCount    = <S0::Borrowed as SparseHierarchy>::LevelCount,
-        LevelMaskType = <S0::Borrowed as SparseHierarchy>::LevelMaskType,
-    >>,
-    
-    F: Fn(
-        Option<&<S0::Borrowed as SparseHierarchy>::DataType>,
-        Option<&<S1::Borrowed as SparseHierarchy>::DataType>,
-    ) -> T,
+        LevelCount = <S0::Borrowed as SparseHierarchy>::LevelCount,
+        LevelMask  = <S0::Borrowed as SparseHierarchy>::LevelMask,
+    >>
 {
-    Union { s0, s1, f }
-} 
+    Union { s0, s1 }
+}
 
 #[cfg(test)]
 mod tests{
     use itertools::assert_equal;
     use crate::compact_sparse_array::CompactSparseArray;
+    use crate::map;
     use crate::ops::union::union;
     use crate::sparse_hierarchy::SparseHierarchy;
 
     #[test]
     fn smoke_test(){
         type Array = CompactSparseArray<usize, 3>;
-        let mut a1= Array::default();
-        let mut a2= Array::default();
+        let mut a1 = Array::default();
+        let mut a2 = Array::default();
         
         *a1.get_or_insert(10) = 10;
         *a1.get_or_insert(15) = 15;
@@ -248,8 +203,9 @@ mod tests{
         *a2.get_or_insert(100) = 100;
         *a2.get_or_insert(15)  = 15;
         *a2.get_or_insert(200) = 200;        
-        
-        let union = union(&a1, &a2, |i0, i1| {
+
+        // test with map
+        let union = map(union(&a1, &a2), |(i0, i1): (Option<&usize>, Option<&usize>)| {
             i0.unwrap_or(&0) + i1.unwrap_or(&0)
         });
         
