@@ -20,7 +20,7 @@ where
 {
     type Data  = DataIter<'item, Iter>;
     type DataUnchecked = DataUncheckedIter<Iter>;
-    type State = MultiUnionState<'this, 'item, Iter>;
+    type State = State<'this, 'item, Iter>;
 }
 
 impl<'i, Iter, T> SparseHierarchy for MultiUnion<Iter>
@@ -120,7 +120,7 @@ const N: usize = 32;
 type StateIndex = u8;
 type StatesItem<'item, Iter> = (<Iter as Iterator>::Item, IterItemState<'item, Iter>);
 
-pub struct MultiUnionState<'src, 'item, Iter>
+pub struct State<'src, 'item, Iter>
 where
     Iter: Iterator<Item: Ref<Type: SparseHierarchy>> + Clone,
 {
@@ -137,14 +137,14 @@ where
     phantom_data: PhantomData<&'src MultiUnion<Iter>>
 }
 
-impl<'this, 'src, 'item, Iter> SparseHierarchyStateTypes<'this> for MultiUnionState<'src, 'item, Iter>
+impl<'this, 'src, 'item, Iter> SparseHierarchyStateTypes<'this> for State<'src, 'item, Iter>
 where
     Iter: Iterator<Item: Ref<Type: SparseHierarchy>> + Clone
 {
     type Data = StateDataIter<'this, 'item, Iter>;
 }
 
-impl<'src, 'item, Iter, T> SparseHierarchyState<'src> for MultiUnionState<'src, 'item, Iter>
+impl<'src, 'item, Iter, T> SparseHierarchyState<'src> for State<'src, 'item, Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
     T: SparseHierarchy + 'item
