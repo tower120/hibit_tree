@@ -10,10 +10,10 @@ use crate::level::ILevel;
 use crate::const_utils::const_int::{ConstInteger, ConstIntVisitor, ConstUsize};
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
 use crate::const_utils::{const_loop, ConstBool, ConstFalse, ConstTrue};
-use crate::{Empty, Index};
+use crate::{Empty, Index, SparseHierarchyStateTypes, SparseHierarchyTypes};
 use crate::req_default::{DefaultInit, DefaultInitFor, DefaultRequirement, ReqDefault};
-use crate::utils::primitive::Primitive;
-use crate::utils::array::Array;
+use crate::utils::Primitive;
+use crate::utils::Array;
 use crate::sparse_array_levels::{FoldMutVisitor, FoldVisitor, MutVisitor, SparseArrayLevels, TypeVisitor, Visitor};
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 
@@ -38,6 +38,7 @@ use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
 /// [get_unchecked]: SparseArray::get_unchecked
 pub struct SparseArray<Levels, Data, R = ReqDefault<false>>
 where
+    Levels: SparseArrayLevels,
     R: DefaultRequirement
 {
     levels: Levels,
@@ -68,7 +69,7 @@ where
         let mut values: Vec<Data> = Vec::with_capacity(1);
         unsafe{ values.set_len(1); }
         unsafe{
-            <DefaultInitFor::<Data, R> as DefaultInit>
+            <DefaultInitFor<Data, R> as DefaultInit>
             ::init_default(values.as_mut_ptr().cast());
         }
         
@@ -511,6 +512,18 @@ where
             )
         }
     }
+    
+    #[inline]
+    unsafe fn drop_impl(&mut self){
+        // Manually drop values, skipping first non-existent element, if necessary.
+        let skip_first = !R::REQUIRED; 
+        let slice = ptr::slice_from_raw_parts_mut(
+            self.values.as_mut_ptr().add(skip_first as usize), 
+            self.values.len() - skip_first as usize
+        ); 
+        ptr::drop_in_place(slice);
+        self.values.set_len(0);
+    }
 }
 
 impl<Levels, Data> SparseArray<Levels, Data, ReqDefault>
@@ -533,47 +546,57 @@ where
     }
 }
 
+#[cfg(feature = "may_dangle")]
 unsafe impl<Levels, #[may_dangle] Data, R> Drop for SparseArray<Levels, Data, R>
 where
+    Levels: SparseArrayLevels,
     R: DefaultRequirement,
 {
     #[inline]
     fn drop(&mut self) {
-        // Manually drop values, skipping first non-existent element, if necessary.
-        unsafe{
-            let skip_first = !R::REQUIRED; 
-            let slice = ptr::slice_from_raw_parts_mut(
-                self.values.as_mut_ptr().add(skip_first as usize), 
-                self.values.len() - skip_first as usize
-            ); 
-            ptr::drop_in_place(slice);
-            self.values.set_len(0);
-        }
+        unsafe{ self.drop_impl(); }
+    }
+}
+
+#[cfg(not(feature = "may_dangle"))]
+impl<Levels, Data, R> Drop for SparseArray<Levels, Data, R>
+where
+    Levels: SparseArrayLevels,
+    R: DefaultRequirement,
+{
+    #[inline]
+    fn drop(&mut self) {
+        unsafe{ self.drop_impl(); }
     }
 }
 
 impl<Levels, Data, R> Borrowable for SparseArray<Levels, Data, R>
 where
+    Levels: SparseArrayLevels,
     R: DefaultRequirement
 {
     type Borrowed = SparseArray<Levels, Data, R>; 
 }
 
-impl<'a, Levels, Data, R> SparseHierarchy<'a> for SparseArray<Levels, Data, R>
+impl<'this, Levels, Data, R> SparseHierarchyTypes<'this> for SparseArray<Levels, Data, R>
 where
-    Self:'a,
+    Levels: SparseArrayLevels,
+    R: DefaultRequirement
+{
+    type Data = &'this Data;
+    type DataUnchecked = &'this Data;
+    type State = SparseArrayState<'this, Levels, Data, R>;
+}
+
+impl<Levels, Data, R> SparseHierarchy for SparseArray<Levels, Data, R>
+where
     Levels: SparseArrayLevels,
     R: DefaultRequirement
 {
     const EXACT_HIERARCHY: bool = true;
     
     type LevelCount = Levels::LevelCount;
-    type LevelMaskType = Levels::Mask;
-    
-    type LevelMask = &'a Levels::Mask;
-    
-    type DataType = Data;
-    type Data = &'a Data;
+    type LevelMask  = Levels::Mask;
     
     // For terminal_node_mask
     /*#[inline]
@@ -584,7 +607,7 @@ where
     }*/    
 
     #[inline]
-    unsafe fn data(&'a self, index: usize, level_indices: &[usize]) -> Option<Self::Data> {
+    unsafe fn data(&self, index: usize, level_indices: &[usize]) -> Option<&Data> {
         let data_block_index = self.fetch_block_index(level_indices);
         if data_block_index == 0 {
             None
@@ -595,16 +618,14 @@ where
 
     // This is also data_or_default
     #[inline]
-    unsafe fn data_unchecked(&'a self, index: usize, level_indices: &[usize]) -> Self::Data {
+    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) -> &Data {
         self.data(index, level_indices).unwrap_unchecked()
         /*let data_block_index = self.fetch_block_index(level_indices);
         self.values.get_unchecked(data_block_index)*/
     }
-
-    type State = SparseArrayState</*'a, */Levels, Data, R>;
 }
 
-pub struct SparseArrayState</*'a, */Levels, Data, R>
+pub struct SparseArrayState<'src, Levels, Data, R>
 where
     Levels: SparseArrayLevels,
     R: DefaultRequirement 
@@ -616,19 +637,26 @@ where
         *const u8, 
         <Levels::LevelCount as ConstInteger>::Dec
     >,
-    phantom_data: PhantomData</*&'a */SparseArray<Levels, Data, R>>
+    phantom_data: PhantomData<&'src SparseArray<Levels, Data, R>>
 }
 
-impl<'a, Levels, Data, R> SparseHierarchyState<'a> for SparseArrayState</*'a, */Levels, Data, R>
+impl<'this, 'src, Levels, Data, R> SparseHierarchyStateTypes<'this> for SparseArrayState<'src, Levels, Data, R>
 where
-    Levels: SparseArrayLevels + 'a,
-    Data: 'a,
-    R: DefaultRequirement + 'a,
+    Levels: SparseArrayLevels,
+    R: DefaultRequirement,
 {
-    type This = SparseArray<Levels, Data, R>;
+    type Data = &'src Data;
+}
+
+impl<'src, Levels, Data, R> SparseHierarchyState<'src> for SparseArrayState<'src, Levels, Data, R>
+where
+    Levels: SparseArrayLevels,
+    R: DefaultRequirement,
+{
+    type Src = SparseArray<Levels, Data, R>;
 
     #[inline]
-    fn new(_: &Self::This) -> Self {
+    fn new(_: &'src Self::Src) -> Self {
         Self{
             level_block_ptrs: Array::from_fn(|_|null()),
             phantom_data: Default::default(),
@@ -636,21 +664,22 @@ where
     }
 
     #[inline(always)]
-    unsafe fn select_level_node_unchecked<'this, N: ConstInteger>(
-        &mut self, this: &'this Self::This, level_n: N, level_index: usize
-    ) -> <Self::This as SparseHierarchy<'a>>::LevelMask {
-        todo!()
-        //self.select_level_node(this, level_n, level_index)
+    unsafe fn select_level_node_unchecked<N: ConstInteger>(
+        &mut self, src: &'src Self::Src, level_n: N, level_index: usize
+    ) -> <Self::Src as SparseHierarchy>::LevelMask {
+        self.select_level_node(src, level_n, level_index)
     }
     
+    // Non-existent childs - always point to "empty" node,
+    // So we do not need any additional branching here.
     #[inline(always)]
     unsafe fn select_level_node<N: ConstInteger>(
-        &mut self, this: &'a Self::This, level_n: N, level_index: usize
-    ) -> <Self::This as SparseHierarchy<'a>>::LevelMask {
+        &mut self, src: &'src Self::Src, level_n: N, level_index: usize
+    ) -> <Self::Src as SparseHierarchy>::LevelMask {
         if N::VALUE == 0 {
             assert_eq!(level_index, 0); // This act as compile-time check
-            let block = this.get_block(level_n, 0);
-            return block.get_mask();
+            let block = src.get_block(level_n, 0);
+            return block.get_mask().clone();
         }
         
         // We do not store the root level's block.
@@ -661,7 +690,7 @@ where
             let prev_level_block: BlockPtr<Levels, N::Dec> = 
                 if N::VALUE == 1 {
                     // get from root
-                    this.get_block(Default::default(), 0)
+                    src.get_block(Default::default(), 0)
                 } else {
                     let ptr = *self.level_block_ptrs.as_ref().get_unchecked(level_block_ptrs_index-1); 
                     BlockPtr::new_unchecked(NonNull::new_unchecked(ptr as *mut u8))
@@ -670,29 +699,28 @@ where
         };
         
         // 2. get block mask from level.
-        let block = this.get_block(level_n, level_block_index);
+        let block = src.get_block(level_n, level_block_index);
         *self.level_block_ptrs.as_mut().get_unchecked_mut(level_block_ptrs_index) = block.as_ptr();
-        block.get_mask()        
+        block.get_mask().clone()        
     }
 
     #[inline(always)]
-    unsafe fn data_unchecked<'this>(&self, this: &'this Self::This, level_index: usize)
-        -> <Self::This as SparseHierarchy<'a>>::Data 
+    unsafe fn data_unchecked<'a>(&'a self, src: &'src Self::Src, level_index: usize)
+        -> <Self as SparseHierarchyStateTypes<'a>>::Data 
     {
-        todo!()
-        //self.data(this, level_index).unwrap_unchecked()
+        self.data(src, level_index).unwrap_unchecked()
     }
     
     #[inline(always)]
-    unsafe fn data(&self, this: &'a Self::This, level_index: usize)
-        -> Option<<Self::This as SparseHierarchy<'a>>::Data> 
+    unsafe fn data<'a>(&'a self, src: &'src Self::Src, level_index: usize)
+        -> Option<<Self as SparseHierarchyStateTypes<'a>>::Data> 
     {
-        let last_level_index = Levels::LevelCount::VALUE - 1;
+        /*const*/ let last_level_index = Levels::LevelCount::VALUE - 1;
         
         let level_block: BlockPtr<Levels, <Levels::LevelCount as ConstInteger>::Dec> = 
             if last_level_index == 1{
                 // get from root 
-                this.get_block(Default::default(), 0)
+                src.get_block(Default::default(), 0)
             } else {
                 // We do not store the root level's block.
                 let ptr = *self.level_block_ptrs.as_ref().get_unchecked(last_level_index - 1);
@@ -703,7 +731,7 @@ where
         if data_block_index == 0 {
             None
         } else {
-            Some(this.values.get_unchecked(data_block_index))
+            Some(src.values.get_unchecked(data_block_index))
         }
     }    
 }

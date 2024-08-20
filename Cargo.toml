@@ -9,6 +9,9 @@ edition = "2021"
 [features]
 default = ["simd"]
 simd = ["dep:wide"]
+# Allows storing &T in containers.  
+# https://doc.rust-lang.org/nomicon/dropck.html#an-escape-hatch
+may_dangle = []
 
 [dependencies]
 arrayvec = "0.7.4"

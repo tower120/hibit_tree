@@ -1,6 +1,5 @@
-#![feature(dropck_eyepatch)]
-
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 
 //! {TODO: This is changed}
 //! The core of the lib is [SparseArray] container and [SparseHierarchy] 
@@ -80,8 +79,19 @@
 //! - TODO [contains()]
 //! - TODO From<impl SparseHierarchy>
 //! - iterated elements are guaranteed to be ![is_empty].
+//! 
+//! # Flags
+//! 
+//! ## simd
+//! 
+//! Enabled by default. Allow to use 128, 256 bit configurations in [SparseArray].
+//! 
+//! ## may_dangle
+//! 
+//! Requires nightly. Allow to store references in containers.
+//! https://doc.rust-lang.org/nomicon/dropck.html#an-escape-hatch 
 
-//mod sparse_array;
+mod sparse_array;
 mod sparse_array_levels;
 mod compact_sparse_array;
 mod bit_utils;
@@ -102,7 +112,7 @@ pub mod config;
 //pub use ref_or_val::*;
 pub use bit_block::BitBlock;
 pub use req_default::ReqDefault;
-//pub use sparse_array::SparseArray;
+pub use sparse_array::SparseArray;
 pub use compact_sparse_array::CompactSparseArray;
 pub use sparse_hierarchy::*;
 pub use iter::*;

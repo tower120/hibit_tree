@@ -52,7 +52,10 @@ type DataIndex = u32;
 /// 
 /// In addition, to lib's `popcnt` and `bmi1` requirement, on x86 arch
 /// CompactSparseArray also benefits from `bmi2`'s [bzhi] instruction.
-pub struct CompactSparseArray<T, const DEPTH: usize>{
+pub struct CompactSparseArray<T, const DEPTH: usize>
+where
+    ConstUsize<DEPTH>: ConstInteger
+{
     root: NodePtr,
     
     /// First item - is a placeholder for non-existent/default element.
@@ -285,23 +288,38 @@ where
             )
         }
     }
+    
+    #[inline]
+    unsafe fn drop_impl(&mut self){
+        // drop values
+        let slice = ptr::slice_from_raw_parts_mut(
+            self.data.as_mut_ptr().add(1), 
+            self.data.len() - 1
+        ); 
+        ptr::drop_in_place(slice);
+        self.data.set_len(0);
+        
+        // drop node hierarchy
+        self.root.drop_node_with_childs::<ConstUsize<0>, DEPTH>()         
+    }
 }
 
+#[cfg(feature = "may_dangle")]
 unsafe impl<#[may_dangle] T, const DEPTH: usize> Drop for CompactSparseArray<T, DEPTH> {
     #[inline]
     fn drop(&mut self) {
-        unsafe{ 
-            // drop values
-            let slice = ptr::slice_from_raw_parts_mut(
-                self.data.as_mut_ptr().add(1), 
-                self.data.len() - 1
-            ); 
-            ptr::drop_in_place(slice);
-            self.data.set_len(0);
-            
-            // drop node hierarchy
-            self.root.drop_node_with_childs::<ConstUsize<0>, DEPTH>() 
-        };
+        unsafe{ self.drop_impl(); }
+    }
+}
+
+#[cfg(not(feature = "may_dangle"))]
+impl<T, const DEPTH: usize> Drop for CompactSparseArray<T, DEPTH>
+where
+    ConstUsize<DEPTH>: ConstInteger
+{
+    #[inline]
+    fn drop(&mut self) {
+        unsafe{ self.drop_impl(); }
     }
 }
 
@@ -483,4 +501,7 @@ where
     }
 }
 
-impl<T, const DEPTH: usize> Borrowable for CompactSparseArray<T, DEPTH>{ type Borrowed = Self; }
+impl<T, const DEPTH: usize> Borrowable for CompactSparseArray<T, DEPTH>
+where
+    ConstUsize<DEPTH>: ConstInteger
+{ type Borrowed = Self; }
