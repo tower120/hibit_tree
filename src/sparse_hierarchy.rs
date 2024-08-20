@@ -308,6 +308,7 @@ pub trait MonoSparseHierarchy: SparseHierarchy
 where
     Self: for<'this> MonoSparseHierarchyTypes<'this>
 {
+    /// See [crate::map]
     #[inline]
     fn map<F>(self, f: F) -> Map<Self, F>
     where
@@ -316,6 +317,7 @@ where
         crate::map(self, f)
     }
     
+    /// See [crate::map]
     #[inline]
     fn map_ref<F>(&self, f: F) -> Map<&Self, F>
     where

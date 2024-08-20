@@ -147,6 +147,40 @@ where
 
 impl<S, F> Borrowable for Map<S, F> { type Borrowed = Self; }
 
+/// Maps each [MonoSparseHierarchy] element with `f: Fn(Item) -> Out`.
+/// 
+/// # Note
+/// 
+/// Due to current Rust limitations, type inference will not work here
+/// for lambdas. You'll have to either specify concrete type, or pass fn, 
+/// or you can implement [UnaryFunction] with generics.
+///
+/// ```
+/// # use hi_sparse_array::CompactSparseArray;
+/// # use hi_sparse_array::utils::UnaryFunction;
+/// let a: CompactSparseArray<usize, 4> = Default::default();
+///
+/// // This will fail to compile:
+/// // let m = map(&a, |d| { d.clone() } );
+///
+/// // Lambdas with concrete input type will work.    
+/// let m = map(&a, |d: &usize| { d.clone() } );
+///
+/// // Function pointers will work too.
+/// fn cloned<T: Clone>(d: T) -> T{ d.clone() }
+/// let m = map(&a, cloned );
+///
+/// // As well as UnaryFunction implementation.
+/// struct Cloned;
+/// impl<T: Clone> UnaryFunction<T> for Cloned{
+///     type Output = T;
+///
+///     fn exec(&self, arg: T) -> Self::Output {
+///         arg.clone()
+///     }
+/// }
+/// let m = map(&a, Cloned );
+/// ```   
 #[inline]
 pub fn map<S, F>(s: S, f: F) -> Map<S, F>
 where

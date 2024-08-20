@@ -3,9 +3,10 @@
 use itertools::assert_equal;
 use rand::{Rng, SeedableRng};
 //use hi_sparse_array::{CompactSparseArray, intersection, LazySparseHierarchy, map, map2, union};
-use hi_sparse_array::{CompactSparseArray, FromSparseHierarchy, intersection, LazySparseHierarchy, map};
+use hi_sparse_array::{CompactSparseArray, FromSparseHierarchy, intersection, LazySparseHierarchy, map, union};
 use hi_sparse_array::const_utils::ConstUsize;
 use hi_sparse_array::SparseHierarchy;
+use hi_sparse_array::MonoSparseHierarchy;
 use hi_sparse_array::utils::{Borrowable, UnaryFunction};
 
 mod common;
@@ -77,6 +78,8 @@ fn materialize_test(){
     let ao: Array = map(intersection(&a1, &a2), |(l, _r) : (&Data, &Data)| l.clone()).materialize();
     assert_equal(ao.iter(), a1.iter());
     
-    /*let ao: Array = union(&a1, &a2, |l, _r| l.unwrap().clone()).materialize();
-    assert_equal(ao.iter(), a1.iter());*/
+    let ao: Array = union(&a1, &a2)
+        .map(|(l, _r) : (Option<&Data>, Option<&Data>)| l.unwrap().clone())
+        .materialize();
+    assert_equal(ao.iter(), a1.iter());
 }
