@@ -5,20 +5,10 @@ mod common;
 use std::collections::HashMap;
 use itertools::assert_equal;
 use rand::{Rng, SeedableRng};
-use hi_sparse_array::{Empty, SparseArray};
 use hi_sparse_array::SparseHierarchy;
 
-#[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Default)]
 struct Data(usize);
-impl Empty for Data{
-    fn empty() -> Self {
-        Self(0)
-    }
-
-    fn is_empty(&self) -> bool {
-        todo!()
-    }
-} 
 
 type Array = common::Array<Data>;
 type Map = HashMap<usize, Data>;
@@ -38,7 +28,7 @@ fn fuzzy_test(){
         {
             let a_items: Vec<_> = a.iter().map(|(_,d)|d).collect();
             
-            let mut a_unordered_items: Vec<_> = a.unordered_iter().map(|(_,d)|d).collect();
+            let mut a_unordered_items: Vec<_> = a.key_values().1.iter().collect();
             a_unordered_items.sort();
             
             let mut h_items: Vec<_> = h.iter().map(|(_,d)|d).collect();
@@ -50,18 +40,18 @@ fn fuzzy_test(){
         
         // get
         for (k, v) in h {
-            let d = a.get(*k).0;
+            let d = a.get(*k).unwrap().0;
             assert_eq!(d, v.0);
+
+            let u = unsafe{ a.get_unchecked(*k).0 };
+            assert_eq!(d, u);
         }
         
         // random get
         for _ in 0..COUNT {
             let v = rng.gen_range(0..RANGE);
-            let d1 = a.get(v).0;
-            let d2 = match h.get(&v){
-                None => 0,
-                Some(d) => d.0
-            };
+            let d1 = a.get(v);
+            let d2 = h.get(&v);
             assert_eq!(d1, d2);
         }          
     }
@@ -70,7 +60,7 @@ fn fuzzy_test(){
         // insert
         for _ in 0..rng.gen_range(0..COUNT) {
             let v = rng.gen_range(0..RANGE);
-            *a.get_mut(v) = Data(v);
+            *a.get_or_insert(v) = Data(v);
             h.insert(v, Data(v));
         }
         check(&mut rng, &a, &h);   

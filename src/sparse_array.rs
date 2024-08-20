@@ -375,11 +375,6 @@ where
     ///
     /// [^1]: Thou, if empty constructor is not complex - compiler may be 
     /// able to optimize away intermediate value anyway. But better safe then sorry.
-    /// 
-    /// # Tip
-    /// 
-    /// Even though this container is ![EXACT_HIERARCHY], try not to insert empty 
-    /// `value`, as it will appear in iteration. 
     pub fn insert(&mut self, index: impl Into<Index<Levels::Mask, Levels::LevelCount>>, value: Data) {
         let index: usize = index.into().into();
         self.get_or_insert_impl(index, ConstTrue, ||value);

@@ -112,7 +112,7 @@ where
             let inner_index = indices.as_ref()[N];
             unsafe{
                 let mut node_ptr = *node;
-                node = if node_ptr.header().contains(inner_index) {
+                /*child*/ node = if node_ptr.header().contains(inner_index) {
                     node_ptr.get_child_mut(inner_index)
                 } else {
                     // TODO: insert node with already inserted ONE element 
@@ -121,10 +121,11 @@ where
 
                     // update a child pointer with a (possibly) new address
                     let (mut inserted_ptr, new_node) =
-                        if N == DEPTH-2 /* terminal node */ {
+                        if N == DEPTH-2 /* child node is terminal */ {
                             node_ptr.insert( inner_index, NodePtr::new::<DataIndex>(node::DEFAULT_CAP, 0) )
                         } else {
-                            let empty_child = empty_node(ConstUsize::<N>.inc(), ConstUsize::<DEPTH>);
+                            // N + 2, because we point from child, and to it's child
+                            let empty_child = empty_node(ConstUsize::<N>.inc().inc(), ConstUsize::<DEPTH>);
                             node_ptr.insert( inner_index, NodePtr::new::<NodePtr>(node::DEFAULT_CAP, empty_child) )
                         };
                     *node = new_node;   // This is actually optional
