@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::slice;
 use arrayvec::ArrayVec;
-use crate::{BitBlock, LazySparseHierarchy, MonoSparseHierarchy, MultiSparseHierarchy, MultiSparseHierarchyTypes, SparseHierarchy, SparseHierarchyData, SparseHierarchyState, SparseHierarchyStateTypes, SparseHierarchyTypes};
+use crate::{BitBlock, LazySparseHierarchy, MonoSparseHierarchy, MultiSparseHierarchy, MultiSparseHierarchyTypes, SparseHierarchy, SparseHierarchyData, SparseHierarchyCursor, SparseHierarchyCursorTypes, SparseHierarchyTypes};
 use crate::const_utils::{ConstArrayType, ConstInteger};
 use crate::utils::{Array, Borrowable, Ref};
 
@@ -11,7 +11,7 @@ pub struct MultiUnion<Iter> {
 }
 
 type IterItem<Iter> = <<Iter as Iterator>::Item as Ref>::Type;
-type IterItemState<'item, Iter> = <IterItem<Iter> as SparseHierarchyTypes<'item>>::State;
+type IterItemCursor<'item, Iter> = <IterItem<Iter> as SparseHierarchyTypes<'item>>::Cursor;
 
 impl<'item, 'this, Iter, T> SparseHierarchyTypes<'this> for MultiUnion<Iter>
 where
@@ -20,7 +20,7 @@ where
 {
     type Data  = Data<'item, Iter>;
     type DataUnchecked = DataUnchecked<Iter>;
-    type State = State<'this, 'item, Iter>;
+    type Cursor = Cursor<'this, 'item, Iter>;
 }
 
 impl<'i, Iter, T> SparseHierarchy for MultiUnion<Iter>
@@ -117,34 +117,34 @@ where
 }
 
 const N: usize = 32;
-type StateIndex = u8;
-type StatesItem<'item, Iter> = (<Iter as Iterator>::Item, IterItemState<'item, Iter>);
+type CursorIndex = u8;
+type CursorsItem<'item, Iter> = (<Iter as Iterator>::Item, IterItemCursor<'item, Iter>);
 
-pub struct State<'src, 'item, Iter>
+pub struct Cursor<'src, 'item, Iter>
 where
     Iter: Iterator<Item: Ref<Type: SparseHierarchy>> + Clone,
 {
-    states: ArrayVec<StatesItem<'item, Iter>, N>,
+    cursors: ArrayVec<CursorsItem<'item, Iter>, N>,
     
     /// [ArrayVec<usize, N>; Array::LevelCount - 1]
     /// 
     /// Root level skipped.
     lvls_non_empty_states: ConstArrayType<
-        ArrayVec<StateIndex, N>,
+        ArrayVec<CursorIndex, N>,
         <<IterItem<Iter> as SparseHierarchy>::LevelCount as ConstInteger>::Dec,
     >,
     
     phantom_data: PhantomData<&'src MultiUnion<Iter>>
 }
 
-impl<'this, 'src, 'item, Iter> SparseHierarchyStateTypes<'this> for State<'src, 'item, Iter>
+impl<'this, 'src, 'item, Iter> SparseHierarchyCursorTypes<'this> for Cursor<'src, 'item, Iter>
 where
     Iter: Iterator<Item: Ref<Type: SparseHierarchy>> + Clone
 {
-    type Data = StateData<'this, 'item, Iter>;
+    type Data = CursorData<'this, 'item, Iter>;
 }
 
-impl<'src, 'item, Iter, T> SparseHierarchyState<'src> for State<'src, 'item, Iter>
+impl<'src, 'item, Iter, T> SparseHierarchyCursor<'src> for Cursor<'src, 'item, Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
     T: SparseHierarchy + 'item
@@ -156,13 +156,13 @@ where
         let states = ArrayVec::from_iter(
             src.iter.clone()
                 .map(|array|{
-                    let state = SparseHierarchyState::new(array.borrow()); 
+                    let state = SparseHierarchyCursor::new(array.borrow()); 
                     (array, state)
                 })
         );
         
         Self {
-            states,
+            cursors: states,
             lvls_non_empty_states: Array::from_fn(|_|ArrayVec::new()),
             phantom_data: PhantomData,
         }
@@ -183,8 +183,8 @@ where
         let mut acc_mask = BitBlock::zero();
         
         if N::VALUE == 0 {
-            for (array, array_state) in self.states.iter_mut() {
-                let mask = array_state.select_level_node(array, level_n, level_index);
+            for (array, array_cursor) in self.cursors.iter_mut() {
+                let mask = array_cursor.select_level_node(array, level_n, level_index);
                 acc_mask |= mask;
             }            
             return acc_mask;
@@ -197,11 +197,11 @@ where
             lvls_non_empty_states.as_mut().get_unchecked_mut(level_n.value()-1);
         lvl_non_empty_states.clear();
         
-        let len = self.states.len() as u8;
+        let len = self.cursors.len() as u8;
         
-        let mut foreach = |i: StateIndex| {
-            let (array, array_state) = self.states.get_unchecked_mut(i as usize);
-            let mask = array_state.select_level_node(array, level_n, level_index);
+        let mut foreach = |i: CursorIndex| {
+            let (array, array_cursor) = self.cursors.get_unchecked_mut(i as usize);
+            let mask = array_cursor.select_level_node(array, level_n, level_index);
             if !mask.is_zero() {
                 lvl_non_empty_states.push_unchecked(i);
             }
@@ -223,7 +223,7 @@ where
 
     #[inline]
     unsafe fn data<'a>(&'a self, src: &'src Self::Src, level_index: usize) 
-        -> Option<<Self as SparseHierarchyStateTypes<'a>>::Data> 
+        -> Option<<Self as SparseHierarchyCursorTypes<'a>>::Data> 
     {
         if <Self::Src as SparseHierarchy>::LevelCount::VALUE == 1 {
             todo!("TODO: compile-time special case for 1-level SparseHierarchy");
@@ -235,44 +235,44 @@ where
             return None;
         }
         
-        Some(StateData {
+        Some(CursorData {
             lvl_non_empty_states: lvl_non_empty_states.iter(),
-            states: &self.states,
+            cursors: &self.cursors,
             level_index,
         })
     }
 
     #[inline]
     unsafe fn data_unchecked<'a>(&'a self, src: &'src Self::Src, level_index: usize) 
-        -> <Self as SparseHierarchyStateTypes<'a>>::Data 
+        -> <Self as SparseHierarchyCursorTypes<'a>>::Data 
     {
         self.data(src, level_index).unwrap_unchecked()
     }
 }
 
-pub struct StateData<'state, 'item, I>
+pub struct CursorData<'cursor, 'item, I>
 where
     I: Iterator<Item: Ref<Type: SparseHierarchy>>
 {
-    lvl_non_empty_states: slice::Iter<'state, StateIndex>,
-    states: &'state [StatesItem<'item, I>],
+    lvl_non_empty_states: slice::Iter<'cursor, CursorIndex>,
+    cursors: &'cursor [CursorsItem<'item, I>],
     level_index: usize,
 }
 
-impl<'state, 'item, I, T> Iterator for StateData<'state, 'item, I>
+impl<'cursor, 'item, I, T> Iterator for CursorData<'cursor, 'item, I>
 where
     I: Iterator<Item = &'item T> + Clone,
     T: SparseHierarchy + 'item
 {
     /// <I::Item as SparseHierarchy2>::Data<'a>
-    type Item = <IterItemState<'item, I> as SparseHierarchyStateTypes<'state>>::Data;
+    type Item = <IterItemCursor<'item, I> as SparseHierarchyCursorTypes<'cursor>>::Data;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.lvl_non_empty_states
             .find_map(|&i| unsafe {
-                let (array, array_state) = self.states.get_unchecked(i as usize);
-                if let Some(data) = array_state.data(array, self.level_index) {
+                let (array, array_cursor) = self.cursors.get_unchecked(i as usize);
+                if let Some(data) = array_cursor.data(array, self.level_index) {
                     Some(data)
                 } else {
                     None
@@ -288,8 +288,8 @@ where
     {
         let level_index = self.level_index;
         for &i in self.lvl_non_empty_states {
-            let (array, array_state) = unsafe{ self.states.get_unchecked(i as usize) };
-            if let Some(data) = unsafe{ array_state.data(array, level_index) } {
+            let (array, array_cursor) = unsafe{ self.cursors.get_unchecked(i as usize) };
+            if let Some(data) = unsafe{ array_cursor.data(array, level_index) } {
                 init = f(init, data);
             }
         }

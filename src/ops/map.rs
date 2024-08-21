@@ -1,6 +1,6 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
-use crate::{LazySparseHierarchy, MonoSparseHierarchy, SparseHierarchy, SparseHierarchyState, SparseHierarchyStateTypes, SparseHierarchyTypes};
+use crate::{LazySparseHierarchy, MonoSparseHierarchy, SparseHierarchy, SparseHierarchyCursor, SparseHierarchyCursorTypes, SparseHierarchyTypes};
 use crate::const_utils::ConstInteger;
 use crate::utils::{Borrowable, UnaryFunction};
 
@@ -39,7 +39,7 @@ where
 {
     type Data = <F as MapFunction<'this, <S::Borrowed as SparseHierarchyTypes<'this>>::Data>>::Output;
     type DataUnchecked = Self::Data;
-    type State = State<'this, S, F>;
+    type Cursor = Cursor<'this, S, F>;
 }
 
 impl<S, F> SparseHierarchy for Map<S, F>
@@ -73,7 +73,7 @@ where
     }
 }
 
-impl<'this, 'src, S, F> SparseHierarchyStateTypes<'this> for State<'src, S, F>
+impl<'this, 'src, S, F> SparseHierarchyCursorTypes<'this> for Cursor<'src, S, F>
 where 
     S: Borrowable<Borrowed: MonoSparseHierarchy>,
     F: for<'a> MapFunction<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data>
@@ -83,14 +83,14 @@ where
     type Data = <Map<S, F> as SparseHierarchyTypes<'src>>::Data;
 } 
 
-pub struct State<'src, S, F>(
-    <S::Borrowed as SparseHierarchyTypes<'src>>::State,
+pub struct Cursor<'src, S, F>(
+    <S::Borrowed as SparseHierarchyTypes<'src>>::Cursor,
     PhantomData<&'src Map<S, F>>
 ) 
 where 
     S: Borrowable<Borrowed: SparseHierarchy>;
 
-impl<'src, S, F> SparseHierarchyState<'src> for State<'src, S, F>
+impl<'src, S, F> SparseHierarchyCursor<'src> for Cursor<'src, S, F>
 where 
     S: Borrowable<Borrowed: MonoSparseHierarchy>,
     F: for<'a> MapFunction<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data>
@@ -100,7 +100,7 @@ where
     #[inline]
     fn new(this: &'src Self::Src) -> Self {
         Self(
-            SparseHierarchyState::new(this.s.borrow()),
+            SparseHierarchyCursor::new(this.s.borrow()),
             PhantomData
         )
     }
@@ -121,7 +121,7 @@ where
 
     #[inline]
     unsafe fn data<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
-        -> Option<<Self as SparseHierarchyStateTypes<'a>>::Data> 
+        -> Option<<Self as SparseHierarchyCursorTypes<'a>>::Data> 
     {
         let data = self.0.data(this.s.borrow(), level_index);
         if let Some(data) = data {
@@ -133,7 +133,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
-        -> <Self as SparseHierarchyStateTypes<'a>>::Data
+        -> <Self as SparseHierarchyCursorTypes<'a>>::Data
     {
         let data = self.0.data_unchecked(this.s.borrow(), level_index);
         this.f.exec(data)

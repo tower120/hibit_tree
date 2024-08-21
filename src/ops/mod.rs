@@ -15,24 +15,24 @@ pub use union::Union;
 
 
 pub(crate) mod _multi_intersection;
-pub mod multi_intersection4{
+pub mod multi_intersection {
     pub use super::_multi_intersection::{
         Data,
         DataUnchecked,
-        State,
-        StateData
+        Cursor,
+        CursorData
     };
 }
 pub use _multi_intersection::MultiIntersection;
 
 
 pub(crate) mod _multi_union;
-pub mod multi_union4{
+pub mod multi_union {
     pub use super::_multi_union::{
         Data,
         DataUnchecked,
-        State,
-        StateData,
+        Cursor,
+        CursorData,
     };
 }
 pub use _multi_union::MultiUnion;

@@ -13,7 +13,7 @@ use hi_sparse_array::BinaryOp;
 use hi_sparse_array::compact_sparse_array2::CompactSparseArray;
 use hi_sparse_array::ops::union2::union2;
 use hi_sparse_array::ops::union::union;
-use hi_sparse_array::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
+use hi_sparse_array::sparse_hierarchy::{SparseHierarchy, SparseHierarchyCursor};
 use hi_sparse_array::utils::Take;
 
 type Lvl0Block = Block<u64, [u8;64]>;

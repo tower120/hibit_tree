@@ -10,12 +10,12 @@ use crate::level::ILevel;
 use crate::const_utils::const_int::{ConstInteger, ConstIntVisitor, ConstUsize};
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
 use crate::const_utils::{const_loop, ConstBool, ConstFalse, ConstTrue};
-use crate::{Empty, Index, SparseHierarchyStateTypes, SparseHierarchyTypes};
+use crate::{Empty, Index, SparseHierarchyCursorTypes, SparseHierarchyTypes};
 use crate::req_default::{DefaultInit, DefaultInitFor, DefaultRequirement, ReqDefault};
 use crate::utils::Primitive;
 use crate::utils::Array;
 use crate::sparse_array_levels::{FoldMutVisitor, FoldVisitor, MutVisitor, SparseArrayLevels, TypeVisitor, Visitor};
-use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
+use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyCursor};
 
 ///
 /// # Universal set (better naming?)
@@ -580,7 +580,7 @@ where
 {
     type Data = &'this Data;
     type DataUnchecked = &'this Data;
-    type State = SparseArrayState<'this, Levels, Data, R>;
+    type Cursor = Cursor<'this, Levels, Data, R>;
 }
 
 impl<Levels, Data, R> SparseHierarchy for SparseArray<Levels, Data, R>
@@ -620,7 +620,7 @@ where
     }
 }
 
-pub struct SparseArrayState<'src, Levels, Data, R>
+pub struct Cursor<'src, Levels, Data, R>
 where
     Levels: SparseArrayLevels,
     R: DefaultRequirement 
@@ -635,7 +635,7 @@ where
     phantom_data: PhantomData<&'src SparseArray<Levels, Data, R>>
 }
 
-impl<'this, 'src, Levels, Data, R> SparseHierarchyStateTypes<'this> for SparseArrayState<'src, Levels, Data, R>
+impl<'this, 'src, Levels, Data, R> SparseHierarchyCursorTypes<'this> for Cursor<'src, Levels, Data, R>
 where
     Levels: SparseArrayLevels,
     R: DefaultRequirement,
@@ -643,7 +643,7 @@ where
     type Data = &'src Data;
 }
 
-impl<'src, Levels, Data, R> SparseHierarchyState<'src> for SparseArrayState<'src, Levels, Data, R>
+impl<'src, Levels, Data, R> SparseHierarchyCursor<'src> for Cursor<'src, Levels, Data, R>
 where
     Levels: SparseArrayLevels,
     R: DefaultRequirement,
@@ -701,14 +701,14 @@ where
 
     #[inline(always)]
     unsafe fn data_unchecked<'a>(&'a self, src: &'src Self::Src, level_index: usize)
-        -> <Self as SparseHierarchyStateTypes<'a>>::Data 
+        -> <Self as SparseHierarchyCursorTypes<'a>>::Data 
     {
         self.data(src, level_index).unwrap_unchecked()
     }
     
     #[inline(always)]
     unsafe fn data<'a>(&'a self, src: &'src Self::Src, level_index: usize)
-        -> Option<<Self as SparseHierarchyStateTypes<'a>>::Data> 
+        -> Option<<Self as SparseHierarchyCursorTypes<'a>>::Data> 
     {
         /*const*/ let last_level_index = Levels::LevelCount::VALUE - 1;
         

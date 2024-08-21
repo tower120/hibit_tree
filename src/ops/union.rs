@@ -1,10 +1,9 @@
 use std::marker::PhantomData;
 use std::borrow::Borrow;
-use std::hint::unreachable_unchecked;
 use std::ops::{BitAnd, BitOr};
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
-use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
-use crate::{BitBlock, LazySparseHierarchy, SparseHierarchyStateTypes, SparseHierarchyTypes};
+use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyCursor};
+use crate::{BitBlock, LazySparseHierarchy, SparseHierarchyCursorTypes, SparseHierarchyTypes};
 use crate::bit_queue::BitQueue;
 use crate::utils::{Array, Borrowable, Take};
 
@@ -28,7 +27,7 @@ where
     
     type DataUnchecked = Self::Data;
     
-    type State = State<'this, S0, S1>;
+    type Cursor = Cursor<'this, S0, S1>;
 }
 
 impl<S0, S1> SparseHierarchy for Union<S0, S1>
@@ -73,28 +72,28 @@ type Masks<S> = ConstArrayType<
     <<S as Borrowable>::Borrowed as SparseHierarchy>::LevelCount,
 >;
 
-pub struct State<'src, S0, S1>
+pub struct Cursor<'src, S0, S1>
 where
     S0: Borrowable<Borrowed: SparseHierarchy>,
     S1: Borrowable<Borrowed: SparseHierarchy>,
 {
-    s0: <S0::Borrowed as SparseHierarchyTypes<'src>>::State, 
-    s1: <S1::Borrowed as SparseHierarchyTypes<'src>>::State,
+    s0: <S0::Borrowed as SparseHierarchyTypes<'src>>::Cursor, 
+    s1: <S1::Borrowed as SparseHierarchyTypes<'src>>::Cursor,
     phantom: PhantomData<&'src Union<S0, S1>>
 }
 
-impl<'this, 'src, S0, S1> SparseHierarchyStateTypes<'this> for State<'src, S0, S1>
+impl<'this, 'src, S0, S1> SparseHierarchyCursorTypes<'this> for Cursor<'src, S0, S1>
 where
     S0: Borrowable<Borrowed: SparseHierarchy>,
     S1: Borrowable<Borrowed: SparseHierarchy>,
 {
     type Data = (
-        Option<<<S0::Borrowed as SparseHierarchyTypes<'src>>::State as SparseHierarchyStateTypes<'this>>::Data>,
-        Option<<<S1::Borrowed as SparseHierarchyTypes<'src>>::State as SparseHierarchyStateTypes<'this>>::Data>
+        Option<<<S0::Borrowed as SparseHierarchyTypes<'src>>::Cursor as SparseHierarchyCursorTypes<'this>>::Data>,
+        Option<<<S1::Borrowed as SparseHierarchyTypes<'src>>::Cursor as SparseHierarchyCursorTypes<'this>>::Data>
     );
 }
 
-impl<'src, S0, S1> SparseHierarchyState<'src> for State<'src, S0, S1>
+impl<'src, S0, S1> SparseHierarchyCursor<'src> for Cursor<'src, S0, S1>
 where
     S0: Borrowable<Borrowed: SparseHierarchy>,
     S1: Borrowable<Borrowed: SparseHierarchy<
@@ -107,8 +106,8 @@ where
     #[inline]
     fn new(src: &'src Self::Src) -> Self {
         Self{
-            s0: SparseHierarchyState::new(src.s0.borrow()), 
-            s1: SparseHierarchyState::new(src.s1.borrow()),
+            s0: SparseHierarchyCursor::new(src.s0.borrow()), 
+            s1: SparseHierarchyCursor::new(src.s1.borrow()),
             phantom: PhantomData
         }
     }
@@ -143,7 +142,7 @@ where
 
     #[inline]
     unsafe fn data<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
-        -> Option<<Self as SparseHierarchyStateTypes<'a>>::Data> 
+        -> Option<<Self as SparseHierarchyCursorTypes<'a>>::Data> 
     {
         let d0 = self.s0.data(this.s0.borrow(), level_index);
         let d1 = self.s1.data(this.s1.borrow(), level_index);
@@ -156,7 +155,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
-        -> <Self as SparseHierarchyStateTypes<'a>>::Data 
+        -> <Self as SparseHierarchyCursorTypes<'a>>::Data 
     {
         self.data(this, level_index).unwrap_unchecked()
     }

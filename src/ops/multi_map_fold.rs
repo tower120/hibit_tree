@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use crate::{LazySparseHierarchy, MultiSparseHierarchy, MultiSparseHierarchyTypes, SparseHierarchy, SparseHierarchyState, SparseHierarchyStateTypes, SparseHierarchyTypes};
+use crate::{LazySparseHierarchy, MultiSparseHierarchy, MultiSparseHierarchyTypes, SparseHierarchy, SparseHierarchyCursor, SparseHierarchyCursorTypes, SparseHierarchyTypes};
 use crate::const_utils::ConstInteger;
 use crate::utils::{BinaryFunction, Borrowable, NullaryFunction, UnaryFunction};
 
@@ -21,7 +21,7 @@ where
 {
     type Data = I::Output;
     type DataUnchecked = Self::Data;
-    type State = State<'this, S, I, F>;
+    type Cursor = Cursor<'this, S, I, F>;
 }
 
 impl<S, I, F> SparseHierarchy for MultiMapFold<S, I, F>
@@ -62,21 +62,21 @@ where
     }
 }
 
-pub struct State<'src, S, I, F> (
-    <S as SparseHierarchyTypes<'src>>::State,
+pub struct Cursor<'src, S, I, F> (
+    <S as SparseHierarchyTypes<'src>>::Cursor,
     PhantomData<&'src MultiMapFold<S, I, F>>
 ) where
     S: SparseHierarchy;
 
 
-impl<'this, 'src, S, I, F> SparseHierarchyStateTypes<'this> for State<'src, S, I, F>
+impl<'this, 'src, S, I, F> SparseHierarchyCursorTypes<'this> for Cursor<'src, S, I, F>
 where
     S: MultiSparseHierarchy,
     I: NullaryFunction,
 { 
     type Data = I::Output; 
 }
-impl<'src, S, I, F> SparseHierarchyState<'src> for State<'src, S, I, F>
+impl<'src, S, I, F> SparseHierarchyCursor<'src> for Cursor<'src, S, I, F>
 where
     S: MultiSparseHierarchy,
     I: NullaryFunction,
@@ -91,7 +91,7 @@ where
     #[inline]
     fn new(this: &'src Self::Src) -> Self {
         Self(
-            SparseHierarchyState::new(&this.s), 
+            SparseHierarchyCursor::new(&this.s),
             PhantomData
         )
     }
@@ -112,7 +112,7 @@ where
 
     #[inline]
     unsafe fn data<'a>(&'a self, src: &'src Self::Src, level_index: usize) 
-        -> Option<<Self as SparseHierarchyStateTypes<'a>>::Data> 
+        -> Option<<Self as SparseHierarchyCursorTypes<'a>>::Data> 
     {
         if let Some(data_iter) = self.0.data(&src.s, level_index){
             let init = src.init.exec();
@@ -125,7 +125,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked<'a>(&'a self, src: &'src Self::Src, level_index: usize) 
-        -> <Self as SparseHierarchyStateTypes<'a>>::Data 
+        -> <Self as SparseHierarchyCursorTypes<'a>>::Data 
     {
         let init = src.init.exec();
         let data_iter = self.0.data_unchecked(&src.s, level_index);

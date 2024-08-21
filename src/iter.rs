@@ -1,6 +1,6 @@
 use std::ops::ControlFlow;
-use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyState};
-use crate::{BitBlock, data_block_index, MonoSparseHierarchy, SparseHierarchyStateTypes, SparseHierarchyTypes};
+use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyCursor};
+use crate::{BitBlock, data_block_index, MonoSparseHierarchy, SparseHierarchyCursorTypes, SparseHierarchyTypes};
 use crate::bit_queue::BitQueue;
 use crate::const_utils::const_int::{const_for_rev, ConstInteger, ConstIntVisitor, ConstUsize};
 use crate::const_utils::const_array::ConstArrayType;
@@ -39,7 +39,7 @@ where
     /// [usize; T::LevelCount - 1]
     level_indices: LevelIndices<T>,
 
-    state: <T as SparseHierarchyTypes<'a>>::State,
+    cursor: <T as SparseHierarchyTypes<'a>>::Cursor,
 }
 
 impl<'a, T> Iter<'a, T>
@@ -50,10 +50,10 @@ where
     pub fn new(container: &'a T) -> Self {
         let mut level_iters: LevelIterators<T> = Array::from_fn(|_| BitQueue::empty());
         
-        let mut state = T::State::new(container);
+        let mut cursor = T::Cursor::new(container);
         
         let root_mask = unsafe{
-            state.select_level_node_unchecked(container, ConstUsize::<0>, 0)
+            cursor.select_level_node_unchecked(container, ConstUsize::<0>, 0)
         };
         let level0_iter = root_mask.into_bits_iter();
         
@@ -68,7 +68,7 @@ where
             // Which means that only level0_iter initialized, and in original state.
             level_indices: Array::from_fn(|_| usize::MAX),
 
-            state,
+            cursor,
         }
     }
 }
@@ -79,7 +79,7 @@ where
 {
     type Item<'this>= (
         usize/*index*/, 
-        <<T as SparseHierarchyTypes<'a>>::State as SparseHierarchyStateTypes<'this>>::Data
+        <<T as SparseHierarchyTypes<'a>>::Cursor as SparseHierarchyCursorTypes<'this>>::Data
     ) where Self:'this;
 
     #[inline]
@@ -113,7 +113,7 @@ where
                             // 2. update level_iter from mask
                             let level_depth = i.inc();                            
                             let level_mask = unsafe{
-                                self.0.state.select_level_node_unchecked(
+                                self.0.cursor.select_level_node_unchecked(
                                     &self.0.container,
                                     level_depth,
                                     index
@@ -140,7 +140,7 @@ where
         };
 
         let data_block = unsafe {
-            self.state.data_unchecked(&self.container, level_index)
+            self.cursor.data_unchecked(&self.container, level_index)
         };
         let block_index = data_block_index::<T::LevelCount, T::LevelMask>(&self.level_indices, level_index);
         Some((block_index, data_block))

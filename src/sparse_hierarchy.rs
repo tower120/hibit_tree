@@ -85,7 +85,7 @@ for
 pub trait SparseHierarchyTypes<'this, ImplicitBounds = &'this Self>{
     type Data;
     type DataUnchecked;
-    type State: SparseHierarchyState<'this, Src=Self>;
+    type Cursor: SparseHierarchyCursor<'this, Src=Self>;
 }
 
 /// 
@@ -216,13 +216,13 @@ pub trait FromSparseHierarchy<From: SparseHierarchy> {
     fn from_sparse_hierarchy(from: From) -> Self;
 }
 
-pub trait SparseHierarchyStateTypes<'this, ImplicitBounds = &'this Self>{
+pub trait SparseHierarchyCursorTypes<'this, ImplicitBounds = &'this Self>{
     type Data;
     // Looks like we don't need DataUnchecked in State yet.
     // (unchecked versions return Data)
 }
 
-/// Stateful [SparseHierarchy] interface.
+/// Stateful [SparseHierarchy] traverse interface.
 /// 
 /// Having state allows implementations to have cache level meta-info.
 /// If level block changed seldom and not sporadically (like during iteration) -
@@ -246,9 +246,9 @@ pub trait SparseHierarchyStateTypes<'this, ImplicitBounds = &'this Self>{
 /// // Select 9th data block (array index 201)
 /// let data = state.data(array, 9);
 /// ``` 
-pub trait SparseHierarchyState<'src>
+pub trait SparseHierarchyCursor<'src>
 where
-	Self: for<'this> SparseHierarchyStateTypes<'this>,
+	Self: for<'this> SparseHierarchyCursorTypes<'this>,
 {
     type Src: SparseHierarchy;
     
@@ -275,14 +275,14 @@ where
         &'a self,
         src: &'src Self::Src,
         level_index: usize
-    ) -> Option<<Self as SparseHierarchyStateTypes<'a>>::Data>;      
+    ) -> Option<<Self as SparseHierarchyCursorTypes<'a>>::Data>;      
  
     /// Pointed data must exists
     unsafe fn data_unchecked<'a>(
         &'a self,
         src: &'src Self::Src,
         level_index: usize
-    ) -> <Self as SparseHierarchyStateTypes<'a>>::Data;        
+    ) -> <Self as SparseHierarchyCursorTypes<'a>>::Data;        
 }
 
 pub type SparseHierarchyData<'a, T> = <T as SparseHierarchyTypes<'a>>::Data;
@@ -291,7 +291,7 @@ pub type MultiSparseHierarchyIterItem<'a, T> = <T as MultiSparseHierarchyTypes<'
 pub trait MonoSparseHierarchyTypes<'this, ImplicitBounds = &'this Self>
     : SparseHierarchyTypes<'this, ImplicitBounds,
         DataUnchecked = <Self as SparseHierarchyTypes<'this, ImplicitBounds>>::Data, 
-        State: for<'a> SparseHierarchyStateTypes<'a, 
+        Cursor: for<'a> SparseHierarchyCursorTypes<'a, 
             Data = Self::Data
         >,
     >
@@ -331,7 +331,7 @@ impl<'this, T> MonoSparseHierarchyTypes<'this> for T
 where
     T: SparseHierarchyTypes<'this,
         DataUnchecked = <Self as SparseHierarchyTypes<'this>>::Data,
-        State: for<'a> SparseHierarchyStateTypes<'a, 
+        Cursor: for<'a> SparseHierarchyCursorTypes<'a, 
             Data = Self::Data
         >,
     >
@@ -348,7 +348,7 @@ pub trait MultiSparseHierarchyTypes<'this, ImplicitBounds = &'this Self>
     : SparseHierarchyTypes<'this, ImplicitBounds, 
         Data: Iterator<Item=Self::IterItem>,
         DataUnchecked: Iterator<Item=Self::IterItem>,
-        State: for<'a> SparseHierarchyStateTypes<'a, 
+        Cursor: for<'a> SparseHierarchyCursorTypes<'a, 
             Data: Iterator<Item=Self::IterItem>
         >,
     >
