@@ -1,6 +1,6 @@
 use std::ops::ControlFlow;
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyCursor};
-use crate::{BitBlock, data_block_index, MonoSparseHierarchy, SparseHierarchyCursorTypes, SparseHierarchyTypes};
+use crate::{BitBlock, data_block_index, RegularSparseHierarchy, SparseHierarchyCursorTypes, SparseHierarchyTypes};
 use crate::bit_queue::BitQueue;
 use crate::const_utils::const_int::{const_for_rev, ConstInteger, ConstIntVisitor, ConstUsize};
 use crate::const_utils::const_array::ConstArrayType;
@@ -26,7 +26,7 @@ type LevelIterators<T: SparseHierarchy> =
 
 /// [SparseHierarchy] iterator.
 ///  
-/// This is [LendingIterator], that also [Iterator] for [MonoSparseHierarchy]. 
+/// This is [LendingIterator], that also [Iterator] for [RegularSparseHierarchy]. 
 pub struct Iter<'a, T>
 where
     T: SparseHierarchy,
@@ -150,7 +150,7 @@ where
 
 impl<'a, T> Iterator for Iter<'a, T>
 where
-    T: MonoSparseHierarchy,
+    T: RegularSparseHierarchy,
 {
     type Item = (usize, <T as SparseHierarchyTypes<'a>>::Data);
 

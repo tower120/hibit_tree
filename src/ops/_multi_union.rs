@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::slice;
 use arrayvec::ArrayVec;
-use crate::{BitBlock, LazySparseHierarchy, MonoSparseHierarchy, MultiSparseHierarchy, MultiSparseHierarchyTypes, SparseHierarchy, SparseHierarchyData, SparseHierarchyCursor, SparseHierarchyCursorTypes, SparseHierarchyTypes};
+use crate::{BitBlock, LazySparseHierarchy, RegularSparseHierarchy, MultiSparseHierarchy, MultiSparseHierarchyTypes, SparseHierarchy, SparseHierarchyData, SparseHierarchyCursor, SparseHierarchyCursorTypes, SparseHierarchyTypes};
 use crate::const_utils::{ConstArrayType, ConstInteger};
 use crate::utils::{Array, Borrowable, Ref};
 
@@ -310,7 +310,7 @@ where
 impl<'item, 'this, Iter, T> MultiSparseHierarchyTypes<'this> for MultiUnion<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: MonoSparseHierarchy + 'item
+    T: RegularSparseHierarchy + 'item
 { 
     type IterItem = SparseHierarchyData<'item, T>; 
 }
@@ -318,7 +318,7 @@ where
 impl<'item, Iter, T> MultiSparseHierarchy for MultiUnion<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: MonoSparseHierarchy + 'item
+    T: RegularSparseHierarchy + 'item
 {}
 
 impl<Iter> Borrowable for MultiUnion<Iter>{ type Borrowed = Self; }

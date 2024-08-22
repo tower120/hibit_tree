@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::BitAnd;
 use crate::const_utils::{ConstArray, ConstInteger};
-use crate::{LazySparseHierarchy, MonoSparseHierarchy, SparseHierarchyCursorTypes, SparseHierarchyTypes};
+use crate::{LazySparseHierarchy, RegularSparseHierarchy, SparseHierarchyCursorTypes, SparseHierarchyTypes};
 use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyCursor};
 use crate::utils::{Borrowable, Take};
 
@@ -174,7 +174,7 @@ where
 
 impl<S0, S1> LazySparseHierarchy for Intersection<S0, S1>
 where
-    Intersection<S0, S1>: MonoSparseHierarchy
+    Intersection<S0, S1>: RegularSparseHierarchy
 {}
 
 impl<S0, S1> Borrowable for Intersection<S0, S1>{ type Borrowed = Self; }

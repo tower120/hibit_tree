@@ -1,6 +1,6 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
-use crate::{LazySparseHierarchy, MonoSparseHierarchy, SparseHierarchy, SparseHierarchyCursor, SparseHierarchyCursorTypes, SparseHierarchyTypes};
+use crate::{LazySparseHierarchy, RegularSparseHierarchy, SparseHierarchy, SparseHierarchyCursor, SparseHierarchyCursorTypes, SparseHierarchyTypes};
 use crate::const_utils::ConstInteger;
 use crate::utils::{Borrowable, UnaryFunction};
 
@@ -34,7 +34,7 @@ pub struct Map<S, F>{
 
 impl<'this, S, F> SparseHierarchyTypes<'this> for Map<S, F>
 where
-    S: Borrowable<Borrowed: MonoSparseHierarchy>,
+    S: Borrowable<Borrowed: RegularSparseHierarchy>,
     F: for<'a> MapFunction<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data> 
 {
     type Data = <F as MapFunction<'this, <S::Borrowed as SparseHierarchyTypes<'this>>::Data>>::Output;
@@ -44,7 +44,7 @@ where
 
 impl<S, F> SparseHierarchy for Map<S, F>
 where
-    S: Borrowable<Borrowed: MonoSparseHierarchy>,
+    S: Borrowable<Borrowed: RegularSparseHierarchy>,
     F: for<'a> MapFunction<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data>
 {
     const EXACT_HIERARCHY: bool = <S::Borrowed as SparseHierarchy>::EXACT_HIERARCHY;
@@ -75,7 +75,7 @@ where
 
 impl<'this, 'src, S, F> SparseHierarchyCursorTypes<'this> for Cursor<'src, S, F>
 where 
-    S: Borrowable<Borrowed: MonoSparseHierarchy>,
+    S: Borrowable<Borrowed: RegularSparseHierarchy>,
     F: for<'a> MapFunction<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data>
 {
     // Map can work only with "monolithic" SparseHierarchy. 
@@ -92,7 +92,7 @@ where
 
 impl<'src, S, F> SparseHierarchyCursor<'src> for Cursor<'src, S, F>
 where 
-    S: Borrowable<Borrowed: MonoSparseHierarchy>,
+    S: Borrowable<Borrowed: RegularSparseHierarchy>,
     F: for<'a> MapFunction<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data>
 {
     type Src = Map<S, F>;
@@ -142,12 +142,12 @@ where
 
 impl<S, F> LazySparseHierarchy for Map<S, F>
 where
-    Map<S, F>: MonoSparseHierarchy
+    Map<S, F>: RegularSparseHierarchy
 {}
 
 impl<S, F> Borrowable for Map<S, F> { type Borrowed = Self; }
 
-/// Maps each [MonoSparseHierarchy] element with `f: Fn(Item) -> Out`.
+/// Maps each [RegularSparseHierarchy] element with `f: Fn(Item) -> Out`.
 /// 
 /// # Note
 /// 
@@ -184,7 +184,7 @@ impl<S, F> Borrowable for Map<S, F> { type Borrowed = Self; }
 #[inline]
 pub fn map<S, F>(s: S, f: F) -> Map<S, F>
 where
-    S: Borrowable<Borrowed: MonoSparseHierarchy>,
+    S: Borrowable<Borrowed: RegularSparseHierarchy>,
     F: for<'a> MapFunction<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data>
 {
     Map{ s, f }

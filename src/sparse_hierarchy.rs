@@ -91,8 +91,8 @@ pub trait SparseHierarchyTypes<'this, ImplicitBounds = &'this Self>{
 /// 
 /// TODO: Add more description
 /// 
-/// SparseHierarchy is a base trait for [MonoSparseHierarchy] and [MultiSparseHierarchy],
-/// which you will use most of the time. Only multi_* operations over non-[MonoSparseHierarchy]'ies
+/// SparseHierarchy is a base trait for [RegularSparseHierarchy] and [MultiSparseHierarchy],
+/// which you will use most of the time. Only multi_* operations over non-[RegularSparseHierarchy]'ies
 /// return bare SparseHierarchy.
 ///
 /// This split is needed, because multi_* operations ([MultiSparseHierarchy]'ies) 
@@ -288,7 +288,7 @@ where
 pub type SparseHierarchyData<'a, T> = <T as SparseHierarchyTypes<'a>>::Data;
 pub type MultiSparseHierarchyIterItem<'a, T> = <T as MultiSparseHierarchyTypes<'a>>::IterItem;
 
-pub trait MonoSparseHierarchyTypes<'this, ImplicitBounds = &'this Self>
+pub trait RegularSparseHierarchyTypes<'this, ImplicitBounds = &'this Self>
     : SparseHierarchyTypes<'this, ImplicitBounds,
         DataUnchecked = <Self as SparseHierarchyTypes<'this, ImplicitBounds>>::Data, 
         Cursor: for<'a> SparseHierarchyCursorTypes<'a, 
@@ -304,9 +304,9 @@ pub trait MonoSparseHierarchyTypes<'this, ImplicitBounds = &'this Self>
 /// Think of it as of "the usual" [SparseHierarchy].  
 /// 
 /// All containers and all "non-multi" operations results are MonoSparseHierarchy. 
-pub trait MonoSparseHierarchy: SparseHierarchy
+pub trait RegularSparseHierarchy: SparseHierarchy
 where
-    Self: for<'this> MonoSparseHierarchyTypes<'this>
+    Self: for<'this> RegularSparseHierarchyTypes<'this>
 {
     /// See [crate::map]
     #[inline]
@@ -327,7 +327,7 @@ where
     }
 }
 
-impl<'this, T> MonoSparseHierarchyTypes<'this> for T
+impl<'this, T> RegularSparseHierarchyTypes<'this> for T
 where
     T: SparseHierarchyTypes<'this,
         DataUnchecked = <Self as SparseHierarchyTypes<'this>>::Data,
@@ -338,10 +338,10 @@ where
 {} 
 
 // TODO: impl manually?
-impl<T> MonoSparseHierarchy for T
+impl<T> RegularSparseHierarchy for T
 where
     T: SparseHierarchy,
-    T: for<'this> MonoSparseHierarchyTypes<'this>
+    T: for<'this> RegularSparseHierarchyTypes<'this>
 {}
 
 pub trait MultiSparseHierarchyTypes<'this, ImplicitBounds = &'this Self>
@@ -361,7 +361,7 @@ pub trait MultiSparseHierarchyTypes<'this, ImplicitBounds = &'this Self>
 /// 
 /// `multi_*` operations return [MultiSparseHierarchy]'ies.
 /// 
-/// You can convert MultiSparseHierarchy to [MonoSparseHierarchy],
+/// You can convert MultiSparseHierarchy to [RegularSparseHierarchy],
 /// with [multi_map_fold()]. 
 pub trait MultiSparseHierarchy: SparseHierarchy
 where

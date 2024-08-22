@@ -6,7 +6,7 @@ use rand::{Rng, SeedableRng};
 use hi_sparse_array::{CompactSparseArray, FromSparseHierarchy, intersection, LazySparseHierarchy, map, union};
 use hi_sparse_array::const_utils::ConstUsize;
 use hi_sparse_array::SparseHierarchy;
-use hi_sparse_array::MonoSparseHierarchy;
+use hi_sparse_array::RegularSparseHierarchy;
 use hi_sparse_array::utils::{Borrowable, UnaryFunction};
 
 mod common;
