@@ -1,5 +1,5 @@
 [package]
-name = "hi_sparse_array"
+name = "hibit_tree"
 version = "0.1.0"
 rust-version = "1.79.0"
 edition = "2021"
