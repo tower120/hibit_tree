@@ -1,4 +1,4 @@
-**Hi**erarchical **bit**map **Tree**
+**HI**erarchical **BIT**map **TREE**
 
 Hierarchical bitmap tree is an integer-indexed prefix-tree without
 memory overhead[^mem_overhead] and performance higher than a HashMap with no 
