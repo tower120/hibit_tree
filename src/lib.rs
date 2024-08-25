@@ -2,7 +2,7 @@
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 
 //! {TODO: This is changed}
-//! The core of the lib is [SparseArray] container and [SparseHierarchy] 
+//! The core of the lib is [SparseArray] container and [BitmapTree] 
 //! interface. They represent concept of data structure that filled
 //! with "empty" elements across whole range, and populated with values.    
 //! 

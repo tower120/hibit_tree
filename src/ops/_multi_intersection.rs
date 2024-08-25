@@ -4,9 +4,9 @@ use std::mem::MaybeUninit;
 use std::ptr::NonNull;
 use std::slice;
 use arrayvec::ArrayVec;
-use crate::{BitBlock, LazySparseHierarchy, RegularSparseHierarchy, MultiSparseHierarchy, MultiSparseHierarchyTypes, SparseHierarchyData, SparseHierarchyCursorTypes, SparseHierarchyTypes};
+use crate::{BitBlock, LazyBitmapTree, RegularBitmapTree, MultiBitmapTree, MultiBitmapTreeTypes, BitmapTreeData, BitmapTreeCursorTypes, BitmapTreeTypes};
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
-use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyCursor};
+use crate::sparse_hierarchy::{BitmapTree, BitmapTreeCursor};
 use crate::utils::{Array, Borrowable, Ref, Take};
 
 /// Intersection between all iterator items.
@@ -17,22 +17,22 @@ pub struct MultiIntersection<Iter> {
 }
 
 type IterItem<Iter> = <<Iter as Iterator>::Item as Ref>::Type;
-type IterItemCursor<'item, Iter> = <IterItem<Iter> as SparseHierarchyTypes<'item>>::Cursor;
+type IterItemCursor<'item, Iter> = <IterItem<Iter> as BitmapTreeTypes<'item>>::Cursor;
 
-impl<'item, 'this, Iter, T> SparseHierarchyTypes<'this> for MultiIntersection<Iter>
+impl<'item, 'this, Iter, T> BitmapTreeTypes<'this> for MultiIntersection<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: SparseHierarchy + 'item
+    T: BitmapTree + 'item
 {
     type Data  = Data<'item, Iter>;
     type DataUnchecked = DataUnchecked<Iter>;
     type Cursor = Cursor<'this, 'item, Iter>;
 }
 
-impl<'i, Iter, T> SparseHierarchy for MultiIntersection<Iter>
+impl<'i, Iter, T> BitmapTree for MultiIntersection<Iter>
 where
     Iter: Iterator<Item = &'i T> + Clone,
-    T: SparseHierarchy + 'i
+    T: BitmapTree + 'i
 {
     const EXACT_HIERARCHY: bool = false;
     
@@ -41,7 +41,7 @@ where
 
     #[inline]
     unsafe fn data(&self, index: usize, level_indices: &[usize]) 
-        -> Option<<Self as SparseHierarchyTypes<'_>>::Data> 
+        -> Option<<Self as BitmapTreeTypes<'_>>::Data> 
     {
         // There are few ways to do it:
         // 1. Iterate, get data() and build resolve value on the fly. As
@@ -141,7 +141,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked<'a>(&'a self, index: usize, level_indices: &'a [usize]) 
-        -> <Self as SparseHierarchyTypes<'a>>::DataUnchecked
+        -> <Self as BitmapTreeTypes<'a>>::DataUnchecked
     {
         DataUnchecked {
             index, 
@@ -151,7 +151,7 @@ where
     }
 }
 
-pub type Data<'item, Iter> = arrayvec::IntoIter<<IterItem<Iter> as SparseHierarchyTypes<'item>>::Data, N>; 
+pub type Data<'item, Iter> = arrayvec::IntoIter<<IterItem<Iter> as BitmapTreeTypes<'item>>::Data, N>; 
 
 /*use data_resolve_v2::ResolveIter;
 
@@ -266,21 +266,21 @@ mod data_resolve_v2 {
 
 pub struct DataUnchecked<Iter> 
 where
-    Iter: Iterator<Item: Ref<Type: SparseHierarchy>>,
+    Iter: Iterator<Item: Ref<Type: BitmapTree>>,
 {
     index: usize, 
     // This is copy from level_indices &[usize]. 
     // Compiler optimize away the very act of cloning and directly use &[usize].
     // At least, if value used immediately, and not stored for latter use. 
-    level_indices: ConstArrayType<usize, <IterItem<Iter> as SparseHierarchy>::LevelCount>,
+    level_indices: ConstArrayType<usize, <IterItem<Iter> as BitmapTree>::LevelCount>,
     iter: Iter,
 }
 impl<'item, Iter, T> Iterator for DataUnchecked<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: SparseHierarchy + 'item,
+    T: BitmapTree + 'item,
 {
-    type Item = </*IterItem<Iter>*/T as SparseHierarchyTypes<'item>>::DataUnchecked;
+    type Item = </*IterItem<Iter>*/T as BitmapTreeTypes<'item>>::DataUnchecked;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -312,7 +312,7 @@ where
 impl<'item, Iter, T> ExactSizeIterator for DataUnchecked<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: SparseHierarchy + 'item,
+    T: BitmapTree + 'item,
 {}
 
 const N: usize = 32;
@@ -320,25 +320,25 @@ type CursorsItem<'item, Iter> = IterItemCursor<'item, Iter>;
 
 pub struct Cursor<'src, 'item, I>
 where
-    I: Iterator<Item: Ref<Type: SparseHierarchy>>
+    I: Iterator<Item: Ref<Type: BitmapTree>>
 {
     cursors: ArrayVec<CursorsItem<'item, I>, N>,    
     empty_below_n: usize,
-    terminal_node_mask: <IterItem<I> as SparseHierarchy>::LevelMask,
+    terminal_node_mask: <IterItem<I> as BitmapTree>::LevelMask,
     phantom_data: PhantomData<(&'src MultiIntersection<I>)>
 }
 
-impl<'this, 'src, 'item, Iter> SparseHierarchyCursorTypes<'this> for Cursor<'src, 'item, Iter>
+impl<'this, 'src, 'item, Iter> BitmapTreeCursorTypes<'this> for Cursor<'src, 'item, Iter>
 where
-    Iter: Iterator<Item: Ref<Type: SparseHierarchy>>
+    Iter: Iterator<Item: Ref<Type: BitmapTree>>
 {
     type Data = CursorData<'this, 'item, Iter>;
 }
 
-impl<'src, 'item, Iter, T> SparseHierarchyCursor<'src> for Cursor<'src, 'item, Iter>
+impl<'src, 'item, Iter, T> BitmapTreeCursor<'src> for Cursor<'src, 'item, Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: SparseHierarchy + 'item
+    T: BitmapTree + 'item
 {
     type Src = MultiIntersection<Iter>;
 
@@ -347,7 +347,7 @@ where
         let cursors = ArrayVec::from_iter(
             src.iter.clone()
                 .map(|array|{
-                    SparseHierarchyCursor::new(array)
+                    BitmapTreeCursor::new(array)
                 })
         );
         
@@ -362,7 +362,7 @@ where
     #[inline]
     unsafe fn select_level_node<N: ConstInteger>(
         &mut self, src: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as SparseHierarchy>::LevelMask {
+    ) -> <Self::Src as BitmapTree>::LevelMask {
         // if we know that upper levels returned empty - return early.
         if N > self.empty_below_n {
             return BitBlock::zero(); 
@@ -393,7 +393,7 @@ where
             usize::MAX
         };
         
-        /*const*/ if N::VALUE == <Self::Src as SparseHierarchy>::LevelCount::VALUE - 1 {
+        /*const*/ if N::VALUE == <Self::Src as BitmapTree>::LevelCount::VALUE - 1 {
             self.terminal_node_mask = acc_mask.clone(); 
         }
         
@@ -403,7 +403,7 @@ where
     #[inline]
     unsafe fn select_level_node_unchecked<N: ConstInteger> (
         &mut self, src: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as SparseHierarchy>::LevelMask {
+    ) -> <Self::Src as BitmapTree>::LevelMask {
         // TODO: Almost the same as in checked version. Reuse somehow. 
         let mut cursors_iter = self.cursors.iter_mut();
         let mut array_iter  = src.iter.clone();
@@ -429,7 +429,7 @@ where
 
     #[inline]
     unsafe fn data<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
-        -> Option<<Self as SparseHierarchyCursorTypes<'a>>::Data> 
+        -> Option<<Self as BitmapTreeCursorTypes<'a>>::Data> 
     {
         if !self.terminal_node_mask.get_bit(level_index){
             return None;
@@ -441,7 +441,7 @@ where
     #[inline]
     unsafe fn data_unchecked<'a>(
         &'a self, src: &'src Self::Src, level_index: usize
-    ) -> <Self as SparseHierarchyCursorTypes<'a>>::Data {
+    ) -> <Self as BitmapTreeCursorTypes<'a>>::Data {
         CursorData { 
             level_index,
             array_iter: src.iter.clone(),
@@ -452,7 +452,7 @@ where
 
 pub struct CursorData<'cursor, 'item, I>
 where
-    I: Iterator<Item: Ref<Type: SparseHierarchy>>
+    I: Iterator<Item: Ref<Type: BitmapTree>>
 {
     level_index: usize,
     array_iter: I,
@@ -467,9 +467,9 @@ where
 impl<'cursor, 'item, I, T> Iterator for CursorData<'cursor, 'item, I>
 where
     I: Iterator<Item = &'item T> + Clone,
-    T: SparseHierarchy + 'item
+    T: BitmapTree + 'item
 {
-    type Item = <IterItemCursor<'item, I> as SparseHierarchyCursorTypes<'cursor>>::Data;
+    type Item = <IterItemCursor<'item, I> as BitmapTreeCursorTypes<'cursor>>::Data;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -508,26 +508,26 @@ where
 impl<'cursor, 'item, I, T> ExactSizeIterator for CursorData<'cursor, 'item, I>
 where
     I: Iterator<Item = &'item T> + Clone,
-    T: SparseHierarchy + 'item
+    T: BitmapTree + 'item
 {}
 
-impl<'item, 'this, Iter, T> MultiSparseHierarchyTypes<'this> for MultiIntersection<Iter>
+impl<'item, 'this, Iter, T> MultiBitmapTreeTypes<'this> for MultiIntersection<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: RegularSparseHierarchy + 'item
+    T: RegularBitmapTree + 'item
 { 
-    type IterItem = SparseHierarchyData<'item, T>; 
+    type IterItem = BitmapTreeData<'item, T>; 
 }
 
-impl<'item, Iter, T> MultiSparseHierarchy for MultiIntersection<Iter>
+impl<'item, Iter, T> MultiBitmapTree for MultiIntersection<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: RegularSparseHierarchy + 'item
+    T: RegularBitmapTree + 'item
 {} 
 
-impl<Iter> LazySparseHierarchy for MultiIntersection<Iter>
+impl<Iter> LazyBitmapTree for MultiIntersection<Iter>
 where
-    MultiIntersection<Iter>: SparseHierarchy
+    MultiIntersection<Iter>: BitmapTree
 {}
 
 impl<Iter> Borrowable for MultiIntersection<Iter>{ type Borrowed = Self; }
@@ -536,7 +536,7 @@ impl<Iter> Borrowable for MultiIntersection<Iter>{ type Borrowed = Self; }
 pub fn multi_intersection<Iter>(iter: Iter) 
     -> MultiIntersection<Iter>
 where
-    Iter: Iterator<Item: Ref<Type:SparseHierarchy>> + Clone,
+    Iter: Iterator<Item: Ref<Type: BitmapTree>> + Clone,
 {
     MultiIntersection{ iter }
 }
@@ -545,7 +545,7 @@ where
 mod tests{
     use itertools::assert_equal;
     use crate::compact_sparse_array::CompactSparseArray;
-    use crate::sparse_hierarchy::SparseHierarchy;
+    use crate::sparse_hierarchy::BitmapTree;
     use crate::utils::LendingIterator;
     use super::multi_intersection;
 

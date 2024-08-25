@@ -3,8 +3,8 @@ use std::ops::ControlFlow::Continue;
 
 use crate::const_utils::{ConstInteger, ConstUsize};
 use crate::{
-    BitBlock, FromSparseHierarchy, SparseHierarchy, SparseHierarchyCursor,
-    SparseHierarchyCursorTypes, SparseHierarchyTypes
+    BitBlock, FromBitmapTree, BitmapTree, BitmapTreeCursor,
+    BitmapTreeCursorTypes, BitmapTreeTypes
 };
 use crate::utils::Take;
 
@@ -12,15 +12,15 @@ use super::node::{empty_node, NodePtr};
 use super::{CompactSparseArray, DataIndex, Mask};
 
 type CursorData<'src, 'state, L> = 
-    <<L as SparseHierarchyTypes<'src>>
-    ::Cursor as SparseHierarchyCursorTypes<'state>>
+    <<L as BitmapTreeTypes<'src>>
+    ::Cursor as BitmapTreeCursorTypes<'state>>
     ::Data;
 
 // TODO: move somewhere up, use in iter
 #[inline]
-fn block_start<S: SparseHierarchy, N: ConstInteger>(index: usize) -> usize {
+fn block_start<S: BitmapTree, N: ConstInteger>(index: usize) -> usize {
     index << (
-        <S as SparseHierarchy>::LevelMask::SIZE.ilog2() as usize * 
+        <S as BitmapTree>::LevelMask::SIZE.ilog2() as usize * 
         (S::LevelCount::VALUE - N::VALUE - 1)
     )
 }
@@ -28,14 +28,14 @@ fn block_start<S: SparseHierarchy, N: ConstInteger>(index: usize) -> usize {
 #[inline]
 unsafe fn make_terminal_node<'src, L, F>(
     other: &'src L,
-    other_cursor: &mut <L as SparseHierarchyTypes<'src>>::Cursor,
+    other_cursor: &mut <L as BitmapTreeTypes<'src>>::Cursor,
     mask: Mask,
     cap: u8,
     key_acc: usize,
     mut push_data: F
 ) -> NodePtr
 where
-    L: SparseHierarchy<LevelMask = Mask>,
+    L: BitmapTree<LevelMask = Mask>,
     F: for<'a> FnMut(usize, CursorData<'src, 'a, L>) -> DataIndex
 {
     let raw_node = NodePtr::raw_new::<DataIndex>(cap, mask);
@@ -53,14 +53,14 @@ where
 #[inline(always)]
 unsafe fn from_exact_sparse_hierarchy<'src, L, N, F>(
     other: &'src L,
-    other_cursor: &mut <L as SparseHierarchyTypes<'src>>::Cursor,
+    other_cursor: &mut <L as BitmapTreeTypes<'src>>::Cursor,
     n: N,
     index: usize,
     key_acc: usize,
     push_data: &mut F,
 ) -> NodePtr
 where
-    L: SparseHierarchy<LevelMask = Mask>,
+    L: BitmapTree<LevelMask = Mask>,
     F: for<'a> FnMut(usize, CursorData<'src, 'a, L>) -> DataIndex,
     N: ConstInteger,
 {
@@ -98,14 +98,14 @@ where
 #[inline(always)]
 unsafe fn from_sparse_hierarchy<'src, L, N, F>(
     other: &'src L,
-    other_cursor: &mut <L as SparseHierarchyTypes<'src>>::Cursor,
+    other_cursor: &mut <L as BitmapTreeTypes<'src>>::Cursor,
     n: N,
     index: usize,
     key_acc: usize,
     push_data: &mut F,
 ) -> Option<NodePtr>
 where
-    L: SparseHierarchy<LevelMask = Mask>,
+    L: BitmapTree<LevelMask = Mask>,
     F: for<'a> FnMut(usize, CursorData<'src, 'a, L>) -> DataIndex,
     N: ConstInteger,
 {
@@ -139,21 +139,21 @@ where
     }
 }
 
-impl<From, T, const DEPTH: usize> FromSparseHierarchy<From> for CompactSparseArray<T, DEPTH>
+impl<From, T, const DEPTH: usize> FromBitmapTree<From> for CompactSparseArray<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger,
-    From: SparseHierarchy<
+    From: BitmapTree<
         LevelMask  = Mask,
         LevelCount = ConstUsize<DEPTH>,
     >,
-    for<'a> From: SparseHierarchyTypes<'a,
-        Cursor: for<'b> SparseHierarchyCursorTypes<'b, 
+    for<'a> From: BitmapTreeTypes<'a,
+        Cursor: for<'b> BitmapTreeCursorTypes<'b, 
             Data = T
         >,
     >,    
 {
     fn from_sparse_hierarchy(other: From) -> Self {
-        let mut other_cursor = <From as SparseHierarchyTypes>::Cursor::new(&other);        
+        let mut other_cursor = <From as BitmapTreeTypes>::Cursor::new(&other);        
         let mut data: Vec<T> = Vec::with_capacity(1);
         unsafe{ data.set_len(1); }
         
@@ -167,7 +167,7 @@ where
         };
 
         let root = unsafe {
-            if <From as SparseHierarchy>::EXACT_HIERARCHY {
+            if <From as BitmapTree>::EXACT_HIERARCHY {
                 from_exact_sparse_hierarchy(
                     &other, &mut other_cursor, ConstUsize::<0>, 0, 0, &mut push_fn
                 )

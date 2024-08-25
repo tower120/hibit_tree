@@ -1,6 +1,6 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
-use crate::{LazySparseHierarchy, RegularSparseHierarchy, SparseHierarchy, SparseHierarchyCursor, SparseHierarchyCursorTypes, SparseHierarchyTypes};
+use crate::{LazyBitmapTree, RegularBitmapTree, BitmapTree, BitmapTreeCursor, BitmapTreeCursorTypes, BitmapTreeTypes};
 use crate::const_utils::ConstInteger;
 use crate::utils::{Borrowable, UnaryFunction};
 
@@ -32,29 +32,29 @@ pub struct Map<S, F>{
     f: F,
 }
 
-impl<'this, S, F> SparseHierarchyTypes<'this> for Map<S, F>
+impl<'this, S, F> BitmapTreeTypes<'this> for Map<S, F>
 where
-    S: Borrowable<Borrowed: RegularSparseHierarchy>,
-    F: for<'a> MapFunction<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data> 
+    S: Borrowable<Borrowed: RegularBitmapTree>,
+    F: for<'a> MapFunction<'a, <S::Borrowed as BitmapTreeTypes<'a>>::Data> 
 {
-    type Data = <F as MapFunction<'this, <S::Borrowed as SparseHierarchyTypes<'this>>::Data>>::Output;
+    type Data = <F as MapFunction<'this, <S::Borrowed as BitmapTreeTypes<'this>>::Data>>::Output;
     type DataUnchecked = Self::Data;
     type Cursor = Cursor<'this, S, F>;
 }
 
-impl<S, F> SparseHierarchy for Map<S, F>
+impl<S, F> BitmapTree for Map<S, F>
 where
-    S: Borrowable<Borrowed: RegularSparseHierarchy>,
-    F: for<'a> MapFunction<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data>
+    S: Borrowable<Borrowed: RegularBitmapTree>,
+    F: for<'a> MapFunction<'a, <S::Borrowed as BitmapTreeTypes<'a>>::Data>
 {
-    const EXACT_HIERARCHY: bool = <S::Borrowed as SparseHierarchy>::EXACT_HIERARCHY;
+    const EXACT_HIERARCHY: bool = <S::Borrowed as BitmapTree>::EXACT_HIERARCHY;
     
-    type LevelCount = <S::Borrowed as SparseHierarchy>::LevelCount;
-    type LevelMask  = <S::Borrowed as SparseHierarchy>::LevelMask;
+    type LevelCount = <S::Borrowed as BitmapTree>::LevelCount;
+    type LevelMask  = <S::Borrowed as BitmapTree>::LevelMask;
 
     #[inline]
     unsafe fn data(&self, index: usize, level_indices: &[usize]) 
-        -> Option<<Self as SparseHierarchyTypes<'_>>::Data> 
+        -> Option<<Self as BitmapTreeTypes<'_>>::Data> 
     {
         let data = self.s.borrow().data(index, level_indices);
         if let Some(data) = data {
@@ -66,41 +66,41 @@ where
 
     #[inline]
     unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
-        -> <Self as SparseHierarchyTypes<'_>>::DataUnchecked 
+        -> <Self as BitmapTreeTypes<'_>>::DataUnchecked 
     {
         let data = self.s.borrow().data_unchecked(index, level_indices);
         self.f.exec(data)
     }
 }
 
-impl<'this, 'src, S, F> SparseHierarchyCursorTypes<'this> for Cursor<'src, S, F>
+impl<'this, 'src, S, F> BitmapTreeCursorTypes<'this> for Cursor<'src, S, F>
 where 
-    S: Borrowable<Borrowed: RegularSparseHierarchy>,
-    F: for<'a> MapFunction<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data>
+    S: Borrowable<Borrowed: RegularBitmapTree>,
+    F: for<'a> MapFunction<'a, <S::Borrowed as BitmapTreeTypes<'a>>::Data>
 {
     // Map can work only with "monolithic" SparseHierarchy. 
     // So it's the same return type everywhere. 
-    type Data = <Map<S, F> as SparseHierarchyTypes<'src>>::Data;
+    type Data = <Map<S, F> as BitmapTreeTypes<'src>>::Data;
 } 
 
 pub struct Cursor<'src, S, F>(
-    <S::Borrowed as SparseHierarchyTypes<'src>>::Cursor,
+    <S::Borrowed as BitmapTreeTypes<'src>>::Cursor,
     PhantomData<&'src Map<S, F>>
 ) 
 where 
-    S: Borrowable<Borrowed: SparseHierarchy>;
+    S: Borrowable<Borrowed: BitmapTree>;
 
-impl<'src, S, F> SparseHierarchyCursor<'src> for Cursor<'src, S, F>
+impl<'src, S, F> BitmapTreeCursor<'src> for Cursor<'src, S, F>
 where 
-    S: Borrowable<Borrowed: RegularSparseHierarchy>,
-    F: for<'a> MapFunction<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data>
+    S: Borrowable<Borrowed: RegularBitmapTree>,
+    F: for<'a> MapFunction<'a, <S::Borrowed as BitmapTreeTypes<'a>>::Data>
 {
     type Src = Map<S, F>;
     
     #[inline]
     fn new(this: &'src Self::Src) -> Self {
         Self(
-            SparseHierarchyCursor::new(this.s.borrow()),
+            BitmapTreeCursor::new(this.s.borrow()),
             PhantomData
         )
     }
@@ -108,20 +108,20 @@ where
     #[inline]
     unsafe fn select_level_node<N: ConstInteger>(
         &mut self, src: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as SparseHierarchy>::LevelMask {
+    ) -> <Self::Src as BitmapTree>::LevelMask {
         self.0.select_level_node(src.s.borrow(), level_n, level_index)
     }
 
     #[inline]
     unsafe fn select_level_node_unchecked<N: ConstInteger>(
         &mut self, src: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as SparseHierarchy>::LevelMask {
+    ) -> <Self::Src as BitmapTree>::LevelMask {
         self.0.select_level_node_unchecked(src.s.borrow(), level_n, level_index)
     }
 
     #[inline]
     unsafe fn data<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
-        -> Option<<Self as SparseHierarchyCursorTypes<'a>>::Data> 
+        -> Option<<Self as BitmapTreeCursorTypes<'a>>::Data> 
     {
         let data = self.0.data(this.s.borrow(), level_index);
         if let Some(data) = data {
@@ -133,21 +133,21 @@ where
 
     #[inline]
     unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
-        -> <Self as SparseHierarchyCursorTypes<'a>>::Data
+        -> <Self as BitmapTreeCursorTypes<'a>>::Data
     {
         let data = self.0.data_unchecked(this.s.borrow(), level_index);
         this.f.exec(data)
     }
 }
 
-impl<S, F> LazySparseHierarchy for Map<S, F>
+impl<S, F> LazyBitmapTree for Map<S, F>
 where
-    Map<S, F>: RegularSparseHierarchy
+    Map<S, F>: RegularBitmapTree
 {}
 
 impl<S, F> Borrowable for Map<S, F> { type Borrowed = Self; }
 
-/// Maps each [RegularSparseHierarchy] element with `f: Fn(Item) -> Out`.
+/// Maps each [RegularBitmapTree] element with `f: Fn(Item) -> Out`.
 /// 
 /// # Note
 /// 
@@ -184,8 +184,8 @@ impl<S, F> Borrowable for Map<S, F> { type Borrowed = Self; }
 #[inline]
 pub fn map<S, F>(s: S, f: F) -> Map<S, F>
 where
-    S: Borrowable<Borrowed: RegularSparseHierarchy>,
-    F: for<'a> MapFunction<'a, <S::Borrowed as SparseHierarchyTypes<'a>>::Data>
+    S: Borrowable<Borrowed: RegularBitmapTree>,
+    F: for<'a> MapFunction<'a, <S::Borrowed as BitmapTreeTypes<'a>>::Data>
 {
     Map{ s, f }
 } 

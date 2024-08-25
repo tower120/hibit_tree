@@ -12,11 +12,11 @@ mod node;
 
 use std::{mem, ptr};
 use std::marker::PhantomData;
-use crate::{BitBlock, Index, SparseHierarchyCursorTypes, SparseHierarchyTypes};
+use crate::{BitBlock, Index, BitmapTreeCursorTypes, BitmapTreeTypes};
 use crate::bit_queue::BitQueue;
 use crate::const_utils::{const_loop, ConstArray, ConstArrayType, ConstBool, ConstFalse, ConstInteger, ConstTrue, ConstUsize};
 use crate::level_indices;
-use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyCursor};
+use crate::sparse_hierarchy::{BitmapTree, BitmapTreeCursor};
 use crate::utils::{Array, Borrowable, Primitive, Take};
 
 use node::{NodePtr, empty_node};
@@ -324,7 +324,7 @@ where
     }
 }
 
-impl<'a, T, const DEPTH: usize> SparseHierarchyTypes<'a> for CompactSparseArray<T, DEPTH>
+impl<'a, T, const DEPTH: usize> BitmapTreeTypes<'a> for CompactSparseArray<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger
 {
@@ -333,7 +333,7 @@ where
     type Cursor = Cursor<'a, T, DEPTH>;    
 }
 
-impl<T, const DEPTH: usize> SparseHierarchy for CompactSparseArray<T, DEPTH>
+impl<T, const DEPTH: usize> BitmapTree for CompactSparseArray<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger
 {
@@ -381,14 +381,14 @@ where
     phantom_data: PhantomData<&'src T>
 }
 
-impl<'this, 'src, T, const DEPTH: usize> SparseHierarchyCursorTypes<'this> for Cursor<'src, T, DEPTH>
+impl<'this, 'src, T, const DEPTH: usize> BitmapTreeCursorTypes<'this> for Cursor<'src, T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger
 {
     type Data = &'src T;
 }
 
-impl<'src, T, const DEPTH: usize> SparseHierarchyCursor<'src> for Cursor<'src, T, DEPTH>
+impl<'src, T, const DEPTH: usize> BitmapTreeCursor<'src> for Cursor<'src, T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger
 {
@@ -408,7 +408,7 @@ where
         src: &'src Self::Src,
         level_n: N,
         level_index: usize
-    ) -> <Self::Src as SparseHierarchy>::LevelMask {
+    ) -> <Self::Src as BitmapTree>::LevelMask {
         if N::VALUE == 0 {
             return *src.root.header().mask();
         }
@@ -439,7 +439,7 @@ where
         this: &'src Self::Src,
         level_n: N,
         level_index: usize
-    ) -> <Self::Src as SparseHierarchy>::LevelMask {
+    ) -> <Self::Src as BitmapTree>::LevelMask {
         if N::VALUE == 0 {
             return *this.root.header().mask();
         }
@@ -465,7 +465,7 @@ where
     
     #[inline]
     unsafe fn data<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
-        -> Option<<Self as SparseHierarchyCursorTypes<'a>>::Data> 
+        -> Option<<Self as BitmapTreeCursorTypes<'a>>::Data> 
     {
         let node = if DEPTH == 1{
             // We do not store the root level's block.
@@ -488,7 +488,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
-        -> <Self as SparseHierarchyCursorTypes<'a>>::Data
+        -> <Self as BitmapTreeCursorTypes<'a>>::Data
     {
         let node = if DEPTH == 1{
             // We do not store the root level's block.

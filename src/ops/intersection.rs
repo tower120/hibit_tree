@@ -2,8 +2,8 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::BitAnd;
 use crate::const_utils::{ConstArray, ConstInteger};
-use crate::{LazySparseHierarchy, RegularSparseHierarchy, SparseHierarchyCursorTypes, SparseHierarchyTypes};
-use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyCursor};
+use crate::{LazyBitmapTree, RegularBitmapTree, BitmapTreeCursorTypes, BitmapTreeTypes};
+use crate::sparse_hierarchy::{BitmapTree, BitmapTreeCursor};
 use crate::utils::{Borrowable, Take};
 
 pub struct Intersection<S0, S1>{
@@ -11,43 +11,43 @@ pub struct Intersection<S0, S1>{
     s1: S1
 }
 
-impl<'this, S0, S1> SparseHierarchyTypes<'this> for Intersection<S0, S1>
+impl<'this, S0, S1> BitmapTreeTypes<'this> for Intersection<S0, S1>
 where
-    S0: Borrowable<Borrowed: SparseHierarchy>,
-    S1: Borrowable<Borrowed: SparseHierarchy<
-        LevelCount = <S0::Borrowed as SparseHierarchy>::LevelCount,
-        LevelMask  = <S0::Borrowed as SparseHierarchy>::LevelMask,
+    S0: Borrowable<Borrowed: BitmapTree>,
+    S1: Borrowable<Borrowed: BitmapTree<
+        LevelCount = <S0::Borrowed as BitmapTree>::LevelCount,
+        LevelMask  = <S0::Borrowed as BitmapTree>::LevelMask,
     >>,
 {
     type Data = (
-        <S0::Borrowed as SparseHierarchyTypes<'this>>::Data,
-        <S1::Borrowed as SparseHierarchyTypes<'this>>::Data
+        <S0::Borrowed as BitmapTreeTypes<'this>>::Data,
+        <S1::Borrowed as BitmapTreeTypes<'this>>::Data
     );
     
     type DataUnchecked = (
-        <S0::Borrowed as SparseHierarchyTypes<'this>>::DataUnchecked,
-        <S1::Borrowed as SparseHierarchyTypes<'this>>::DataUnchecked
+        <S0::Borrowed as BitmapTreeTypes<'this>>::DataUnchecked,
+        <S1::Borrowed as BitmapTreeTypes<'this>>::DataUnchecked
     );
     
     type Cursor = Cursor<'this, S0, S1>;
 }
 
-impl<S0, S1> SparseHierarchy for Intersection<S0, S1>
+impl<S0, S1> BitmapTree for Intersection<S0, S1>
 where
-    S0: Borrowable<Borrowed: SparseHierarchy>,
-    S1: Borrowable<Borrowed: SparseHierarchy<
-        LevelCount = <S0::Borrowed as SparseHierarchy>::LevelCount,
-        LevelMask  = <S0::Borrowed as SparseHierarchy>::LevelMask,
+    S0: Borrowable<Borrowed: BitmapTree>,
+    S1: Borrowable<Borrowed: BitmapTree<
+        LevelCount = <S0::Borrowed as BitmapTree>::LevelCount,
+        LevelMask  = <S0::Borrowed as BitmapTree>::LevelMask,
     >>,
 {
     const EXACT_HIERARCHY: bool = false;
     
-    type LevelCount = <S0::Borrowed as SparseHierarchy>::LevelCount;
-    type LevelMask  = <S0::Borrowed as SparseHierarchy>::LevelMask;
+    type LevelCount = <S0::Borrowed as BitmapTree>::LevelCount;
+    type LevelMask  = <S0::Borrowed as BitmapTree>::LevelMask;
 
     #[inline]
     unsafe fn data(&self, index: usize, level_indices: &[usize]) 
-        -> Option<<Self as SparseHierarchyTypes<'_>>::Data> 
+        -> Option<<Self as BitmapTreeTypes<'_>>::Data> 
     {
         let d0 = self.s0.borrow().data(index, level_indices);
         let d1 = self.s1.borrow().data(index, level_indices);
@@ -59,7 +59,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
-        -> <Self as SparseHierarchyTypes<'_>>::DataUnchecked
+        -> <Self as BitmapTreeTypes<'_>>::DataUnchecked
     {
         let d0 = self.s0.borrow().data_unchecked(index, level_indices);
         let d1 = self.s1.borrow().data_unchecked(index, level_indices);
@@ -69,31 +69,31 @@ where
 
 pub struct Cursor<'src, S0, S1>
 where
-    S0: Borrowable<Borrowed: SparseHierarchy>,
-    S1: Borrowable<Borrowed: SparseHierarchy>,
+    S0: Borrowable<Borrowed: BitmapTree>,
+    S1: Borrowable<Borrowed: BitmapTree>,
 {
-    s0: <S0::Borrowed as SparseHierarchyTypes<'src>>::Cursor, 
-    s1: <S1::Borrowed as SparseHierarchyTypes<'src>>::Cursor,
+    s0: <S0::Borrowed as BitmapTreeTypes<'src>>::Cursor, 
+    s1: <S1::Borrowed as BitmapTreeTypes<'src>>::Cursor,
     phantom: PhantomData<&'src Intersection<S0, S1>>
 }
 
-impl<'this, 'src, S0, S1> SparseHierarchyCursorTypes<'this> for Cursor<'src, S0, S1>
+impl<'this, 'src, S0, S1> BitmapTreeCursorTypes<'this> for Cursor<'src, S0, S1>
 where
-    S0: Borrowable<Borrowed: SparseHierarchy>,
-    S1: Borrowable<Borrowed: SparseHierarchy>,
+    S0: Borrowable<Borrowed: BitmapTree>,
+    S1: Borrowable<Borrowed: BitmapTree>,
 {
     type Data = (
-        <<S0::Borrowed as SparseHierarchyTypes<'src>>::Cursor as SparseHierarchyCursorTypes<'this>>::Data,
-        <<S1::Borrowed as SparseHierarchyTypes<'src>>::Cursor as SparseHierarchyCursorTypes<'this>>::Data
+        <<S0::Borrowed as BitmapTreeTypes<'src>>::Cursor as BitmapTreeCursorTypes<'this>>::Data,
+        <<S1::Borrowed as BitmapTreeTypes<'src>>::Cursor as BitmapTreeCursorTypes<'this>>::Data
     );
 }
 
-impl<'src, S0, S1> SparseHierarchyCursor<'src> for Cursor<'src, S0, S1>
+impl<'src, S0, S1> BitmapTreeCursor<'src> for Cursor<'src, S0, S1>
 where
-    S0: Borrowable<Borrowed: SparseHierarchy>,
-    S1: Borrowable<Borrowed: SparseHierarchy<
-        LevelCount = <S0::Borrowed as SparseHierarchy>::LevelCount,
-        LevelMask  = <S0::Borrowed as SparseHierarchy>::LevelMask,
+    S0: Borrowable<Borrowed: BitmapTree>,
+    S1: Borrowable<Borrowed: BitmapTree<
+        LevelCount = <S0::Borrowed as BitmapTree>::LevelCount,
+        LevelMask  = <S0::Borrowed as BitmapTree>::LevelMask,
     >>,
 {
     type Src = Intersection<S0, S1>;
@@ -101,8 +101,8 @@ where
     #[inline]
     fn new(this: &'src Self::Src) -> Self {
         Self{
-            s0: SparseHierarchyCursor::new(this.s0.borrow()), 
-            s1: SparseHierarchyCursor::new(this.s1.borrow()),
+            s0: BitmapTreeCursor::new(this.s0.borrow()), 
+            s1: BitmapTreeCursor::new(this.s1.borrow()),
             phantom: PhantomData
         }
     }
@@ -110,7 +110,7 @@ where
     #[inline]
     unsafe fn select_level_node<N: ConstInteger>(
         &mut self, this: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as SparseHierarchy>::LevelMask {
+    ) -> <Self::Src as BitmapTree>::LevelMask {
         // Putting "if" here is not justified for general case. 
         
         let mask0 = self.s0.select_level_node(
@@ -131,7 +131,7 @@ where
     #[inline]
     unsafe fn select_level_node_unchecked<N: ConstInteger> (
         &mut self, this: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as SparseHierarchy>::LevelMask {
+    ) -> <Self::Src as BitmapTree>::LevelMask {
         let mask0 = self.s0.select_level_node_unchecked(
             this.s0.borrow(), level_n, level_index
         );
@@ -149,7 +149,7 @@ where
 
     #[inline]
     unsafe fn data<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
-        -> Option<<Self as SparseHierarchyCursorTypes<'a>>::Data> 
+        -> Option<<Self as BitmapTreeCursorTypes<'a>>::Data> 
     {
         let d0 = self.s0.data(this.s0.borrow(), level_index);
         let d1 = self.s1.data(this.s1.borrow(), level_index);
@@ -164,7 +164,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
-        -> <Self as SparseHierarchyCursorTypes<'a>>::Data 
+        -> <Self as BitmapTreeCursorTypes<'a>>::Data 
     {
         let d0 = self.s0.data_unchecked(this.s0.borrow(), level_index);
         let d1 = self.s1.data_unchecked(this.s1.borrow(), level_index);
@@ -172,9 +172,9 @@ where
     }
 }
 
-impl<S0, S1> LazySparseHierarchy for Intersection<S0, S1>
+impl<S0, S1> LazyBitmapTree for Intersection<S0, S1>
 where
-    Intersection<S0, S1>: RegularSparseHierarchy
+    Intersection<S0, S1>: RegularBitmapTree
 {}
 
 impl<S0, S1> Borrowable for Intersection<S0, S1>{ type Borrowed = Self; }
@@ -182,10 +182,10 @@ impl<S0, S1> Borrowable for Intersection<S0, S1>{ type Borrowed = Self; }
 #[inline]
 pub fn intersection<S0, S1>(s0: S0, s1: S1) -> Intersection<S0, S1>
 where
-    S0: Borrowable<Borrowed: SparseHierarchy>,
-    S1: Borrowable<Borrowed: SparseHierarchy<
-        LevelCount = <S0::Borrowed as SparseHierarchy>::LevelCount,
-        LevelMask  = <S0::Borrowed as SparseHierarchy>::LevelMask,
+    S0: Borrowable<Borrowed: BitmapTree>,
+    S1: Borrowable<Borrowed: BitmapTree<
+        LevelCount = <S0::Borrowed as BitmapTree>::LevelCount,
+        LevelMask  = <S0::Borrowed as BitmapTree>::LevelMask,
     >>,
 {
     Intersection { s0, s1 }
@@ -196,7 +196,7 @@ mod tests{
     use itertools::assert_equal;
     use crate::compact_sparse_array::CompactSparseArray;
     use crate::ops::intersection::intersection;
-    use crate::sparse_hierarchy::SparseHierarchy;
+    use crate::sparse_hierarchy::BitmapTree;
 
     #[test]
     fn smoke_test(){

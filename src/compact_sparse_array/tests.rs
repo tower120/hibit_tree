@@ -1,6 +1,6 @@
 use itertools::assert_equal;
-use crate::FromSparseHierarchy;
-use crate::sparse_hierarchy::SparseHierarchy;
+use crate::FromBitmapTree;
+use crate::sparse_hierarchy::BitmapTree;
 use super::CompactSparseArray;
 
 #[test]

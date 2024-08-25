@@ -10,12 +10,12 @@ use crate::level::ILevel;
 use crate::const_utils::const_int::{ConstInteger, ConstIntVisitor, ConstUsize};
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
 use crate::const_utils::{const_loop, ConstBool, ConstFalse, ConstTrue};
-use crate::{Empty, Index, SparseHierarchyCursorTypes, SparseHierarchyTypes};
+use crate::{Empty, Index, BitmapTreeCursorTypes, BitmapTreeTypes};
 use crate::req_default::{DefaultInit, DefaultInitFor, DefaultRequirement, ReqDefault};
 use crate::utils::Primitive;
 use crate::utils::Array;
 use crate::sparse_array_levels::{FoldMutVisitor, FoldVisitor, MutVisitor, SparseArrayLevels, TypeVisitor, Visitor};
-use crate::sparse_hierarchy::{SparseHierarchy, SparseHierarchyCursor};
+use crate::sparse_hierarchy::{BitmapTree, BitmapTreeCursor};
 
 ///
 /// # Universal set (better naming?)
@@ -573,7 +573,7 @@ where
     type Borrowed = SparseArray<Levels, Data, R>; 
 }
 
-impl<'this, Levels, Data, R> SparseHierarchyTypes<'this> for SparseArray<Levels, Data, R>
+impl<'this, Levels, Data, R> BitmapTreeTypes<'this> for SparseArray<Levels, Data, R>
 where
     Levels: SparseArrayLevels,
     R: DefaultRequirement
@@ -583,7 +583,7 @@ where
     type Cursor = Cursor<'this, Levels, Data, R>;
 }
 
-impl<Levels, Data, R> SparseHierarchy for SparseArray<Levels, Data, R>
+impl<Levels, Data, R> BitmapTree for SparseArray<Levels, Data, R>
 where
     Levels: SparseArrayLevels,
     R: DefaultRequirement
@@ -635,7 +635,7 @@ where
     phantom_data: PhantomData<&'src SparseArray<Levels, Data, R>>
 }
 
-impl<'this, 'src, Levels, Data, R> SparseHierarchyCursorTypes<'this> for Cursor<'src, Levels, Data, R>
+impl<'this, 'src, Levels, Data, R> BitmapTreeCursorTypes<'this> for Cursor<'src, Levels, Data, R>
 where
     Levels: SparseArrayLevels,
     R: DefaultRequirement,
@@ -643,7 +643,7 @@ where
     type Data = &'src Data;
 }
 
-impl<'src, Levels, Data, R> SparseHierarchyCursor<'src> for Cursor<'src, Levels, Data, R>
+impl<'src, Levels, Data, R> BitmapTreeCursor<'src> for Cursor<'src, Levels, Data, R>
 where
     Levels: SparseArrayLevels,
     R: DefaultRequirement,
@@ -661,7 +661,7 @@ where
     #[inline(always)]
     unsafe fn select_level_node_unchecked<N: ConstInteger>(
         &mut self, src: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as SparseHierarchy>::LevelMask {
+    ) -> <Self::Src as BitmapTree>::LevelMask {
         self.select_level_node(src, level_n, level_index)
     }
     
@@ -670,7 +670,7 @@ where
     #[inline(always)]
     unsafe fn select_level_node<N: ConstInteger>(
         &mut self, src: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as SparseHierarchy>::LevelMask {
+    ) -> <Self::Src as BitmapTree>::LevelMask {
         if N::VALUE == 0 {
             assert_eq!(level_index, 0); // This act as compile-time check
             let block = src.get_block(level_n, 0);
@@ -701,14 +701,14 @@ where
 
     #[inline(always)]
     unsafe fn data_unchecked<'a>(&'a self, src: &'src Self::Src, level_index: usize)
-        -> <Self as SparseHierarchyCursorTypes<'a>>::Data 
+        -> <Self as BitmapTreeCursorTypes<'a>>::Data 
     {
         self.data(src, level_index).unwrap_unchecked()
     }
     
     #[inline(always)]
     unsafe fn data<'a>(&'a self, src: &'src Self::Src, level_index: usize)
-        -> Option<<Self as SparseHierarchyCursorTypes<'a>>::Data> 
+        -> Option<<Self as BitmapTreeCursorTypes<'a>>::Data> 
     {
         /*const*/ let last_level_index = Levels::LevelCount::VALUE - 1;
         
