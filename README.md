@@ -1,7 +1,7 @@
 # **HI**erarchical **BIT**map **TREE**
 
 Hierarchical bitmap tree is an integer-indexed prefix-tree without
-memory overhead[^mem_overhead] and performance higher than a HashMap with no 
+memory overhead[^mem_overhead] and performance better than a HashMap with no 
 hasher[^hashmap_perf]. That also has unparalleled[^unparalleled_intersection] 
 intersection performance, and other[^unique_ops] set-like operations between containers.
 
@@ -30,11 +30,22 @@ it naturally acts as intersection acceleration structure.
 
 ### Sparse-vector to sparse-vector multiplication
 
+For dot product we need to element-wise multiply two vectors, then sum it's elements.
+
+Multiply zero equals zero. Sparse vector mainly filled with zeroes.
+In result of element-wise multiplication only elements that have BOTH sources non-null
+will be non-null.
+
+Let's represent hierarchical bitmap tree as a sparse vector. We store only non-zero 
+elements into tree. Intersection of two such trees will return pairs of non-zero elements.
+By mapping pairs to multiplication operation - we get element-wise multiplied sparse vector. 
+By summing it's all elements - we get dot product.
+
+See examples/sparse_vector.rs TODO: direct link here
+
+### Compressed bitset
+
 TODO
-
-### Compressed array
-
-TODO: Quite obviously. Remove section?
 
 ## How it works
 
