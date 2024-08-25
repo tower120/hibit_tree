@@ -5,7 +5,7 @@ mod common;
 use std::collections::HashMap;
 use itertools::assert_equal;
 use rand::{Rng, SeedableRng};
-use hi_sparse_array::SparseHierarchy;
+use hibit_tree::BitmapTree;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Default)]
 struct Data(usize);

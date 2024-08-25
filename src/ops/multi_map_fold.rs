@@ -166,11 +166,11 @@ where
 mod tests{
     use itertools::assert_equal;
     use super::*;
-    use crate::{multi_intersection, CompactSparseArray};
+    use crate::{multi_intersection, DenseTree};
     
     #[test]
     fn smoke_test() {
-        type Array = CompactSparseArray<usize, 4>; 
+        type Array = DenseTree<usize, 4>; 
         let mut a1: Array = Default::default();
         let mut a2: Array = Default::default();
         let mut a3: Array = Default::default();

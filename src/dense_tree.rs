@@ -16,7 +16,7 @@ use crate::{BitBlock, Index, BitmapTreeCursorTypes, BitmapTreeTypes};
 use crate::bit_queue::BitQueue;
 use crate::const_utils::{const_loop, ConstArray, ConstArrayType, ConstBool, ConstFalse, ConstInteger, ConstTrue, ConstUsize};
 use crate::level_indices;
-use crate::sparse_hierarchy::{BitmapTree, BitmapTreeCursor};
+use crate::bitmap_tree::{BitmapTree, BitmapTreeCursor};
 use crate::utils::{Array, Borrowable, Primitive, Take};
 
 use node::{NodePtr, empty_node};
@@ -27,11 +27,26 @@ type Mask = u64;
 //       Can be usize as well.
 type DataIndex = u32;
 
+/// Compressed Hierarchical Bitmap Tree.
+/// 
+/// Nodes store children pointers in dense array. 
+/// This means that array size roughly equals to children count.
+/// 
 /// TODO: Description
 /// 
-/// Only 64bit wide version available[^64bit_only].
+/// # Design choices
 /// 
-/// [^64bit_only]: TODO explain why
+/// ## 64 bit only
+/// 
+/// DenseTree have only 64bit wide bitmasks, because there is no hardware
+/// instructions for SIMD register-wide bit manipulations (like popcnt for mm256). 
+/// Using SIMD bitmasks for "bit-block mapping" requires splitting them into u64s,
+/// and also using additional array of counters of popcnt of each u64 block in SIMD register.
+/// This require more instructions and slower, but is doable and work with acceptable performance.
+///
+/// It is just that instead of all of this - we can just increase tree depth on 20% - and
+/// achieve the same index range with u64 bitblocks. And benchmarks shows that
+/// it is faster then using SIMD bitmasks in such way and having lower tree depth. 
 /// 
 /// # Performance
 /// 
@@ -52,7 +67,7 @@ type DataIndex = u32;
 /// 
 /// In addition, to lib's `popcnt` and `bmi1` requirement, on x86 arch
 /// CompactSparseArray also benefits from `bmi2`'s [bzhi] instruction.
-pub struct CompactSparseArray<T, const DEPTH: usize>
+pub struct DenseTree<T, const DEPTH: usize>
 where
     ConstUsize<DEPTH>: ConstInteger
 {
@@ -71,7 +86,7 @@ where
     terminal_node_positions: Vec<(NodePtr/*terminal_node*/, usize/*in-node index*/)>,*/
 }
 
-impl<T, const DEPTH: usize> Default for CompactSparseArray<T, DEPTH>
+impl<T, const DEPTH: usize> Default for DenseTree<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger
 {
@@ -93,7 +108,7 @@ where
     }
 }
 
-impl<T, const DEPTH: usize> CompactSparseArray<T, DEPTH>
+impl<T, const DEPTH: usize> DenseTree<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger    
 {
@@ -306,7 +321,7 @@ where
 }
 
 #[cfg(feature = "may_dangle")]
-unsafe impl<#[may_dangle] T, const DEPTH: usize> Drop for CompactSparseArray<T, DEPTH> {
+unsafe impl<#[may_dangle] T, const DEPTH: usize> Drop for DenseTree<T, DEPTH> {
     #[inline]
     fn drop(&mut self) {
         unsafe{ self.drop_impl(); }
@@ -314,7 +329,7 @@ unsafe impl<#[may_dangle] T, const DEPTH: usize> Drop for CompactSparseArray<T, 
 }
 
 #[cfg(not(feature = "may_dangle"))]
-impl<T, const DEPTH: usize> Drop for CompactSparseArray<T, DEPTH>
+impl<T, const DEPTH: usize> Drop for DenseTree<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger
 {
@@ -324,7 +339,7 @@ where
     }
 }
 
-impl<'a, T, const DEPTH: usize> BitmapTreeTypes<'a> for CompactSparseArray<T, DEPTH>
+impl<'a, T, const DEPTH: usize> BitmapTreeTypes<'a> for DenseTree<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger
 {
@@ -333,7 +348,7 @@ where
     type Cursor = Cursor<'a, T, DEPTH>;    
 }
 
-impl<T, const DEPTH: usize> BitmapTree for CompactSparseArray<T, DEPTH>
+impl<T, const DEPTH: usize> BitmapTree for DenseTree<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger
 {
@@ -392,7 +407,7 @@ impl<'src, T, const DEPTH: usize> BitmapTreeCursor<'src> for Cursor<'src, T, DEP
 where
     ConstUsize<DEPTH>: ConstInteger
 {
-    type Src = CompactSparseArray<T, DEPTH>;
+    type Src = DenseTree<T, DEPTH>;
 
     #[inline]
     fn new(_: &'src Self::Src) -> Self {
@@ -502,7 +517,7 @@ where
     }
 }
 
-impl<T, const DEPTH: usize> Borrowable for CompactSparseArray<T, DEPTH>
+impl<T, const DEPTH: usize> Borrowable for DenseTree<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger
 { type Borrowed = Self; }

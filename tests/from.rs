@@ -2,12 +2,10 @@
 
 use itertools::assert_equal;
 use rand::{Rng, SeedableRng};
-//use hi_sparse_array::{CompactSparseArray, intersection, LazySparseHierarchy, map, map2, union};
-use hi_sparse_array::{CompactSparseArray, FromSparseHierarchy, intersection, LazySparseHierarchy, map, union};
-use hi_sparse_array::const_utils::ConstUsize;
-use hi_sparse_array::SparseHierarchy;
-use hi_sparse_array::RegularSparseHierarchy;
-use hi_sparse_array::utils::{Borrowable, UnaryFunction};
+use hibit_tree::{DenseTree, FromBitmapTree, intersection, LazyBitmapTree, map, union};
+use hibit_tree::BitmapTree;
+use hibit_tree::RegularBitmapTree;
+use hibit_tree::utils::{Borrowable, UnaryFunction};
 
 mod common;
 
@@ -15,7 +13,7 @@ mod common;
 struct Data(usize);
 
 // TODO: common::Array<Data>
-type Array = CompactSparseArray<Data, 4>;
+type Array = DenseTree<Data, 4>;
 
 #[test]
 fn materialize_test(){
@@ -33,7 +31,7 @@ fn materialize_test(){
     }
 
     {
-        let mut a1: CompactSparseArray<_, 4> = Default::default();
+        let mut a1: DenseTree<_, 4> = Default::default();
         let i0 = 0;
         a1.insert(0, i0);
         

@@ -336,13 +336,13 @@ where
 mod tests{
     use super::*;
     use itertools::assert_equal;
-    use crate::compact_sparse_array::CompactSparseArray;
-    use crate::sparse_hierarchy::BitmapTree;
+    use crate::dense_tree::DenseTree;
+    use crate::bitmap_tree::BitmapTree;
     use crate::utils::LendingIterator;
 
     #[test]
     fn smoke_test(){
-        type Array = CompactSparseArray<usize, 3>;
+        type Array = DenseTree<usize, 3>;
         let mut a1 = Array::default();
         let mut a2 = Array::default();
         let mut a3 = Array::default();

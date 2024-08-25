@@ -56,7 +56,7 @@ Level0    │ cap         │
           ┌─────────────┐
           │ 64bit mask  │
 LevelN    │ cap         │
-          │ [usize;cap] │
+          │ [usize;cap] │  <- Data indices.
           └─────────────┘
                          
                 ┌   ┐    
@@ -120,7 +120,7 @@ below threshold it will work as usual, above - it's dense-index will equal spars
 
 ## Hierarchical bitmap
 
-Bitmasks in nodes form hierarchical bitset/bitmap, similar to the one in [hi_sparse_bitset](https://crates.io/crates/hi_sparse_bitset), which in turn was derived from [hibitset](https://crates.io/crates/hibitset). This means, that all operations from hierarchical bitsets are possible, with the
+Bitmasks in nodes form hierarchical bitset/bitmap. Which is similar to [hi_sparse_bitset](https://crates.io/crates/hi_sparse_bitset), which in turn was derived from [hibitset](https://crates.io/crates/hibitset). This means, that all operations from hierarchical bitsets are possible, with the
 same performance characteristics.
 
 ## Intersection

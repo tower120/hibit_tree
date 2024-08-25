@@ -1,5 +1,5 @@
 use std::ops::ControlFlow;
-use crate::sparse_hierarchy::{BitmapTree, BitmapTreeCursor};
+use crate::bitmap_tree::{BitmapTree, BitmapTreeCursor};
 use crate::{BitBlock, data_block_index, RegularBitmapTree, BitmapTreeCursorTypes, BitmapTreeTypes};
 use crate::bit_queue::BitQueue;
 use crate::const_utils::const_int::{const_for_rev, ConstInteger, ConstIntVisitor, ConstUsize};

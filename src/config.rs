@@ -2,7 +2,7 @@
 //! 
 //! General rule: use the smallest depth possible. 
 
-pub use crate::sparse_array_levels::SparseArrayLevels;
+pub use crate::sparse_tree_levels::SparseTreeLevels;
 
 use crate::level::{IntrusiveListLevel, SingleBlockLevel};
 use crate::level_block::Block;

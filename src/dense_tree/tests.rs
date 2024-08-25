@@ -1,11 +1,11 @@
 use itertools::assert_equal;
 use crate::FromBitmapTree;
-use crate::sparse_hierarchy::BitmapTree;
-use super::CompactSparseArray;
+use crate::bitmap_tree::BitmapTree;
+use super::DenseTree;
 
 #[test]
 fn test(){
-    let mut a: CompactSparseArray<usize, 3> = Default::default();
+    let mut a: DenseTree<usize, 3> = Default::default();
     assert_eq!(a.get(15), None);
 
     *a.get_or_insert(15) = 89;
@@ -21,7 +21,7 @@ fn test(){
 
 #[test]
 fn test2(){
-    let mut a: CompactSparseArray<usize, 3> = Default::default();
+    let mut a: DenseTree<usize, 3> = Default::default();
 
     #[cfg(not(miri))]
     const COUNT: usize = 200_000;
@@ -49,7 +49,7 @@ fn test2(){
 
 #[test]
 fn test_remove(){
-    let mut a: CompactSparseArray<usize, 2> = Default::default();
+    let mut a: DenseTree<usize, 2> = Default::default();
     *a.get_or_insert(10) = 10;
     *a.get_or_insert(11) = 11;
     //*a.get_or_insert(12) = 12;
@@ -60,7 +60,7 @@ fn test_remove(){
 
 #[test]
 fn test_remove2(){
-    let mut a: CompactSparseArray<usize, 2> = Default::default();
+    let mut a: DenseTree<usize, 2> = Default::default();
 
     for i in 0..2000{
         *a.get_or_insert(i) = i;

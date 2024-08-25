@@ -50,7 +50,7 @@ pub trait FoldMutVisitor<Mask> {
 }
 
 
-pub trait SparseArrayLevels: Default {
+pub trait SparseTreeLevels: Default {
     type LevelCount: ConstInteger;
     type Mask: BitBlock;
     
@@ -76,7 +76,7 @@ pub trait SparseArrayLevels: Default {
 
 macro_rules! sparse_array_levels_impl {
     ($n:literal: [$($i:tt,)+] [$($rev_i:tt,)+]; $first_t:tt, $($t:tt,)* ) => {
-        impl<$first_t, $($t,)*> SparseArrayLevels for ($first_t, $($t,)*)
+        impl<$first_t, $($t,)*> SparseTreeLevels for ($first_t, $($t,)*)
         where
             $first_t: ILevel,
             $first_t::Block: HiBlock,

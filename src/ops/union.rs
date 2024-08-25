@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::borrow::Borrow;
 use std::ops::{BitAnd, BitOr};
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
-use crate::sparse_hierarchy::{BitmapTree, BitmapTreeCursor};
+use crate::bitmap_tree::{BitmapTree, BitmapTreeCursor};
 use crate::{BitBlock, LazyBitmapTree, BitmapTreeCursorTypes, BitmapTreeTypes};
 use crate::bit_queue::BitQueue;
 use crate::utils::{Array, Borrowable, Take};
@@ -184,14 +184,14 @@ where
 #[cfg(test)]
 mod tests{
     use itertools::assert_equal;
-    use crate::compact_sparse_array::CompactSparseArray;
+    use crate::dense_tree::DenseTree;
     use crate::map;
     use crate::ops::union::union;
-    use crate::sparse_hierarchy::BitmapTree;
+    use crate::bitmap_tree::BitmapTree;
 
     #[test]
     fn smoke_test(){
-        type Array = CompactSparseArray<usize, 3>;
+        type Array = DenseTree<usize, 3>;
         let mut a1 = Array::default();
         let mut a2 = Array::default();
         

@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::ops::BitAnd;
 use crate::const_utils::{ConstArray, ConstInteger};
 use crate::{LazyBitmapTree, RegularBitmapTree, BitmapTreeCursorTypes, BitmapTreeTypes};
-use crate::sparse_hierarchy::{BitmapTree, BitmapTreeCursor};
+use crate::bitmap_tree::{BitmapTree, BitmapTreeCursor};
 use crate::utils::{Borrowable, Take};
 
 pub struct Intersection<S0, S1>{
@@ -194,13 +194,13 @@ where
 #[cfg(test)]
 mod tests{
     use itertools::assert_equal;
-    use crate::compact_sparse_array::CompactSparseArray;
+    use crate::dense_tree::DenseTree;
     use crate::ops::intersection::intersection;
-    use crate::sparse_hierarchy::BitmapTree;
+    use crate::bitmap_tree::BitmapTree;
 
     #[test]
     fn smoke_test(){
-        type Array = CompactSparseArray<usize, 3>;
+        type Array = DenseTree<usize, 3>;
         let mut a1= Array::default();
         let mut a2= Array::default();
         

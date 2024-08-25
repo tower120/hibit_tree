@@ -5,8 +5,8 @@ mod common;
 use itertools::assert_equal;
 use rand::{Rng, SeedableRng};
 use rand::prelude::SliceRandom;
-use hi_sparse_array::{config, SparseHierarchy};
-use hi_sparse_array::utils::LendingIterator;
+use hibit_tree::{config, BitmapTree, SparseTree};
+use hibit_tree::utils::LendingIterator;
 
 #[derive(Default, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 struct Data(usize);
@@ -24,6 +24,16 @@ fn smoke_test(){
     //array.insert(143231, Data(143231));
     //array.insert(175928, Data(175928));
 }*/
+
+#[test]
+fn depth2_test(){
+    pub type Tree<Data> = SparseTree<config::width_64::depth_2, Data>;
+    let mut t: Tree<Data> = Default::default();
+    t.insert(1, Data(3));
+    
+    let mut iter = t.iter();
+    LendingIterator::next(&mut iter);
+}
 
 #[test]
 fn insert_test(){

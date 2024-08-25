@@ -2,12 +2,12 @@
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 
 //! {TODO: This is changed}
-//! The core of the lib is [SparseArray] container and [BitmapTree] 
+//! The core of the lib is [SparseTree] container and [BitmapTree] 
 //! interface. They represent concept of data structure that filled
 //! with "empty" elements across whole range, and populated with values.    
 //! 
 //! {TODO: This is changed}
-//! All elements that are not actually stored in [SparseArray], 
+//! All elements that are not actually stored in [SparseTree], 
 //! considered to be [Empty::empty()]. Accessing such elements
 //! does not involve branching, and as fast as accessing the real data.
 //! 
@@ -54,10 +54,10 @@
 //!
 //! Insertion is not benchmarked, but it can be viewed as special case of random access.
 //!
-//! Iteration of intersection between N [SparseArray]s in worst case scenario,
+//! Iteration of intersection between N [SparseTree]s in worst case scenario,
 //! where all elements intersects, took N times of usual ordered iteration. In best
 //! case scenario where nothing intersects - basically free. Finding intersected
-//! sub-trees costs almost nothing by itself. [SparseArray] acts as acceleration
+//! sub-trees costs almost nothing by itself. [SparseTree] acts as acceleration
 //! structure for intersection.
 //! 
 //! # Inter SparseHierarchy operations
@@ -84,19 +84,19 @@
 //! 
 //! ## simd
 //! 
-//! Enabled by default. Allow to use 128, 256 bit configurations in [SparseArray].
+//! Enabled by default. Allow to use 128, 256 bit configurations in [SparseTree].
 //! 
 //! ## may_dangle
 //! 
 //! Requires nightly. Allow to store references in containers.
 //! https://doc.rust-lang.org/nomicon/dropck.html#an-escape-hatch 
 
-mod sparse_array;
-mod sparse_array_levels;
-mod compact_sparse_array;
+mod sparse_tree;
+mod sparse_tree_levels;
+mod dense_tree;
 mod bit_utils;
 mod bit_block;
-mod sparse_hierarchy;
+mod bitmap_tree;
 mod iter;
 mod level;
 mod level_block;
@@ -112,9 +112,9 @@ pub mod config;
 //pub use ref_or_val::*;
 pub use bit_block::BitBlock;
 pub use req_default::ReqDefault;
-pub use sparse_array::SparseArray;
-pub use compact_sparse_array::CompactSparseArray;
-pub use sparse_hierarchy::*;
+pub use sparse_tree::SparseTree;
+pub use dense_tree::DenseTree;
+pub use bitmap_tree::*;
 pub use iter::*;
 pub use ops::map::map;
 pub use ops::multi_map_fold::multi_map_fold;

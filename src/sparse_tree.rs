@@ -14,18 +14,28 @@ use crate::{Empty, Index, BitmapTreeCursorTypes, BitmapTreeTypes};
 use crate::req_default::{DefaultInit, DefaultInitFor, DefaultRequirement, ReqDefault};
 use crate::utils::Primitive;
 use crate::utils::Array;
-use crate::sparse_array_levels::{FoldMutVisitor, FoldVisitor, MutVisitor, SparseArrayLevels, TypeVisitor, Visitor};
-use crate::sparse_hierarchy::{BitmapTree, BitmapTreeCursor};
+use crate::sparse_tree_levels::{FoldMutVisitor, FoldVisitor, MutVisitor, SparseTreeLevels, TypeVisitor, Visitor};
+use crate::bitmap_tree::{BitmapTree, BitmapTreeCursor};
 
+/// Uncompressed Hierarchical Bitmap Tree.
+///
+/// Nodes store children pointers in sparse array. 
+/// This means that array size equals to maximum children count (bitmask width).
+/// 
+/// To save memory, instead of traditional pointers, integer indices
+/// are used. Root level use u8 for indices, first level - u16, everything below - u32.
+/// 
+/// It is slightly faster than [DenseTree], and can have wider nodes with 
+/// SIMD-accelerated bitmasks. 
 ///
 /// # Universal set (better naming?)
-/// 
+///
 /// Pass [ReqDefault] as `R` argument, to unlock [get_or_default] operation[^1].
 /// This will require `Data` to be [Default] to construct container.
-/// 
+///
 /// [get_or_default] is as fast as [get_unchecked] and has no
 /// performance hit from branching[^2]. 
-/// 
+///
 /// Accessing items through [get_or_default] effectively makes container 
 /// [universal set](https://en.wikipedia.org/wiki/Universal_set)[^3].
 ///
@@ -33,12 +43,12 @@ use crate::sparse_hierarchy::{BitmapTree, BitmapTreeCursor};
 ///       due to stable Rust limitations - we need specialization for that.
 /// [^2]: All non-existent items just point to the very first default item.
 /// [^3]: Container acts as it has all items across index range.
-/// 
-/// [get_or_default]: SparseArray::get_or_default 
-/// [get_unchecked]: SparseArray::get_unchecked
-pub struct SparseArray<Levels, Data, R = ReqDefault<false>>
+///
+/// [get_or_default]: SparseTree::get_or_default 
+/// [get_unchecked]: SparseTree::get_unchecked
+pub struct SparseTree<Levels, Data, R = ReqDefault<false>>
 where
-    Levels: SparseArrayLevels,
+    Levels: SparseTreeLevels,
     R: DefaultRequirement
 {
     levels: Levels,
@@ -58,9 +68,9 @@ where
 }
 
 impl<Levels, Data, R> Default for
-    SparseArray<Levels, Data, R>
+    SparseTree<Levels, Data, R>
 where
-    Levels: SparseArrayLevels,
+    Levels: SparseTreeLevels,
     R: DefaultRequirement,
     DefaultInitFor<Data, R>: DefaultInit
 {
@@ -97,7 +107,7 @@ impl<Levels, LevelN> Copy for BlockPtr<Levels, LevelN>{}
 
 impl<Levels, LevelN> BlockPtr<Levels, LevelN>
 where
-    Levels: SparseArrayLevels,
+    Levels: SparseTreeLevels,
     LevelN: ConstInteger,
 {
     /// # Safety
@@ -175,9 +185,9 @@ where
     }
 }
 
-impl<Levels, Data, R> SparseArray<Levels, Data, R>
+impl<Levels, Data, R> SparseTree<Levels, Data, R>
 where
-    Levels: SparseArrayLevels,
+    Levels: SparseTreeLevels,
     R: DefaultRequirement,
 {
     #[inline(always)]
@@ -521,9 +531,9 @@ where
     }
 }
 
-impl<Levels, Data> SparseArray<Levels, Data, ReqDefault>
+impl<Levels, Data> SparseTree<Levels, Data, ReqDefault>
 where
-    Levels: SparseArrayLevels,
+    Levels: SparseTreeLevels,
     Data: Default
 {
     /// This is **SIGNIFICANTLY** faster than `get(index).unwrap_or(Default::default())`.
@@ -542,9 +552,9 @@ where
 }
 
 #[cfg(feature = "may_dangle")]
-unsafe impl<Levels, #[may_dangle] Data, R> Drop for SparseArray<Levels, Data, R>
+unsafe impl<Levels, #[may_dangle] Data, R> Drop for SparseTree<Levels, Data, R>
 where
-    Levels: SparseArrayLevels,
+    Levels: SparseTreeLevels,
     R: DefaultRequirement,
 {
     #[inline]
@@ -554,9 +564,9 @@ where
 }
 
 #[cfg(not(feature = "may_dangle"))]
-impl<Levels, Data, R> Drop for SparseArray<Levels, Data, R>
+impl<Levels, Data, R> Drop for SparseTree<Levels, Data, R>
 where
-    Levels: SparseArrayLevels,
+    Levels: SparseTreeLevels,
     R: DefaultRequirement,
 {
     #[inline]
@@ -565,17 +575,17 @@ where
     }
 }
 
-impl<Levels, Data, R> Borrowable for SparseArray<Levels, Data, R>
+impl<Levels, Data, R> Borrowable for SparseTree<Levels, Data, R>
 where
-    Levels: SparseArrayLevels,
+    Levels: SparseTreeLevels,
     R: DefaultRequirement
 {
-    type Borrowed = SparseArray<Levels, Data, R>; 
+    type Borrowed = SparseTree<Levels, Data, R>; 
 }
 
-impl<'this, Levels, Data, R> BitmapTreeTypes<'this> for SparseArray<Levels, Data, R>
+impl<'this, Levels, Data, R> BitmapTreeTypes<'this> for SparseTree<Levels, Data, R>
 where
-    Levels: SparseArrayLevels,
+    Levels: SparseTreeLevels,
     R: DefaultRequirement
 {
     type Data = &'this Data;
@@ -583,9 +593,9 @@ where
     type Cursor = Cursor<'this, Levels, Data, R>;
 }
 
-impl<Levels, Data, R> BitmapTree for SparseArray<Levels, Data, R>
+impl<Levels, Data, R> BitmapTree for SparseTree<Levels, Data, R>
 where
-    Levels: SparseArrayLevels,
+    Levels: SparseTreeLevels,
     R: DefaultRequirement
 {
     const EXACT_HIERARCHY: bool = true;
@@ -622,7 +632,7 @@ where
 
 pub struct Cursor<'src, Levels, Data, R>
 where
-    Levels: SparseArrayLevels,
+    Levels: SparseTreeLevels,
     R: DefaultRequirement 
 {
     /// [*const u8; Levels::LevelCount-1]
@@ -632,12 +642,12 @@ where
         *const u8, 
         <Levels::LevelCount as ConstInteger>::Dec
     >,
-    phantom_data: PhantomData<&'src SparseArray<Levels, Data, R>>
+    phantom_data: PhantomData<&'src SparseTree<Levels, Data, R>>
 }
 
 impl<'this, 'src, Levels, Data, R> BitmapTreeCursorTypes<'this> for Cursor<'src, Levels, Data, R>
 where
-    Levels: SparseArrayLevels,
+    Levels: SparseTreeLevels,
     R: DefaultRequirement,
 {
     type Data = &'src Data;
@@ -645,10 +655,10 @@ where
 
 impl<'src, Levels, Data, R> BitmapTreeCursor<'src> for Cursor<'src, Levels, Data, R>
 where
-    Levels: SparseArrayLevels,
+    Levels: SparseTreeLevels,
     R: DefaultRequirement,
 {
-    type Src = SparseArray<Levels, Data, R>;
+    type Src = SparseTree<Levels, Data, R>;
 
     #[inline]
     fn new(_: &'src Self::Src) -> Self {
@@ -710,15 +720,14 @@ where
     unsafe fn data<'a>(&'a self, src: &'src Self::Src, level_index: usize)
         -> Option<<Self as BitmapTreeCursorTypes<'a>>::Data> 
     {
-        /*const*/ let last_level_index = Levels::LevelCount::VALUE - 1;
-        
         let level_block: BlockPtr<Levels, <Levels::LevelCount as ConstInteger>::Dec> = 
-            if last_level_index == 1{
+            if Levels::LevelCount::VALUE == 1{
                 // get from root 
                 src.get_block(Default::default(), 0)
             } else {
                 // We do not store the root level's block.
-                let ptr = *self.level_block_ptrs.as_ref().get_unchecked(last_level_index - 1);
+                let ptr = *self.level_block_ptrs.as_ref().last().unwrap_unchecked();
+                    //get_unchecked(Levels::LevelCount::VALUE - 2);
                 BlockPtr::new_unchecked(NonNull::new_unchecked(ptr as * mut u8))
             };
         

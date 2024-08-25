@@ -6,7 +6,7 @@ use std::slice;
 use arrayvec::ArrayVec;
 use crate::{BitBlock, LazyBitmapTree, RegularBitmapTree, MultiBitmapTree, MultiBitmapTreeTypes, BitmapTreeData, BitmapTreeCursorTypes, BitmapTreeTypes};
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
-use crate::sparse_hierarchy::{BitmapTree, BitmapTreeCursor};
+use crate::bitmap_tree::{BitmapTree, BitmapTreeCursor};
 use crate::utils::{Array, Borrowable, Ref, Take};
 
 /// Intersection between all iterator items.
@@ -544,14 +544,14 @@ where
 #[cfg(test)]
 mod tests{
     use itertools::assert_equal;
-    use crate::compact_sparse_array::CompactSparseArray;
-    use crate::sparse_hierarchy::BitmapTree;
+    use crate::dense_tree::DenseTree;
+    use crate::bitmap_tree::BitmapTree;
     use crate::utils::LendingIterator;
     use super::multi_intersection;
 
     #[test]
     fn smoke_test(){
-        type Array = CompactSparseArray<usize, 3>;
+        type Array = DenseTree<usize, 3>;
         let mut a1 = Array::default();
         let mut a2 = Array::default();
         let mut a3 = Array::default();

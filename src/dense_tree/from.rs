@@ -9,7 +9,7 @@ use crate::{
 use crate::utils::Take;
 
 use super::node::{empty_node, NodePtr};
-use super::{CompactSparseArray, DataIndex, Mask};
+use super::{DenseTree, DataIndex, Mask};
 
 type CursorData<'src, 'state, L> = 
     <<L as BitmapTreeTypes<'src>>
@@ -139,7 +139,7 @@ where
     }
 }
 
-impl<From, T, const DEPTH: usize> FromBitmapTree<From> for CompactSparseArray<T, DEPTH>
+impl<From, T, const DEPTH: usize> FromBitmapTree<From> for DenseTree<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger,
     From: BitmapTree<
