@@ -42,7 +42,7 @@ Hierarchical bitmap tree is a form of a prefix tree. Each node have fixed number
 Level count is fixed. This allows to fast calculate in-node indices for by-index access,
 without touching nodes, spending ~1 cycle per level.
 
-Thou we have fixed number of children - we store only non-null children, using ["bit-block map" technique](#bit-block-map-technique) for access.
+Thou we have fixed number of children in node - we store only non-null children, using ["bit-block map" technique](#bit-block-map-technique) for access.
 ```
                 Node     
           ┌─────────────┐
@@ -103,7 +103,22 @@ and just 2 with `bmi2`:
 _bzhi_u64(bit_block, index).count_ones()
 ```
 
-### Hierarchical bitmap
+### Switching to uncompressed node
+
+[Unimplemented]
+
+Since children must always remain sorted, insert and remove technically O(N).
+That's not a problem for most nodes, since they will have just a few children.
+But for dense nodes - it is reasonably to switch to "uncompressed" data storage - 
+where insert and remove O(1). 
+
+To do this without introducing branching, we add another bitmask.
+If children count less then some threshold (32) it is equal to the original one.
+Otherwise - filled with ones. We will use it for [bit-block mapping](#bit-block-map-technique): 
+below threshold it will work as usual, above - it's dense-index will equal sparse-index
+(because bits before requested sparse index are all ones).
+
+## Hierarchical bitmap
 
 Bitmasks in nodes form hierarchical bitset/bitmap, similar to the one in [hi_sparse_bitset](https://crates.io/crates/hi_sparse_bitset), which in turn was derived from [hibitset](https://crates.io/crates/hibitset). This means, that all operations from hierarchical bitsets are possible, with the
 same performance characteristics.
