@@ -323,6 +323,10 @@ where
 
 impl<Iter> Borrowable for MultiUnion<Iter>{ type Borrowed = Self; }
 
+/// Union between multiple &[HibitTree]s.
+/// 
+/// `iter` will be cloned and iterated multiple times.
+/// Pass something like [slice::Iter].
 #[inline]
 pub fn multi_union<Iter>(iter: Iter) 
     -> MultiUnion<Iter>

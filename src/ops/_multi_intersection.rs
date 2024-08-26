@@ -532,6 +532,10 @@ where
 
 impl<Iter> Borrowable for MultiIntersection<Iter>{ type Borrowed = Self; }
 
+/// Intersection between multiple &[HibitTree]s.
+/// 
+/// `iter` will be cloned and iterated multiple times.
+/// Pass something like [slice::Iter].
 #[inline]
 pub fn multi_intersection<Iter>(iter: Iter) 
     -> MultiIntersection<Iter>

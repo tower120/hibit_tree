@@ -41,7 +41,7 @@ elements into tree. Intersection of two such trees will return pairs of non-zero
 By mapping pairs to multiplication operation - we get element-wise multiplied sparse vector. 
 By summing it's all elements - we get dot product.
 
-See examples/sparse_vector.rs TODO: direct link here
+See [examples/sparse_vector.rs](https://github.com/tower120/hibit_tree/blob/main/examples/sparse_vector.rs)
 
 ### Compressed bitset
 

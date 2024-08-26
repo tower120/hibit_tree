@@ -148,6 +148,9 @@ where
     >,*/
 {}
 
+/// Aggregate each [MultiHibitTree] element with fold operation.
+///
+/// Makes [RegularHibitTree] from [MultiHibitTree]. 
 #[inline]
 pub fn multi_map_fold<S, I, F>(s: S, init: I, f: F) -> MultiMapFold<S, I, F>
 where 

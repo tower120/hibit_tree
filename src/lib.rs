@@ -1,95 +1,135 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 
-//! {TODO: This is changed}
-//! The core of the lib is [SparseTree] container and [HibitTree] 
-//! interface. They represent concept of data structure that filled
-//! with "empty" elements across whole range, and populated with values.    
-//! 
-//! {TODO: This is changed}
-//! All elements that are not actually stored in [SparseTree], 
-//! considered to be [Empty::empty()]. Accessing such elements
-//! does not involve branching, and as fast as accessing the real data.
-//! 
-//! Also inter container intersection and merging possible. All merged/intersected
-//! element indices are become known basically instantly, since they obtained in bulk 
-//! as bitmasks primitive operations(AND/OR). So intersection is very, very cheap.
+//! # Hibit tree[^hibit]
 //!
-//! # Data structure
+//! The core of the lib is [SparseTree] and [DenseTree] containers with [HibitTree] 
+//! interface. These are fixed-depth, K-ary[^k_ary] trees[^trie] with integer keys,
+//! that form bitmap hierarchy[^bitmap_hierarchy].
 //! 
-//! TODO: image of container structure from hi_sparse_bitset.
+//! * Branchless O(1) access.
+//! * No tree balancing.
+//! * Ordered.
+//! * Unordered contiguous storage.
+//! * Tree act as a bitset/bitmap hierarchy. Bitmap hierarchy is a natural
+//!   acceleration structure for intersection. Allows super-fast set-like operations: 
+//!   intersection, merge, etc.   
+//!
+//! [^hibit]: Hibit stands for **hi**erarchical **bit**map.
+//! [^k_ary]: A.k.a. "N-ary", a.k.a. "M-ary". 
+//! [^trie]: Also, may be considered as form of radix tree, a.k.a. "prefix tree", a.k.a. "trie".
+//! [^bitmap_hierarchy]: Bitmap hierarchy - is a hierarchy of bitmasks, where each
+//! raised bit in bitmask means, that child at corresponding bit index have data.
+//! See [hi_sparse_bitset](https://crates.io/crates/hi_sparse_bitset), 
+//! [hibitset](https://docs.rs/hibitset/0.6.4/hibitset).     
 //! 
-//! TODO: level block description from hi_sparse_bitset.
+//! ## Data structure
 //! 
-//! ## Bitmasks
+//! See readme.
 //! 
-//! Each node supplemented with bitmask, where raised bits corresponds to
-//! sub-tree childs with data. All other node childs point to the empty data.
-//! With bitmasks, instead of searching non-empty node child in childs array,
-//! we just iterate bitmask population.
-//! Also, bitmasks allows **FAST** container-to-container intersections.
-//! 
-//! # Performance
+//! ## Performance
 //! 
 //! Accessing element by index act as dereferencing N pointers (where N - number
 //! of levels in hierarchy). This is significantly faster then traversing tree 
 //! with dynamic depth, since it does not involve any kind of branching.
 //! 
-//! Insert basically same as by index element access, plus some minor overhead.
+//! Random insert have the same logic as random access, but with branching at each level.
 //!
 //! Ordered (by index) iteration is fast. Traversing each hierarchy node is fast O(1)
 //! operation, which basically is just BMI's pop_cnt/trail_cnt. There is no "scan"
 //! across node child items, for finding non-empty child/sub-tree.
 //! 
-//! Unordered iteration is as fast as it can possibly be. It is just plain Vec iteration.
+//! Unordered iteration is as fast as a plain Vec iteration.
 //! 
-//! ## Benchmarks data
+//! Iteration of intersection between N trees in worst case scenario,
+//! where trees have keys located nearby (fit same terminal blocks), 
+//! take N/block_width[^block_width] times of usual ordered iteration. In the best
+//! case scenario where nothing intersects, and this happens at the first levels - 
+//! basically free. 
+//! Hierarchical bitmap acts as acceleration structure for intersection.
+//! Branches/sub-trees that have no keys in common index-range discarded early.
 //! 
-//! At any default configuration random access and ordered iteration 
-//! is always faster then no_hash HashMap with usize uniformly distributed keys 
-//! (ideal HashMap scenario). [config::sbo] is faster up to 4 levels.
-//! Shallow trees (2-3 levels) are up to x3 faster.
+//! [^block_width]: 64 for [DenseTree]. Can be up to 256 for [SparseTree]. 
+//! 
+//! ### Benchmarks data
+//! 
+//! #### Against HashMap
+//! 
+//! Comparing random access against `no_hash` HashMap with usize uniformly distributed keys 
+//! (ideal HashMap scenario):
+//! * 4-6 levels (u32 range) both containers are faster.
+//! * 8 levels (u64 range) [SparseTree] with 256bit have the same performance.
+//! 
+//! TODO: add graphic image
+//! 
+//! Against `ahash` - both containers always faster.
+//! 
+//! TODO: add graphic image
 //! 
 //! In general, performance does not depends on data distribution across index range.
 //!
-//! Insertion is not benchmarked, but it can be viewed as special case of random access.
+//! Random insert is not benchmarked yet.
+//! 
+//! Bulk insert with [materialize] is not benchmarked yet. Should be **significantly** 
+//! faster then random insert.
+//! 
+//! Intersection is order of magnitudes faster then HashMap's per-element "contains". 
 //!
-//! Iteration of intersection between N [SparseTree]s in worst case scenario,
-//! where all elements intersects, took N times of usual ordered iteration. In best
-//! case scenario where nothing intersects - basically free. Finding intersected
-//! sub-trees costs almost nothing by itself. [SparseTree] acts as acceleration
-//! structure for intersection.
+//! Unordered iteration is faster then current [hashbrown](https://crates.io/crates/hashbrown)
+//! implementation.   
 //! 
-//! # Inter SparseHierarchy operations
+//! ## Inter HibitTree operations
 //! 
-//! As you can see SparseArray is a form of set/map, and hence, can be used for
-//! inter set operations, such as intersection, merge, diff. 
+//! As you can see [HibitTree] is a form of set/map, and hence, can be used for
+//! inter set operations, such as [intersection], [merge], etc. 
 //! 
 //! Due to the fact, that each hierarchy block supplemented with bitmask, finding
 //! intersection is just a matter of ANDing bitmasks.
 //! 
-//! # Exact hierarchy
+//! ## Laziness
 //! 
-//! "Exact hierarchy" - is hierarchy that DOES NOT have nodes pointing to 
-//! empty elements or nodes. Hence, it's bitmasks contains "exact" emptiness info.
+//! All [ops] are [LazyHibitTree]s. Which means that tree is computed on the fly.
+//! If you need to iterate the result once or twice, or [get()] a few times - there
+//! is no need to save result into a concrete container. Otherwise - you may want 
+//! to [materialize] it. Obviously, there is no need to materialize [map] that just
+//! return reference to object field.
+//!
+//! Due to current limitations you can't materialize references[^store_ref].
+//!
+//! [^store_ref]: But you can have &T containers in general. You'll need 
+//! [may_dangle](#may_dangle) flag.
+//! 
+//! [get()]: HibitTree::get
+//! [materialize]: LazyHibitTree::materialize
+//! [map]: crate::map 
+//! 
+//! ## Exact hierarchy
+//! 
+//! "Exact hierarchy" - is a bitmap hierarchy, where each bitmask have
+//! exact emptiness info. All raised bits in bitmasks corresponds to non-empty childs.
+//! Or from the tree view: there can be no empty node in tree, except root. 
+//! 
+//! You can have non-[EXACT_HIERARCHY] in [LazyHibitTree]. For example, lazy 
+//! intersection.  
 //! 
 //! Speeds up following operations:
+//! - [FromHibitTree]
 //! - TODO [Eq]
 //! - TODO [is_empty()]
 //! - TODO [contains()]
-//! - TODO From<impl SparseHierarchy>
-//! - iterated elements are guaranteed to be ![is_empty].
 //! 
-//! # Flags
+//! [EXACT_HIERARCHY]: HibitTree::EXACT_HIERARCHY
 //! 
-//! ## simd
+//! ## Flags
+//! 
+//! ### simd
 //! 
 //! Enabled by default. Allow to use 128, 256 bit configurations in [SparseTree].
 //! 
-//! ## may_dangle
+//! ### may_dangle
 //! 
 //! Requires nightly. Allow to store references in containers.
-//! https://doc.rust-lang.org/nomicon/dropck.html#an-escape-hatch 
+//! See [rustonomicon](https://doc.rust-lang.org/nomicon/dropck.html#an-escape-hatch).
 
 mod sparse_tree;
 mod sparse_tree_levels;

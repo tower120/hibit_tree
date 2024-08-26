@@ -88,12 +88,11 @@ pub trait HibitTreeTypes<'this, ImplicitBounds = &'this Self>{
     type Cursor: HibitTreeCursor<'this, Src=Self>;
 }
 
+/// Hierarchical bitmap tree interface.
 /// 
-/// TODO: Add more description
-/// 
-/// SparseHierarchy is a base trait for [RegularHibitTree] and [MultiHibitTree],
+/// HibitTree is a base trait for [RegularHibitTree] and [MultiHibitTree],
 /// which you will use most of the time. Only multi_* operations over non-[RegularHibitTree]'ies
-/// return bare SparseHierarchy.
+/// return bare `HibitTree`.
 ///
 /// This split is needed, because multi_* operations ([MultiHibitTree]'ies) 
 /// return Iterators, that produce values on the fly. [data()], [data_unchecked()] 
@@ -101,24 +100,24 @@ pub trait HibitTreeTypes<'this, ImplicitBounds = &'this Self>{
 /// process it in different ways. Alternative to this would be collect all items
 /// into intermediate container, and then return it to the user. That is what
 /// [multi_map_fold] do - aggregates iterator into one value, and thus makes 
-/// [MultiHibitTree] Mono again(!).
+/// [MultiHibitTree] Regular again(!).
 ///
-/// # SparseHierarchyTypes
+/// # HibitTreeTypes
 /// 
-/// SparseHierarchy "inherits" SparseHierarchyTypes with lifetime argument. 
+/// HibitTree "inherits" HibitTreeTypes with lifetime argument. 
 /// This is workaround for Rust's basically non-usable GATs[^gat_problems].
 /// 
 /// If you need concrete types - use [HibitTreeData] and 
-/// [SparseHierarchyDataUnchecked] helpers. Or get them from [HibitTreeTypes],
+/// [MultiHibitTreeIterItem] helpers. Or get them from [HibitTreeTypes],
 /// as if it were super-trait:
 /// ```
-/// let i: <MySparseContainer as SparseHierarchyTypes>::Data = my_sparse_container.get(1).unwrap();
+/// let i: <MySparseContainer as HibitTreeTypes>::Data = my_sparse_container.get(1).unwrap();
 /// ```
 /// ```
-/// type MyData = <MySparseContainer as SparseHierarchyTypes<'i>>::Data; 
+/// type MyData<'i> = <MySparseContainer as HibitTreeTypes<'i>>::Data; 
 /// ```
 /// 
-/// Same technique used for other SparseHierarchy related traits.
+/// Same technique used for other HibitTree related traits.
 /// 
 /// [^gat_problems]: With GAT's we always end up with this <https://blog.rust-lang.org/2022/10/28/gats-stabilization.html#implied-static-requirement-from-higher-ranked-trait-bounds>
 /// error.
@@ -361,12 +360,13 @@ pub trait MultiHibitTreeTypes<'this, ImplicitBounds = &'this Self>
 /// 
 /// `multi_*` operations return [MultiHibitTree]'ies.
 /// 
-/// You can convert MultiSparseHierarchy to [RegularHibitTree],
+/// You can convert `MultiHibitTree` to [RegularHibitTree],
 /// with [multi_map_fold()]. 
 pub trait MultiHibitTree: HibitTree
 where
     Self: for<'this> MultiHibitTreeTypes<'this>
 {
+    /// See [crate::multi_map_fold].
     #[inline]
     fn map_fold<I, F>(self, init: I, f: F) -> MultiMapFold<Self, I, F>
     where 
