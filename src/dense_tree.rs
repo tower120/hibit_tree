@@ -12,11 +12,11 @@ mod node;
 
 use std::{mem, ptr};
 use std::marker::PhantomData;
-use crate::{BitBlock, Index, BitmapTreeCursorTypes, BitmapTreeTypes};
+use crate::{BitBlock, Index, HibitTreeCursorTypes, HibitTreeTypes};
 use crate::bit_queue::BitQueue;
 use crate::const_utils::{const_loop, ConstArray, ConstArrayType, ConstBool, ConstFalse, ConstInteger, ConstTrue, ConstUsize};
 use crate::level_indices;
-use crate::bitmap_tree::{BitmapTree, BitmapTreeCursor};
+use crate::hibit_tree::{HibitTree, HibitTreeCursor};
 use crate::utils::{Array, Borrowable, Primitive, Take};
 
 use node::{NodePtr, empty_node};
@@ -339,7 +339,7 @@ where
     }
 }
 
-impl<'a, T, const DEPTH: usize> BitmapTreeTypes<'a> for DenseTree<T, DEPTH>
+impl<'a, T, const DEPTH: usize> HibitTreeTypes<'a> for DenseTree<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger
 {
@@ -348,7 +348,7 @@ where
     type Cursor = Cursor<'a, T, DEPTH>;    
 }
 
-impl<T, const DEPTH: usize> BitmapTree for DenseTree<T, DEPTH>
+impl<T, const DEPTH: usize> HibitTree for DenseTree<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger
 {
@@ -396,14 +396,14 @@ where
     phantom_data: PhantomData<&'src T>
 }
 
-impl<'this, 'src, T, const DEPTH: usize> BitmapTreeCursorTypes<'this> for Cursor<'src, T, DEPTH>
+impl<'this, 'src, T, const DEPTH: usize> HibitTreeCursorTypes<'this> for Cursor<'src, T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger
 {
     type Data = &'src T;
 }
 
-impl<'src, T, const DEPTH: usize> BitmapTreeCursor<'src> for Cursor<'src, T, DEPTH>
+impl<'src, T, const DEPTH: usize> HibitTreeCursor<'src> for Cursor<'src, T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger
 {
@@ -423,7 +423,7 @@ where
         src: &'src Self::Src,
         level_n: N,
         level_index: usize
-    ) -> <Self::Src as BitmapTree>::LevelMask {
+    ) -> <Self::Src as HibitTree>::LevelMask {
         if N::VALUE == 0 {
             return *src.root.header().mask();
         }
@@ -454,7 +454,7 @@ where
         this: &'src Self::Src,
         level_n: N,
         level_index: usize
-    ) -> <Self::Src as BitmapTree>::LevelMask {
+    ) -> <Self::Src as HibitTree>::LevelMask {
         if N::VALUE == 0 {
             return *this.root.header().mask();
         }
@@ -480,7 +480,7 @@ where
     
     #[inline]
     unsafe fn data<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
-        -> Option<<Self as BitmapTreeCursorTypes<'a>>::Data> 
+        -> Option<<Self as HibitTreeCursorTypes<'a>>::Data> 
     {
         let node = if DEPTH == 1{
             // We do not store the root level's block.
@@ -503,7 +503,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
-        -> <Self as BitmapTreeCursorTypes<'a>>::Data
+        -> <Self as HibitTreeCursorTypes<'a>>::Data
     {
         let node = if DEPTH == 1{
             // We do not store the root level's block.

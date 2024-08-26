@@ -2,9 +2,9 @@
 
 use itertools::assert_equal;
 use rand::{Rng, SeedableRng};
-use hibit_tree::{DenseTree, FromBitmapTree, intersection, LazyBitmapTree, map, union};
-use hibit_tree::BitmapTree;
-use hibit_tree::RegularBitmapTree;
+use hibit_tree::{DenseTree, FromHibitTree, intersection, LazyHibitTree, map, union};
+use hibit_tree::HibitTree;
+use hibit_tree::RegularHibitTree;
 use hibit_tree::utils::{Borrowable, UnaryFunction};
 
 mod common;

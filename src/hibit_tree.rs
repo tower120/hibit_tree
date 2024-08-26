@@ -82,34 +82,34 @@ for
     }
 }
 
-pub trait BitmapTreeTypes<'this, ImplicitBounds = &'this Self>{
+pub trait HibitTreeTypes<'this, ImplicitBounds = &'this Self>{
     type Data;
     type DataUnchecked;
-    type Cursor: BitmapTreeCursor<'this, Src=Self>;
+    type Cursor: HibitTreeCursor<'this, Src=Self>;
 }
 
 /// 
 /// TODO: Add more description
 /// 
-/// SparseHierarchy is a base trait for [RegularBitmapTree] and [MultiBitmapTree],
-/// which you will use most of the time. Only multi_* operations over non-[RegularBitmapTree]'ies
+/// SparseHierarchy is a base trait for [RegularHibitTree] and [MultiHibitTree],
+/// which you will use most of the time. Only multi_* operations over non-[RegularHibitTree]'ies
 /// return bare SparseHierarchy.
 ///
-/// This split is needed, because multi_* operations ([MultiBitmapTree]'ies) 
+/// This split is needed, because multi_* operations ([MultiHibitTree]'ies) 
 /// return Iterators, that produce values on the fly. [data()], [data_unchecked()] 
 /// and [iter()] - all get source data from different functions, and also
 /// process it in different ways. Alternative to this would be collect all items
 /// into intermediate container, and then return it to the user. That is what
 /// [multi_map_fold] do - aggregates iterator into one value, and thus makes 
-/// [MultiBitmapTree] Mono again(!).
+/// [MultiHibitTree] Mono again(!).
 ///
 /// # SparseHierarchyTypes
 /// 
 /// SparseHierarchy "inherits" SparseHierarchyTypes with lifetime argument. 
 /// This is workaround for Rust's basically non-usable GATs[^gat_problems].
 /// 
-/// If you need concrete types - use [BitmapTreeData] and 
-/// [SparseHierarchyDataUnchecked] helpers. Or get them from [BitmapTreeTypes],
+/// If you need concrete types - use [HibitTreeData] and 
+/// [SparseHierarchyDataUnchecked] helpers. Or get them from [HibitTreeTypes],
 /// as if it were super-trait:
 /// ```
 /// let i: <MySparseContainer as SparseHierarchyTypes>::Data = my_sparse_container.get(1).unwrap();
@@ -124,9 +124,9 @@ pub trait BitmapTreeTypes<'this, ImplicitBounds = &'this Self>{
 /// error.
 /// We use this technique <https://sabrinajewson.org/blog/the-better-alternative-to-lifetime-gats#the-better-gats> 
 /// as a workaround.
-pub trait BitmapTree: Sized + Borrowable<Borrowed=Self>
+pub trait HibitTree: Sized + Borrowable<Borrowed=Self>
 where
-	Self: for<'this> BitmapTreeTypes<'this>,
+	Self: for<'this> HibitTreeTypes<'this>,
 {
     /// TODO: Decription form hi_sparse_bitset TRUSTED_HIERARCHY
     const EXACT_HIERARCHY: bool;
@@ -145,7 +145,7 @@ where
     /// [^1]: It is not just `[usize; LevelCount::VALUE]` due to troublesome 
     ///       Rust const expressions in generic context. 
     unsafe fn data(&self, index: usize, level_indices: &[usize]) 
-        -> Option<<Self as BitmapTreeTypes<'_>>::Data>;
+        -> Option<<Self as HibitTreeTypes<'_>>::Data>;
  
     /// # Safety
     /// 
@@ -157,7 +157,7 @@ where
     /// [^1]: It is not just `[usize; LevelCount::VALUE]` due to troublesome 
     ///       Rust const expressions in generic context. 
     unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
-        -> <Self as BitmapTreeTypes<'_>>::DataUnchecked;
+        -> <Self as HibitTreeTypes<'_>>::DataUnchecked;
     
     #[inline]
     fn iter(&self) -> Iter<Self>{
@@ -166,8 +166,8 @@ where
 
     /// You can use `usize` or [Index] for `index`.
     #[inline]
-    fn get(&self, index: impl Into<Index<<Self as BitmapTree>::LevelMask, Self::LevelCount>>) 
-        -> Option<<Self as BitmapTreeTypes<'_>>::Data> 
+    fn get(&self, index: impl Into<Index<<Self as HibitTree>::LevelMask, Self::LevelCount>>) 
+        -> Option<<Self as HibitTreeTypes<'_>>::Data> 
     {
         let index: usize = index.into().into();
         let indices = level_indices::<Self::LevelMask, Self::LevelCount>(index);
@@ -179,7 +179,7 @@ where
     /// Item at `index` must exist.
     #[inline]
     unsafe fn get_unchecked(&self, index: usize) 
-        -> <Self as BitmapTreeTypes<'_>>::DataUnchecked 
+        -> <Self as HibitTreeTypes<'_>>::DataUnchecked 
     {
         let indices = level_indices::<Self::LevelMask, Self::LevelCount>(index);
         self.data_unchecked(index, indices.as_ref())
@@ -197,36 +197,36 @@ where
 }
 
 
-/// [BitmapTree] that is not a concrete collection.
+/// [HibitTree] that is not a concrete collection.
 /// 
 /// Most results of operations are.
-pub trait LazyBitmapTree: BitmapTree {
+pub trait LazyHibitTree: HibitTree {
     /// Make a concrete collection from a lazy/virtual one.
     #[inline]
     fn materialize<T>(self) -> T
     where
-        T: FromBitmapTree<Self>
+        T: FromHibitTree<Self>
     {
         T::from_sparse_hierarchy(self)
     }
 }
 
-/// Construct a [BitmapTree] collection from any [BitmapTree].
-pub trait FromBitmapTree<From: BitmapTree> {
+/// Construct a [HibitTree] collection from any [HibitTree].
+pub trait FromHibitTree<From: HibitTree> {
     fn from_sparse_hierarchy(from: From) -> Self;
 }
 
-pub trait BitmapTreeCursorTypes<'this, ImplicitBounds = &'this Self>{
+pub trait HibitTreeCursorTypes<'this, ImplicitBounds = &'this Self>{
     type Data;
     // Looks like we don't need DataUnchecked in State yet.
     // (unchecked versions return Data)
 }
 
-/// Stateful [BitmapTree] traverse interface.
+/// Stateful [HibitTree] traverse interface.
 /// 
 /// Having state allows implementations to have cache level meta-info.
 /// If level block changed seldom and not sporadically (like during iteration) -
-/// this can get a significant performance boost, especially in generative [BitmapTree]'ies.
+/// this can get a significant performance boost, especially in generative [HibitTree]'ies.
 /// 
 /// Block levels must be selected top(0) to bottom(last N) level.
 /// When you [select_level_node], all levels below considered **not** selected.
@@ -246,11 +246,11 @@ pub trait BitmapTreeCursorTypes<'this, ImplicitBounds = &'this Self>{
 /// // Select 9th data block (array index 201)
 /// let data = state.data(array, 9);
 /// ``` 
-pub trait BitmapTreeCursor<'src>
+pub trait HibitTreeCursor<'src>
 where
-	Self: for<'this> BitmapTreeCursorTypes<'this>,
+	Self: for<'this> HibitTreeCursorTypes<'this>,
 {
-    type Src: BitmapTree;
+    type Src: HibitTree;
     
     fn new(src: &'src Self::Src) -> Self;
     
@@ -260,7 +260,7 @@ where
         src: &'src Self::Src,
         level_n: N,
         level_index: usize,
-    ) -> <Self::Src as BitmapTree>::LevelMask;
+    ) -> <Self::Src as HibitTree>::LevelMask;
     
     /// Pointed node must exists
     unsafe fn select_level_node_unchecked<N: ConstInteger>(
@@ -268,30 +268,30 @@ where
         src: &'src Self::Src,
         level_n: N,
         level_index: usize
-    ) -> <Self::Src as BitmapTree>::LevelMask;
+    ) -> <Self::Src as HibitTree>::LevelMask;
     
     /// Item at index may not exist.
     unsafe fn data<'a>(
         &'a self,
         src: &'src Self::Src,
         level_index: usize
-    ) -> Option<<Self as BitmapTreeCursorTypes<'a>>::Data>;      
+    ) -> Option<<Self as HibitTreeCursorTypes<'a>>::Data>;      
  
     /// Pointed data must exists
     unsafe fn data_unchecked<'a>(
         &'a self,
         src: &'src Self::Src,
         level_index: usize
-    ) -> <Self as BitmapTreeCursorTypes<'a>>::Data;        
+    ) -> <Self as HibitTreeCursorTypes<'a>>::Data;        
 }
 
-pub type BitmapTreeData<'a, T> = <T as BitmapTreeTypes<'a>>::Data;
-pub type MultiBitmapTreeIterItem<'a, T> = <T as MultiBitmapTreeTypes<'a>>::IterItem;
+pub type HibitTreeData<'a, T> = <T as HibitTreeTypes<'a>>::Data;
+pub type MultiHibitTreeIterItem<'a, T> = <T as MultiHibitTreeTypes<'a>>::IterItem;
 
-pub trait RegularBitmapTreeTypes<'this, ImplicitBounds = &'this Self>
-    : BitmapTreeTypes<'this, ImplicitBounds,
-        DataUnchecked = <Self as BitmapTreeTypes<'this, ImplicitBounds>>::Data, 
-        Cursor: for<'a> BitmapTreeCursorTypes<'a, 
+pub trait RegularHibitTreeTypes<'this, ImplicitBounds = &'this Self>
+    : HibitTreeTypes<'this, ImplicitBounds,
+        DataUnchecked = <Self as HibitTreeTypes<'this, ImplicitBounds>>::Data, 
+        Cursor: for<'a> HibitTreeCursorTypes<'a, 
             Data = Self::Data
         >,
     >
@@ -299,20 +299,20 @@ pub trait RegularBitmapTreeTypes<'this, ImplicitBounds = &'this Self>
 
 // TODO: better naming?
 
-/// [BitmapTree] where all operations return same type - [Self::Data].
+/// [HibitTree] where all operations return same type - [Self::Data].
 /// 
-/// Think of it as of "the usual" [BitmapTree].  
+/// Think of it as of "the usual" [HibitTree].  
 /// 
 /// All containers and all "non-multi" operations results are MonoSparseHierarchy. 
-pub trait RegularBitmapTree: BitmapTree
+pub trait RegularHibitTree: HibitTree
 where
-    Self: for<'this> RegularBitmapTreeTypes<'this>
+    Self: for<'this> RegularHibitTreeTypes<'this>
 {
     /// See [crate::map]
     #[inline]
     fn map<F>(self, f: F) -> Map<Self, F>
     where
-        F: for<'a> MapFunction<'a, <Self as BitmapTreeTypes<'a>>::Data>
+        F: for<'a> MapFunction<'a, <Self as HibitTreeTypes<'a>>::Data>
     {
         crate::map(self, f)
     }
@@ -321,34 +321,34 @@ where
     #[inline]
     fn map_ref<F>(&self, f: F) -> Map<&Self, F>
     where
-        F: for<'a> MapFunction<'a, <Self as BitmapTreeTypes<'a>>::Data>
+        F: for<'a> MapFunction<'a, <Self as HibitTreeTypes<'a>>::Data>
     {
         crate::map(self, f)
     }
 }
 
-impl<'this, T> RegularBitmapTreeTypes<'this> for T
+impl<'this, T> RegularHibitTreeTypes<'this> for T
 where
-    T: BitmapTreeTypes<'this,
-        DataUnchecked = <Self as BitmapTreeTypes<'this>>::Data,
-        Cursor: for<'a> BitmapTreeCursorTypes<'a, 
+    T: HibitTreeTypes<'this,
+        DataUnchecked = <Self as HibitTreeTypes<'this>>::Data,
+        Cursor: for<'a> HibitTreeCursorTypes<'a, 
             Data = Self::Data
         >,
     >
 {} 
 
 // TODO: impl manually?
-impl<T> RegularBitmapTree for T
+impl<T> RegularHibitTree for T
 where
-    T: BitmapTree,
-    T: for<'this> RegularBitmapTreeTypes<'this>
+    T: HibitTree,
+    T: for<'this> RegularHibitTreeTypes<'this>
 {}
 
-pub trait MultiBitmapTreeTypes<'this, ImplicitBounds = &'this Self>
-    : BitmapTreeTypes<'this, ImplicitBounds, 
+pub trait MultiHibitTreeTypes<'this, ImplicitBounds = &'this Self>
+    : HibitTreeTypes<'this, ImplicitBounds, 
         Data: Iterator<Item=Self::IterItem>,
         DataUnchecked: Iterator<Item=Self::IterItem>,
-        Cursor: for<'a> BitmapTreeCursorTypes<'a, 
+        Cursor: for<'a> HibitTreeCursorTypes<'a, 
             Data: Iterator<Item=Self::IterItem>
         >,
     >
@@ -356,16 +356,16 @@ pub trait MultiBitmapTreeTypes<'this, ImplicitBounds = &'this Self>
     type IterItem;
 }
 
-/// [BitmapTree], that returns `impl Iterator<Self::IterItem>`
+/// [HibitTree], that returns `impl Iterator<Self::IterItem>`
 /// for all operations.
 /// 
-/// `multi_*` operations return [MultiBitmapTree]'ies.
+/// `multi_*` operations return [MultiHibitTree]'ies.
 /// 
-/// You can convert MultiSparseHierarchy to [RegularBitmapTree],
+/// You can convert MultiSparseHierarchy to [RegularHibitTree],
 /// with [multi_map_fold()]. 
-pub trait MultiBitmapTree: BitmapTree
+pub trait MultiHibitTree: HibitTree
 where
-    Self: for<'this> MultiBitmapTreeTypes<'this>
+    Self: for<'this> MultiHibitTreeTypes<'this>
 {
     #[inline]
     fn map_fold<I, F>(self, init: I, f: F) -> MultiMapFold<Self, I, F>
@@ -373,7 +373,7 @@ where
         I: NullaryFunction,
         F: for<'a> BinaryFunction<
             I::Output, 
-            <Self as MultiBitmapTreeTypes<'a>>::IterItem,
+            <Self as MultiHibitTreeTypes<'a>>::IterItem,
             Output = I::Output
         >,    
     {

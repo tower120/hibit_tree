@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use crate::{LazyBitmapTree, MultiBitmapTree, MultiBitmapTreeTypes, BitmapTree, BitmapTreeCursor, BitmapTreeCursorTypes, BitmapTreeTypes};
+use crate::{LazyHibitTree, MultiHibitTree, MultiHibitTreeTypes, HibitTree, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes};
 use crate::const_utils::ConstInteger;
 use crate::utils::{BinaryFunction, Borrowable, NullaryFunction, UnaryFunction};
 
@@ -9,13 +9,13 @@ pub struct MultiMapFold<S, I, F>{
     f: F
 }
 
-impl<'this, S, I, F> BitmapTreeTypes<'this> for MultiMapFold<S, I, F>
+impl<'this, S, I, F> HibitTreeTypes<'this> for MultiMapFold<S, I, F>
 where
-    S: MultiBitmapTree,
+    S: MultiHibitTree,
     I: NullaryFunction,
     F: for<'a> BinaryFunction<
         I::Output, 
-        <S as MultiBitmapTreeTypes<'a>>::IterItem,
+        <S as MultiHibitTreeTypes<'a>>::IterItem,
         Output = I::Output
     >,
 {
@@ -24,13 +24,13 @@ where
     type Cursor = Cursor<'this, S, I, F>;
 }
 
-impl<S, I, F> BitmapTree for MultiMapFold<S, I, F>
+impl<S, I, F> HibitTree for MultiMapFold<S, I, F>
 where
-    S: MultiBitmapTree,
+    S: MultiHibitTree,
     I: NullaryFunction,
     F: for<'a> BinaryFunction<         
         I::Output, 
-        <S as MultiBitmapTreeTypes<'a>>::IterItem,
+        <S as MultiHibitTreeTypes<'a>>::IterItem,
         Output = I::Output        
     >,
 {
@@ -40,7 +40,7 @@ where
 
     #[inline]
     unsafe fn data(&self, index: usize, level_indices: &[usize]) 
-        -> Option<<Self as BitmapTreeTypes<'_>>::Data> 
+        -> Option<<Self as HibitTreeTypes<'_>>::Data> 
     {
         if let Some(data_iter) = self.s.data(index, level_indices) {
             let init = self.init.exec();
@@ -53,7 +53,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
-        -> <Self as BitmapTreeTypes<'_>>::DataUnchecked 
+        -> <Self as HibitTreeTypes<'_>>::DataUnchecked 
     {
         let data_iter = self.s.data_unchecked(index, level_indices);
         let init = self.init.exec();
@@ -63,26 +63,26 @@ where
 }
 
 pub struct Cursor<'src, S, I, F> (
-    <S as BitmapTreeTypes<'src>>::Cursor,
+    <S as HibitTreeTypes<'src>>::Cursor,
     PhantomData<&'src MultiMapFold<S, I, F>>
 ) where
-    S: BitmapTree;
+    S: HibitTree;
 
 
-impl<'this, 'src, S, I, F> BitmapTreeCursorTypes<'this> for Cursor<'src, S, I, F>
+impl<'this, 'src, S, I, F> HibitTreeCursorTypes<'this> for Cursor<'src, S, I, F>
 where
-    S: MultiBitmapTree,
+    S: MultiHibitTree,
     I: NullaryFunction,
 { 
     type Data = I::Output; 
 }
-impl<'src, S, I, F> BitmapTreeCursor<'src> for Cursor<'src, S, I, F>
+impl<'src, S, I, F> HibitTreeCursor<'src> for Cursor<'src, S, I, F>
 where
-    S: MultiBitmapTree,
+    S: MultiHibitTree,
     I: NullaryFunction,
     F: for<'a> BinaryFunction<
         I::Output, 
-        <S as MultiBitmapTreeTypes<'a>>::IterItem,
+        <S as MultiHibitTreeTypes<'a>>::IterItem,
         Output = I::Output
     >,
 {
@@ -91,7 +91,7 @@ where
     #[inline]
     fn new(this: &'src Self::Src) -> Self {
         Self(
-            BitmapTreeCursor::new(&this.s),
+            HibitTreeCursor::new(&this.s),
             PhantomData
         )
     }
@@ -99,20 +99,20 @@ where
     #[inline]
     unsafe fn select_level_node<N: ConstInteger>(
         &mut self, src: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as BitmapTree>::LevelMask {
+    ) -> <Self::Src as HibitTree>::LevelMask {
         self.0.select_level_node(&src.s, level_n, level_index)
     }
 
     #[inline]
     unsafe fn select_level_node_unchecked<N: ConstInteger>(
         &mut self, src: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as BitmapTree>::LevelMask {
+    ) -> <Self::Src as HibitTree>::LevelMask {
         self.0.select_level_node_unchecked(&src.s, level_n, level_index)
     }
 
     #[inline]
     unsafe fn data<'a>(&'a self, src: &'src Self::Src, level_index: usize) 
-        -> Option<<Self as BitmapTreeCursorTypes<'a>>::Data> 
+        -> Option<<Self as HibitTreeCursorTypes<'a>>::Data> 
     {
         if let Some(data_iter) = self.0.data(&src.s, level_index){
             let init = src.init.exec();
@@ -125,7 +125,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked<'a>(&'a self, src: &'src Self::Src, level_index: usize) 
-        -> <Self as BitmapTreeCursorTypes<'a>>::Data 
+        -> <Self as HibitTreeCursorTypes<'a>>::Data 
     {
         let init = src.init.exec();
         let data_iter = self.0.data_unchecked(&src.s, level_index);
@@ -136,9 +136,9 @@ where
 
 impl<S, I, F> Borrowable for MultiMapFold<S, I, F>{ type Borrowed = Self; }
 
-impl<S, I, F> LazyBitmapTree for MultiMapFold<S, I, F>
+impl<S, I, F> LazyHibitTree for MultiMapFold<S, I, F>
 where
-    MultiMapFold<S, I, F>: BitmapTree,
+    MultiMapFold<S, I, F>: HibitTree,
     /*S: MultiSparseHierarchy,
     I: NullaryFunction,
     F: for<'a> BinaryFunction<
@@ -151,11 +151,11 @@ where
 #[inline]
 pub fn multi_map_fold<S, I, F>(s: S, init: I, f: F) -> MultiMapFold<S, I, F>
 where 
-    S: MultiBitmapTree,
+    S: MultiHibitTree,
     I: NullaryFunction,
     F: for<'a> BinaryFunction<
         I::Output, 
-        <S as MultiBitmapTreeTypes<'a>>::IterItem,
+        <S as MultiHibitTreeTypes<'a>>::IterItem,
         Output = I::Output
     >,
 {

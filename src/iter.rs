@@ -1,6 +1,6 @@
 use std::ops::ControlFlow;
-use crate::bitmap_tree::{BitmapTree, BitmapTreeCursor};
-use crate::{BitBlock, data_block_index, RegularBitmapTree, BitmapTreeCursorTypes, BitmapTreeTypes};
+use crate::hibit_tree::{HibitTree, HibitTreeCursor};
+use crate::{BitBlock, data_block_index, RegularHibitTree, HibitTreeCursorTypes, HibitTreeTypes};
 use crate::bit_queue::BitQueue;
 use crate::const_utils::const_int::{const_for_rev, ConstInteger, ConstIntVisitor, ConstUsize};
 use crate::const_utils::const_array::ConstArrayType;
@@ -9,7 +9,7 @@ use crate::utils::Array;
 
 // TODO: could be u8's
 /// [usize; T::LevelCount::N - 1]
-type LevelIndices<T: BitmapTree> =
+type LevelIndices<T: HibitTree> =
     ConstArrayType<
         usize,
         <T::LevelCount as ConstInteger>::Dec   
@@ -18,18 +18,18 @@ type LevelIndices<T: BitmapTree> =
 /// Each hierarchy level has its own iterator.
 /// 
 /// [T::LevelMaskType::BitsIter; T::LevelCount]
-type LevelIterators<T: BitmapTree> =
+type LevelIterators<T: HibitTree> =
     ConstArrayType<
-        <<T as BitmapTree>::LevelMask as BitBlock>::BitsIter,
+        <<T as HibitTree>::LevelMask as BitBlock>::BitsIter,
         T::LevelCount
     >;
 
-/// [BitmapTree] iterator.
+/// [HibitTree] iterator.
 ///  
-/// This is [LendingIterator], that also [Iterator] for [RegularBitmapTree]. 
+/// This is [LendingIterator], that also [Iterator] for [RegularHibitTree]. 
 pub struct Iter<'a, T>
 where
-    T: BitmapTree,
+    T: HibitTree,
 {
     container: &'a T,
     
@@ -39,12 +39,12 @@ where
     /// [usize; T::LevelCount - 1]
     level_indices: LevelIndices<T>,
 
-    cursor: <T as BitmapTreeTypes<'a>>::Cursor,
+    cursor: <T as HibitTreeTypes<'a>>::Cursor,
 }
 
 impl<'a, T> Iter<'a, T>
 where
-    T: BitmapTree,
+    T: HibitTree,
 {
     #[inline]
     pub fn new(container: &'a T) -> Self {
@@ -75,11 +75,11 @@ where
 
 impl<'a, T> LendingIterator for Iter<'a, T>
 where
-    T: BitmapTree,
+    T: HibitTree,
 {
     type Item<'this>= (
         usize/*index*/, 
-        <<T as BitmapTreeTypes<'a>>::Cursor as BitmapTreeCursorTypes<'this>>::Data
+        <<T as HibitTreeTypes<'a>>::Cursor as HibitTreeCursorTypes<'this>>::Data
     ) where Self:'this;
 
     #[inline]
@@ -91,8 +91,8 @@ where
                 break index;
             } else {
                 let ctrl = const_for_rev(ConstUsize::<0>, T::LevelCount::DEFAULT.dec(), V(self)); 
-                struct V<'b,'a,T: BitmapTree>(&'b mut Iter<'a, T>); 
-                impl<'b,'a,T: BitmapTree> ConstIntVisitor for V<'b,'a,T> {
+                struct V<'b,'a,T: HibitTree>(&'b mut Iter<'a, T>); 
+                impl<'b,'a,T: HibitTree> ConstIntVisitor for V<'b,'a,T> {
                     type Out = ();
                     #[inline(always)]
                     fn visit<I: ConstInteger>(&mut self, i: I) -> ControlFlow<()> {
@@ -150,9 +150,9 @@ where
 
 impl<'a, T> Iterator for Iter<'a, T>
 where
-    T: RegularBitmapTree,
+    T: RegularHibitTree,
 {
-    type Item = (usize, <T as BitmapTreeTypes<'a>>::Data);
+    type Item = (usize, <T as HibitTreeTypes<'a>>::Data);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

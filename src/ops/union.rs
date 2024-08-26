@@ -2,8 +2,8 @@ use std::marker::PhantomData;
 use std::borrow::Borrow;
 use std::ops::{BitAnd, BitOr};
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
-use crate::bitmap_tree::{BitmapTree, BitmapTreeCursor};
-use crate::{BitBlock, LazyBitmapTree, BitmapTreeCursorTypes, BitmapTreeTypes};
+use crate::hibit_tree::{HibitTree, HibitTreeCursor};
+use crate::{BitBlock, LazyHibitTree, HibitTreeCursorTypes, HibitTreeTypes};
 use crate::bit_queue::BitQueue;
 use crate::utils::{Array, Borrowable, Take};
 
@@ -12,17 +12,17 @@ pub struct Union<S0, S1>{
     s1: S1,
 }
 
-impl<'this, S0, S1> BitmapTreeTypes<'this> for Union<S0, S1>
+impl<'this, S0, S1> HibitTreeTypes<'this> for Union<S0, S1>
 where
-    S0: Borrowable<Borrowed: BitmapTree>,
-    S1: Borrowable<Borrowed: BitmapTree<
-        LevelCount = <S0::Borrowed as BitmapTree>::LevelCount,
-        LevelMask  = <S0::Borrowed as BitmapTree>::LevelMask,
+    S0: Borrowable<Borrowed: HibitTree>,
+    S1: Borrowable<Borrowed: HibitTree<
+        LevelCount = <S0::Borrowed as HibitTree>::LevelCount,
+        LevelMask  = <S0::Borrowed as HibitTree>::LevelMask,
     >>,
 {
     type Data = (
-        Option<<S0::Borrowed as BitmapTreeTypes<'this>>::Data>,
-        Option<<S1::Borrowed as BitmapTreeTypes<'this>>::Data>
+        Option<<S0::Borrowed as HibitTreeTypes<'this>>::Data>,
+        Option<<S1::Borrowed as HibitTreeTypes<'this>>::Data>
     );
     
     type DataUnchecked = Self::Data;
@@ -30,24 +30,24 @@ where
     type Cursor = Cursor<'this, S0, S1>;
 }
 
-impl<S0, S1> BitmapTree for Union<S0, S1>
+impl<S0, S1> HibitTree for Union<S0, S1>
 where
-    S0: Borrowable<Borrowed: BitmapTree>,
-    S1: Borrowable<Borrowed: BitmapTree<
-        LevelCount = <S0::Borrowed as BitmapTree>::LevelCount,
-        LevelMask  = <S0::Borrowed as BitmapTree>::LevelMask,
+    S0: Borrowable<Borrowed: HibitTree>,
+    S1: Borrowable<Borrowed: HibitTree<
+        LevelCount = <S0::Borrowed as HibitTree>::LevelCount,
+        LevelMask  = <S0::Borrowed as HibitTree>::LevelMask,
     >>,
 {
     /// true if S0 & S1 are EXACT_HIERARCHY.
-    const EXACT_HIERARCHY: bool = <S0::Borrowed as BitmapTree>::EXACT_HIERARCHY 
-                                & <S1::Borrowed as BitmapTree>::EXACT_HIERARCHY;
+    const EXACT_HIERARCHY: bool = <S0::Borrowed as HibitTree>::EXACT_HIERARCHY 
+                                & <S1::Borrowed as HibitTree>::EXACT_HIERARCHY;
     
-    type LevelCount = <S0::Borrowed as BitmapTree>::LevelCount;
-    type LevelMask  = <S0::Borrowed as BitmapTree>::LevelMask;
+    type LevelCount = <S0::Borrowed as HibitTree>::LevelCount;
+    type LevelMask  = <S0::Borrowed as HibitTree>::LevelMask;
 
     #[inline]
     unsafe fn data(&self, index: usize, level_indices: &[usize]) 
-        -> Option<<Self as BitmapTreeTypes<'_>>::Data> 
+        -> Option<<Self as HibitTreeTypes<'_>>::Data> 
     {
         let d0 = self.s0.borrow().data(index, level_indices);
         let d1 = self.s1.borrow().data(index, level_indices);
@@ -60,7 +60,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
-        -> <Self as BitmapTreeTypes<'_>>::Data
+        -> <Self as HibitTreeTypes<'_>>::Data
     {
         self.data(index, level_indices).unwrap_unchecked()
     }
@@ -68,37 +68,37 @@ where
 
 /// [S::Mask; S::DEPTH]
 type Masks<S> = ConstArrayType<
-    <<S as Borrowable>::Borrowed as BitmapTree>::LevelMask,
-    <<S as Borrowable>::Borrowed as BitmapTree>::LevelCount,
+    <<S as Borrowable>::Borrowed as HibitTree>::LevelMask,
+    <<S as Borrowable>::Borrowed as HibitTree>::LevelCount,
 >;
 
 pub struct Cursor<'src, S0, S1>
 where
-    S0: Borrowable<Borrowed: BitmapTree>,
-    S1: Borrowable<Borrowed: BitmapTree>,
+    S0: Borrowable<Borrowed: HibitTree>,
+    S1: Borrowable<Borrowed: HibitTree>,
 {
-    s0: <S0::Borrowed as BitmapTreeTypes<'src>>::Cursor, 
-    s1: <S1::Borrowed as BitmapTreeTypes<'src>>::Cursor,
+    s0: <S0::Borrowed as HibitTreeTypes<'src>>::Cursor, 
+    s1: <S1::Borrowed as HibitTreeTypes<'src>>::Cursor,
     phantom: PhantomData<&'src Union<S0, S1>>
 }
 
-impl<'this, 'src, S0, S1> BitmapTreeCursorTypes<'this> for Cursor<'src, S0, S1>
+impl<'this, 'src, S0, S1> HibitTreeCursorTypes<'this> for Cursor<'src, S0, S1>
 where
-    S0: Borrowable<Borrowed: BitmapTree>,
-    S1: Borrowable<Borrowed: BitmapTree>,
+    S0: Borrowable<Borrowed: HibitTree>,
+    S1: Borrowable<Borrowed: HibitTree>,
 {
     type Data = (
-        Option<<<S0::Borrowed as BitmapTreeTypes<'src>>::Cursor as BitmapTreeCursorTypes<'this>>::Data>,
-        Option<<<S1::Borrowed as BitmapTreeTypes<'src>>::Cursor as BitmapTreeCursorTypes<'this>>::Data>
+        Option<<<S0::Borrowed as HibitTreeTypes<'src>>::Cursor as HibitTreeCursorTypes<'this>>::Data>,
+        Option<<<S1::Borrowed as HibitTreeTypes<'src>>::Cursor as HibitTreeCursorTypes<'this>>::Data>
     );
 }
 
-impl<'src, S0, S1> BitmapTreeCursor<'src> for Cursor<'src, S0, S1>
+impl<'src, S0, S1> HibitTreeCursor<'src> for Cursor<'src, S0, S1>
 where
-    S0: Borrowable<Borrowed: BitmapTree>,
-    S1: Borrowable<Borrowed: BitmapTree<
-        LevelCount = <S0::Borrowed as BitmapTree>::LevelCount,
-        LevelMask  = <S0::Borrowed as BitmapTree>::LevelMask,
+    S0: Borrowable<Borrowed: HibitTree>,
+    S1: Borrowable<Borrowed: HibitTree<
+        LevelCount = <S0::Borrowed as HibitTree>::LevelCount,
+        LevelMask  = <S0::Borrowed as HibitTree>::LevelMask,
     >>
 {
     type Src = Union<S0, S1>;
@@ -106,8 +106,8 @@ where
     #[inline]
     fn new(src: &'src Self::Src) -> Self {
         Self{
-            s0: BitmapTreeCursor::new(src.s0.borrow()), 
-            s1: BitmapTreeCursor::new(src.s1.borrow()),
+            s0: HibitTreeCursor::new(src.s0.borrow()), 
+            s1: HibitTreeCursor::new(src.s1.borrow()),
             phantom: PhantomData
         }
     }
@@ -115,7 +115,7 @@ where
     #[inline]
     unsafe fn select_level_node<N: ConstInteger>(
         &mut self, this: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as BitmapTree>::LevelMask {
+    ) -> <Self::Src as HibitTree>::LevelMask {
         // unchecked version already deal with non-existent elements
         self.select_level_node_unchecked(this, level_n, level_index)
     }
@@ -123,7 +123,7 @@ where
     #[inline]
     unsafe fn select_level_node_unchecked<N: ConstInteger> (
         &mut self, this: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as BitmapTree>::LevelMask {
+    ) -> <Self::Src as HibitTree>::LevelMask {
         let mask0 = self.s0.select_level_node(
             this.s0.borrow(), level_n, level_index,
         );
@@ -142,7 +142,7 @@ where
 
     #[inline]
     unsafe fn data<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
-        -> Option<<Self as BitmapTreeCursorTypes<'a>>::Data> 
+        -> Option<<Self as HibitTreeCursorTypes<'a>>::Data> 
     {
         let d0 = self.s0.data(this.s0.borrow(), level_index);
         let d1 = self.s1.data(this.s1.borrow(), level_index);
@@ -155,15 +155,15 @@ where
 
     #[inline]
     unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
-        -> <Self as BitmapTreeCursorTypes<'a>>::Data 
+        -> <Self as HibitTreeCursorTypes<'a>>::Data 
     {
         self.data(this, level_index).unwrap_unchecked()
     }
 }
 
-impl<S0, S1> LazyBitmapTree for Union<S0, S1>
+impl<S0, S1> LazyHibitTree for Union<S0, S1>
 where
-    Union<S0, S1>: BitmapTree
+    Union<S0, S1>: HibitTree
 {}
 
 impl<S0, S1> Borrowable for Union<S0, S1>{ type Borrowed = Self; }
@@ -172,10 +172,10 @@ impl<S0, S1> Borrowable for Union<S0, S1>{ type Borrowed = Self; }
 pub fn union<S0, S1>(s0: S0, s1: S1) -> Union<S0, S1>
 where
     // bounds needed here for F's arguments auto-deduction
-    S0: Borrowable<Borrowed: BitmapTree>,
-    S1: Borrowable<Borrowed: BitmapTree<
-        LevelCount = <S0::Borrowed as BitmapTree>::LevelCount,
-        LevelMask  = <S0::Borrowed as BitmapTree>::LevelMask,
+    S0: Borrowable<Borrowed: HibitTree>,
+    S1: Borrowable<Borrowed: HibitTree<
+        LevelCount = <S0::Borrowed as HibitTree>::LevelCount,
+        LevelMask  = <S0::Borrowed as HibitTree>::LevelMask,
     >>
 {
     Union { s0, s1 }
@@ -187,7 +187,7 @@ mod tests{
     use crate::dense_tree::DenseTree;
     use crate::map;
     use crate::ops::union::union;
-    use crate::bitmap_tree::BitmapTree;
+    use crate::hibit_tree::HibitTree;
 
     #[test]
     fn smoke_test(){

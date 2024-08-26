@@ -5,7 +5,7 @@ mod common;
 use itertools::assert_equal;
 use rand::{Rng, SeedableRng};
 use rand::prelude::SliceRandom;
-use hibit_tree::{config, BitmapTree, SparseTree};
+use hibit_tree::{config, HibitTree, SparseTree};
 use hibit_tree::utils::LendingIterator;
 
 #[derive(Default, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]

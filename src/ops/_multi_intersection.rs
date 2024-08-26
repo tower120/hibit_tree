@@ -4,9 +4,9 @@ use std::mem::MaybeUninit;
 use std::ptr::NonNull;
 use std::slice;
 use arrayvec::ArrayVec;
-use crate::{BitBlock, LazyBitmapTree, RegularBitmapTree, MultiBitmapTree, MultiBitmapTreeTypes, BitmapTreeData, BitmapTreeCursorTypes, BitmapTreeTypes};
+use crate::{BitBlock, LazyHibitTree, RegularHibitTree, MultiHibitTree, MultiHibitTreeTypes, HibitTreeData, HibitTreeCursorTypes, HibitTreeTypes};
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
-use crate::bitmap_tree::{BitmapTree, BitmapTreeCursor};
+use crate::hibit_tree::{HibitTree, HibitTreeCursor};
 use crate::utils::{Array, Borrowable, Ref, Take};
 
 /// Intersection between all iterator items.
@@ -17,22 +17,22 @@ pub struct MultiIntersection<Iter> {
 }
 
 type IterItem<Iter> = <<Iter as Iterator>::Item as Ref>::Type;
-type IterItemCursor<'item, Iter> = <IterItem<Iter> as BitmapTreeTypes<'item>>::Cursor;
+type IterItemCursor<'item, Iter> = <IterItem<Iter> as HibitTreeTypes<'item>>::Cursor;
 
-impl<'item, 'this, Iter, T> BitmapTreeTypes<'this> for MultiIntersection<Iter>
+impl<'item, 'this, Iter, T> HibitTreeTypes<'this> for MultiIntersection<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: BitmapTree + 'item
+    T: HibitTree + 'item
 {
     type Data  = Data<'item, Iter>;
     type DataUnchecked = DataUnchecked<Iter>;
     type Cursor = Cursor<'this, 'item, Iter>;
 }
 
-impl<'i, Iter, T> BitmapTree for MultiIntersection<Iter>
+impl<'i, Iter, T> HibitTree for MultiIntersection<Iter>
 where
     Iter: Iterator<Item = &'i T> + Clone,
-    T: BitmapTree + 'i
+    T: HibitTree + 'i
 {
     const EXACT_HIERARCHY: bool = false;
     
@@ -41,7 +41,7 @@ where
 
     #[inline]
     unsafe fn data(&self, index: usize, level_indices: &[usize]) 
-        -> Option<<Self as BitmapTreeTypes<'_>>::Data> 
+        -> Option<<Self as HibitTreeTypes<'_>>::Data> 
     {
         // There are few ways to do it:
         // 1. Iterate, get data() and build resolve value on the fly. As
@@ -141,7 +141,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked<'a>(&'a self, index: usize, level_indices: &'a [usize]) 
-        -> <Self as BitmapTreeTypes<'a>>::DataUnchecked
+        -> <Self as HibitTreeTypes<'a>>::DataUnchecked
     {
         DataUnchecked {
             index, 
@@ -151,7 +151,7 @@ where
     }
 }
 
-pub type Data<'item, Iter> = arrayvec::IntoIter<<IterItem<Iter> as BitmapTreeTypes<'item>>::Data, N>; 
+pub type Data<'item, Iter> = arrayvec::IntoIter<<IterItem<Iter> as HibitTreeTypes<'item>>::Data, N>; 
 
 /*use data_resolve_v2::ResolveIter;
 
@@ -266,21 +266,21 @@ mod data_resolve_v2 {
 
 pub struct DataUnchecked<Iter> 
 where
-    Iter: Iterator<Item: Ref<Type: BitmapTree>>,
+    Iter: Iterator<Item: Ref<Type: HibitTree>>,
 {
     index: usize, 
     // This is copy from level_indices &[usize]. 
     // Compiler optimize away the very act of cloning and directly use &[usize].
     // At least, if value used immediately, and not stored for latter use. 
-    level_indices: ConstArrayType<usize, <IterItem<Iter> as BitmapTree>::LevelCount>,
+    level_indices: ConstArrayType<usize, <IterItem<Iter> as HibitTree>::LevelCount>,
     iter: Iter,
 }
 impl<'item, Iter, T> Iterator for DataUnchecked<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: BitmapTree + 'item,
+    T: HibitTree + 'item,
 {
-    type Item = </*IterItem<Iter>*/T as BitmapTreeTypes<'item>>::DataUnchecked;
+    type Item = </*IterItem<Iter>*/T as HibitTreeTypes<'item>>::DataUnchecked;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -312,7 +312,7 @@ where
 impl<'item, Iter, T> ExactSizeIterator for DataUnchecked<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: BitmapTree + 'item,
+    T: HibitTree + 'item,
 {}
 
 const N: usize = 32;
@@ -320,25 +320,25 @@ type CursorsItem<'item, Iter> = IterItemCursor<'item, Iter>;
 
 pub struct Cursor<'src, 'item, I>
 where
-    I: Iterator<Item: Ref<Type: BitmapTree>>
+    I: Iterator<Item: Ref<Type: HibitTree>>
 {
     cursors: ArrayVec<CursorsItem<'item, I>, N>,    
     empty_below_n: usize,
-    terminal_node_mask: <IterItem<I> as BitmapTree>::LevelMask,
+    terminal_node_mask: <IterItem<I> as HibitTree>::LevelMask,
     phantom_data: PhantomData<(&'src MultiIntersection<I>)>
 }
 
-impl<'this, 'src, 'item, Iter> BitmapTreeCursorTypes<'this> for Cursor<'src, 'item, Iter>
+impl<'this, 'src, 'item, Iter> HibitTreeCursorTypes<'this> for Cursor<'src, 'item, Iter>
 where
-    Iter: Iterator<Item: Ref<Type: BitmapTree>>
+    Iter: Iterator<Item: Ref<Type: HibitTree>>
 {
     type Data = CursorData<'this, 'item, Iter>;
 }
 
-impl<'src, 'item, Iter, T> BitmapTreeCursor<'src> for Cursor<'src, 'item, Iter>
+impl<'src, 'item, Iter, T> HibitTreeCursor<'src> for Cursor<'src, 'item, Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: BitmapTree + 'item
+    T: HibitTree + 'item
 {
     type Src = MultiIntersection<Iter>;
 
@@ -347,7 +347,7 @@ where
         let cursors = ArrayVec::from_iter(
             src.iter.clone()
                 .map(|array|{
-                    BitmapTreeCursor::new(array)
+                    HibitTreeCursor::new(array)
                 })
         );
         
@@ -362,7 +362,7 @@ where
     #[inline]
     unsafe fn select_level_node<N: ConstInteger>(
         &mut self, src: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as BitmapTree>::LevelMask {
+    ) -> <Self::Src as HibitTree>::LevelMask {
         // if we know that upper levels returned empty - return early.
         if N > self.empty_below_n {
             return BitBlock::zero(); 
@@ -393,7 +393,7 @@ where
             usize::MAX
         };
         
-        /*const*/ if N::VALUE == <Self::Src as BitmapTree>::LevelCount::VALUE - 1 {
+        /*const*/ if N::VALUE == <Self::Src as HibitTree>::LevelCount::VALUE - 1 {
             self.terminal_node_mask = acc_mask.clone(); 
         }
         
@@ -403,7 +403,7 @@ where
     #[inline]
     unsafe fn select_level_node_unchecked<N: ConstInteger> (
         &mut self, src: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as BitmapTree>::LevelMask {
+    ) -> <Self::Src as HibitTree>::LevelMask {
         // TODO: Almost the same as in checked version. Reuse somehow. 
         let mut cursors_iter = self.cursors.iter_mut();
         let mut array_iter  = src.iter.clone();
@@ -429,7 +429,7 @@ where
 
     #[inline]
     unsafe fn data<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
-        -> Option<<Self as BitmapTreeCursorTypes<'a>>::Data> 
+        -> Option<<Self as HibitTreeCursorTypes<'a>>::Data> 
     {
         if !self.terminal_node_mask.get_bit(level_index){
             return None;
@@ -441,7 +441,7 @@ where
     #[inline]
     unsafe fn data_unchecked<'a>(
         &'a self, src: &'src Self::Src, level_index: usize
-    ) -> <Self as BitmapTreeCursorTypes<'a>>::Data {
+    ) -> <Self as HibitTreeCursorTypes<'a>>::Data {
         CursorData { 
             level_index,
             array_iter: src.iter.clone(),
@@ -452,7 +452,7 @@ where
 
 pub struct CursorData<'cursor, 'item, I>
 where
-    I: Iterator<Item: Ref<Type: BitmapTree>>
+    I: Iterator<Item: Ref<Type: HibitTree>>
 {
     level_index: usize,
     array_iter: I,
@@ -467,9 +467,9 @@ where
 impl<'cursor, 'item, I, T> Iterator for CursorData<'cursor, 'item, I>
 where
     I: Iterator<Item = &'item T> + Clone,
-    T: BitmapTree + 'item
+    T: HibitTree + 'item
 {
-    type Item = <IterItemCursor<'item, I> as BitmapTreeCursorTypes<'cursor>>::Data;
+    type Item = <IterItemCursor<'item, I> as HibitTreeCursorTypes<'cursor>>::Data;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -508,26 +508,26 @@ where
 impl<'cursor, 'item, I, T> ExactSizeIterator for CursorData<'cursor, 'item, I>
 where
     I: Iterator<Item = &'item T> + Clone,
-    T: BitmapTree + 'item
+    T: HibitTree + 'item
 {}
 
-impl<'item, 'this, Iter, T> MultiBitmapTreeTypes<'this> for MultiIntersection<Iter>
+impl<'item, 'this, Iter, T> MultiHibitTreeTypes<'this> for MultiIntersection<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: RegularBitmapTree + 'item
+    T: RegularHibitTree + 'item
 { 
-    type IterItem = BitmapTreeData<'item, T>; 
+    type IterItem = HibitTreeData<'item, T>; 
 }
 
-impl<'item, Iter, T> MultiBitmapTree for MultiIntersection<Iter>
+impl<'item, Iter, T> MultiHibitTree for MultiIntersection<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: RegularBitmapTree + 'item
+    T: RegularHibitTree + 'item
 {} 
 
-impl<Iter> LazyBitmapTree for MultiIntersection<Iter>
+impl<Iter> LazyHibitTree for MultiIntersection<Iter>
 where
-    MultiIntersection<Iter>: BitmapTree
+    MultiIntersection<Iter>: HibitTree
 {}
 
 impl<Iter> Borrowable for MultiIntersection<Iter>{ type Borrowed = Self; }
@@ -536,7 +536,7 @@ impl<Iter> Borrowable for MultiIntersection<Iter>{ type Borrowed = Self; }
 pub fn multi_intersection<Iter>(iter: Iter) 
     -> MultiIntersection<Iter>
 where
-    Iter: Iterator<Item: Ref<Type: BitmapTree>> + Clone,
+    Iter: Iterator<Item: Ref<Type: HibitTree>> + Clone,
 {
     MultiIntersection{ iter }
 }
@@ -545,7 +545,7 @@ where
 mod tests{
     use itertools::assert_equal;
     use crate::dense_tree::DenseTree;
-    use crate::bitmap_tree::BitmapTree;
+    use crate::hibit_tree::HibitTree;
     use crate::utils::LendingIterator;
     use super::multi_intersection;
 

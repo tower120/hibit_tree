@@ -1,6 +1,6 @@
 use itertools::assert_equal;
-use crate::FromBitmapTree;
-use crate::bitmap_tree::BitmapTree;
+use crate::FromHibitTree;
+use crate::hibit_tree::HibitTree;
 use super::DenseTree;
 
 #[test]

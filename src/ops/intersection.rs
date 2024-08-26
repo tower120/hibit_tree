@@ -2,8 +2,8 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::BitAnd;
 use crate::const_utils::{ConstArray, ConstInteger};
-use crate::{LazyBitmapTree, RegularBitmapTree, BitmapTreeCursorTypes, BitmapTreeTypes};
-use crate::bitmap_tree::{BitmapTree, BitmapTreeCursor};
+use crate::{LazyHibitTree, RegularHibitTree, HibitTreeCursorTypes, HibitTreeTypes};
+use crate::hibit_tree::{HibitTree, HibitTreeCursor};
 use crate::utils::{Borrowable, Take};
 
 pub struct Intersection<S0, S1>{
@@ -11,43 +11,43 @@ pub struct Intersection<S0, S1>{
     s1: S1
 }
 
-impl<'this, S0, S1> BitmapTreeTypes<'this> for Intersection<S0, S1>
+impl<'this, S0, S1> HibitTreeTypes<'this> for Intersection<S0, S1>
 where
-    S0: Borrowable<Borrowed: BitmapTree>,
-    S1: Borrowable<Borrowed: BitmapTree<
-        LevelCount = <S0::Borrowed as BitmapTree>::LevelCount,
-        LevelMask  = <S0::Borrowed as BitmapTree>::LevelMask,
+    S0: Borrowable<Borrowed: HibitTree>,
+    S1: Borrowable<Borrowed: HibitTree<
+        LevelCount = <S0::Borrowed as HibitTree>::LevelCount,
+        LevelMask  = <S0::Borrowed as HibitTree>::LevelMask,
     >>,
 {
     type Data = (
-        <S0::Borrowed as BitmapTreeTypes<'this>>::Data,
-        <S1::Borrowed as BitmapTreeTypes<'this>>::Data
+        <S0::Borrowed as HibitTreeTypes<'this>>::Data,
+        <S1::Borrowed as HibitTreeTypes<'this>>::Data
     );
     
     type DataUnchecked = (
-        <S0::Borrowed as BitmapTreeTypes<'this>>::DataUnchecked,
-        <S1::Borrowed as BitmapTreeTypes<'this>>::DataUnchecked
+        <S0::Borrowed as HibitTreeTypes<'this>>::DataUnchecked,
+        <S1::Borrowed as HibitTreeTypes<'this>>::DataUnchecked
     );
     
     type Cursor = Cursor<'this, S0, S1>;
 }
 
-impl<S0, S1> BitmapTree for Intersection<S0, S1>
+impl<S0, S1> HibitTree for Intersection<S0, S1>
 where
-    S0: Borrowable<Borrowed: BitmapTree>,
-    S1: Borrowable<Borrowed: BitmapTree<
-        LevelCount = <S0::Borrowed as BitmapTree>::LevelCount,
-        LevelMask  = <S0::Borrowed as BitmapTree>::LevelMask,
+    S0: Borrowable<Borrowed: HibitTree>,
+    S1: Borrowable<Borrowed: HibitTree<
+        LevelCount = <S0::Borrowed as HibitTree>::LevelCount,
+        LevelMask  = <S0::Borrowed as HibitTree>::LevelMask,
     >>,
 {
     const EXACT_HIERARCHY: bool = false;
     
-    type LevelCount = <S0::Borrowed as BitmapTree>::LevelCount;
-    type LevelMask  = <S0::Borrowed as BitmapTree>::LevelMask;
+    type LevelCount = <S0::Borrowed as HibitTree>::LevelCount;
+    type LevelMask  = <S0::Borrowed as HibitTree>::LevelMask;
 
     #[inline]
     unsafe fn data(&self, index: usize, level_indices: &[usize]) 
-        -> Option<<Self as BitmapTreeTypes<'_>>::Data> 
+        -> Option<<Self as HibitTreeTypes<'_>>::Data> 
     {
         let d0 = self.s0.borrow().data(index, level_indices);
         let d1 = self.s1.borrow().data(index, level_indices);
@@ -59,7 +59,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
-        -> <Self as BitmapTreeTypes<'_>>::DataUnchecked
+        -> <Self as HibitTreeTypes<'_>>::DataUnchecked
     {
         let d0 = self.s0.borrow().data_unchecked(index, level_indices);
         let d1 = self.s1.borrow().data_unchecked(index, level_indices);
@@ -69,31 +69,31 @@ where
 
 pub struct Cursor<'src, S0, S1>
 where
-    S0: Borrowable<Borrowed: BitmapTree>,
-    S1: Borrowable<Borrowed: BitmapTree>,
+    S0: Borrowable<Borrowed: HibitTree>,
+    S1: Borrowable<Borrowed: HibitTree>,
 {
-    s0: <S0::Borrowed as BitmapTreeTypes<'src>>::Cursor, 
-    s1: <S1::Borrowed as BitmapTreeTypes<'src>>::Cursor,
+    s0: <S0::Borrowed as HibitTreeTypes<'src>>::Cursor, 
+    s1: <S1::Borrowed as HibitTreeTypes<'src>>::Cursor,
     phantom: PhantomData<&'src Intersection<S0, S1>>
 }
 
-impl<'this, 'src, S0, S1> BitmapTreeCursorTypes<'this> for Cursor<'src, S0, S1>
+impl<'this, 'src, S0, S1> HibitTreeCursorTypes<'this> for Cursor<'src, S0, S1>
 where
-    S0: Borrowable<Borrowed: BitmapTree>,
-    S1: Borrowable<Borrowed: BitmapTree>,
+    S0: Borrowable<Borrowed: HibitTree>,
+    S1: Borrowable<Borrowed: HibitTree>,
 {
     type Data = (
-        <<S0::Borrowed as BitmapTreeTypes<'src>>::Cursor as BitmapTreeCursorTypes<'this>>::Data,
-        <<S1::Borrowed as BitmapTreeTypes<'src>>::Cursor as BitmapTreeCursorTypes<'this>>::Data
+        <<S0::Borrowed as HibitTreeTypes<'src>>::Cursor as HibitTreeCursorTypes<'this>>::Data,
+        <<S1::Borrowed as HibitTreeTypes<'src>>::Cursor as HibitTreeCursorTypes<'this>>::Data
     );
 }
 
-impl<'src, S0, S1> BitmapTreeCursor<'src> for Cursor<'src, S0, S1>
+impl<'src, S0, S1> HibitTreeCursor<'src> for Cursor<'src, S0, S1>
 where
-    S0: Borrowable<Borrowed: BitmapTree>,
-    S1: Borrowable<Borrowed: BitmapTree<
-        LevelCount = <S0::Borrowed as BitmapTree>::LevelCount,
-        LevelMask  = <S0::Borrowed as BitmapTree>::LevelMask,
+    S0: Borrowable<Borrowed: HibitTree>,
+    S1: Borrowable<Borrowed: HibitTree<
+        LevelCount = <S0::Borrowed as HibitTree>::LevelCount,
+        LevelMask  = <S0::Borrowed as HibitTree>::LevelMask,
     >>,
 {
     type Src = Intersection<S0, S1>;
@@ -101,8 +101,8 @@ where
     #[inline]
     fn new(this: &'src Self::Src) -> Self {
         Self{
-            s0: BitmapTreeCursor::new(this.s0.borrow()), 
-            s1: BitmapTreeCursor::new(this.s1.borrow()),
+            s0: HibitTreeCursor::new(this.s0.borrow()), 
+            s1: HibitTreeCursor::new(this.s1.borrow()),
             phantom: PhantomData
         }
     }
@@ -110,7 +110,7 @@ where
     #[inline]
     unsafe fn select_level_node<N: ConstInteger>(
         &mut self, this: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as BitmapTree>::LevelMask {
+    ) -> <Self::Src as HibitTree>::LevelMask {
         // Putting "if" here is not justified for general case. 
         
         let mask0 = self.s0.select_level_node(
@@ -131,7 +131,7 @@ where
     #[inline]
     unsafe fn select_level_node_unchecked<N: ConstInteger> (
         &mut self, this: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as BitmapTree>::LevelMask {
+    ) -> <Self::Src as HibitTree>::LevelMask {
         let mask0 = self.s0.select_level_node_unchecked(
             this.s0.borrow(), level_n, level_index
         );
@@ -149,7 +149,7 @@ where
 
     #[inline]
     unsafe fn data<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
-        -> Option<<Self as BitmapTreeCursorTypes<'a>>::Data> 
+        -> Option<<Self as HibitTreeCursorTypes<'a>>::Data> 
     {
         let d0 = self.s0.data(this.s0.borrow(), level_index);
         let d1 = self.s1.data(this.s1.borrow(), level_index);
@@ -164,7 +164,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
-        -> <Self as BitmapTreeCursorTypes<'a>>::Data 
+        -> <Self as HibitTreeCursorTypes<'a>>::Data 
     {
         let d0 = self.s0.data_unchecked(this.s0.borrow(), level_index);
         let d1 = self.s1.data_unchecked(this.s1.borrow(), level_index);
@@ -172,9 +172,9 @@ where
     }
 }
 
-impl<S0, S1> LazyBitmapTree for Intersection<S0, S1>
+impl<S0, S1> LazyHibitTree for Intersection<S0, S1>
 where
-    Intersection<S0, S1>: RegularBitmapTree
+    Intersection<S0, S1>: RegularHibitTree
 {}
 
 impl<S0, S1> Borrowable for Intersection<S0, S1>{ type Borrowed = Self; }
@@ -182,10 +182,10 @@ impl<S0, S1> Borrowable for Intersection<S0, S1>{ type Borrowed = Self; }
 #[inline]
 pub fn intersection<S0, S1>(s0: S0, s1: S1) -> Intersection<S0, S1>
 where
-    S0: Borrowable<Borrowed: BitmapTree>,
-    S1: Borrowable<Borrowed: BitmapTree<
-        LevelCount = <S0::Borrowed as BitmapTree>::LevelCount,
-        LevelMask  = <S0::Borrowed as BitmapTree>::LevelMask,
+    S0: Borrowable<Borrowed: HibitTree>,
+    S1: Borrowable<Borrowed: HibitTree<
+        LevelCount = <S0::Borrowed as HibitTree>::LevelCount,
+        LevelMask  = <S0::Borrowed as HibitTree>::LevelMask,
     >>,
 {
     Intersection { s0, s1 }
@@ -196,7 +196,7 @@ mod tests{
     use itertools::assert_equal;
     use crate::dense_tree::DenseTree;
     use crate::ops::intersection::intersection;
-    use crate::bitmap_tree::BitmapTree;
+    use crate::hibit_tree::HibitTree;
 
     #[test]
     fn smoke_test(){

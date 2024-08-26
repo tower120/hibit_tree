@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
 use wide::f32x4;
 use hibit_tree::{config, intersection, BitBlock, ReqDefault};
-use hibit_tree::RegularBitmapTree;
+use hibit_tree::RegularHibitTree;
 use hibit_tree::Iter;
 
 #[derive(Clone, Default)]
@@ -29,7 +29,7 @@ impl SparseVector{
 
 /// Per-element multiplication
 pub fn mul<'a>(v1: &'a SparseVector, v2: &'a SparseVector) 
-    -> impl RegularBitmapTree<Data=DataBlock> + 'a
+    -> impl RegularHibitTree<Data=DataBlock> + 'a
 {
     intersection(&v1.sparse_array, &v2.sparse_array)
         .map(|(l, r): (&DataBlock, &DataBlock)| DataBlock(l.0 * r.0) )

@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::slice;
 use arrayvec::ArrayVec;
-use crate::{BitBlock, LazyBitmapTree, RegularBitmapTree, MultiBitmapTree, MultiBitmapTreeTypes, BitmapTree, BitmapTreeData, BitmapTreeCursor, BitmapTreeCursorTypes, BitmapTreeTypes};
+use crate::{BitBlock, LazyHibitTree, RegularHibitTree, MultiHibitTree, MultiHibitTreeTypes, HibitTree, HibitTreeData, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes};
 use crate::const_utils::{ConstArrayType, ConstInteger};
 use crate::utils::{Array, Borrowable, Ref};
 
@@ -11,22 +11,22 @@ pub struct MultiUnion<Iter> {
 }
 
 type IterItem<Iter> = <<Iter as Iterator>::Item as Ref>::Type;
-type IterItemCursor<'item, Iter> = <IterItem<Iter> as BitmapTreeTypes<'item>>::Cursor;
+type IterItemCursor<'item, Iter> = <IterItem<Iter> as HibitTreeTypes<'item>>::Cursor;
 
-impl<'item, 'this, Iter, T> BitmapTreeTypes<'this> for MultiUnion<Iter>
+impl<'item, 'this, Iter, T> HibitTreeTypes<'this> for MultiUnion<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: BitmapTree + 'item
+    T: HibitTree + 'item
 {
     type Data  = Data<'item, Iter>;
     type DataUnchecked = DataUnchecked<Iter>;
     type Cursor = Cursor<'this, 'item, Iter>;
 }
 
-impl<'i, Iter, T> BitmapTree for MultiUnion<Iter>
+impl<'i, Iter, T> HibitTree for MultiUnion<Iter>
 where
     Iter: Iterator<Item = &'i T> + Clone,
-    T: BitmapTree + 'i
+    T: HibitTree + 'i
 {
     const EXACT_HIERARCHY: bool = T::EXACT_HIERARCHY;
     
@@ -35,7 +35,7 @@ where
 
     #[inline]
     unsafe fn data(&self, index: usize, level_indices: &[usize]) 
-        -> Option<<Self as BitmapTreeTypes<'_>>::Data> 
+        -> Option<<Self as HibitTreeTypes<'_>>::Data> 
     {
         // Gather items - then return as iter.
         let mut datas: ArrayVec<_, N> = Default::default();
@@ -55,7 +55,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize])
-        -> <Self as BitmapTreeTypes<'_>>::DataUnchecked 
+        -> <Self as HibitTreeTypes<'_>>::DataUnchecked 
     {
         DataUnchecked {
             iter: self.iter.clone(),
@@ -65,25 +65,25 @@ where
     }
 }
 
-pub type Data<'item, Iter> = arrayvec::IntoIter<<IterItem<Iter> as BitmapTreeTypes<'item>>::Data, N>;
+pub type Data<'item, Iter> = arrayvec::IntoIter<<IterItem<Iter> as HibitTreeTypes<'item>>::Data, N>;
 
 pub struct DataUnchecked<Iter>
 where
-    Iter: Iterator<Item: Ref<Type: BitmapTree>>,
+    Iter: Iterator<Item: Ref<Type: HibitTree>>,
 {
     iter: Iter,
     index: usize, 
     // This is copy from level_indices &[usize]. 
     // Compiler optimize away the very act of cloning and directly use &[usize].
     // At least, if value used immediately, and not stored for latter use. 
-    level_indices: ConstArrayType<usize, <IterItem<Iter> as BitmapTree>::LevelCount>,
+    level_indices: ConstArrayType<usize, <IterItem<Iter> as HibitTree>::LevelCount>,
 }
 impl<'item, Iter, T> Iterator for DataUnchecked<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: BitmapTree + 'item,
+    T: HibitTree + 'item,
 {
-    type Item = </*IterItem<Iter>*/T as BitmapTreeTypes<'item>>::Data;
+    type Item = </*IterItem<Iter>*/T as HibitTreeTypes<'item>>::Data;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -122,7 +122,7 @@ type CursorsItem<'item, Iter> = (<Iter as Iterator>::Item, IterItemCursor<'item,
 
 pub struct Cursor<'src, 'item, Iter>
 where
-    Iter: Iterator<Item: Ref<Type: BitmapTree>> + Clone,
+    Iter: Iterator<Item: Ref<Type: HibitTree>> + Clone,
 {
     cursors: ArrayVec<CursorsItem<'item, Iter>, N>,
     
@@ -131,23 +131,23 @@ where
     /// Root level skipped.
     lvls_non_empty_states: ConstArrayType<
         ArrayVec<CursorIndex, N>,
-        <<IterItem<Iter> as BitmapTree>::LevelCount as ConstInteger>::Dec,
+        <<IterItem<Iter> as HibitTree>::LevelCount as ConstInteger>::Dec,
     >,
     
     phantom_data: PhantomData<&'src MultiUnion<Iter>>
 }
 
-impl<'this, 'src, 'item, Iter> BitmapTreeCursorTypes<'this> for Cursor<'src, 'item, Iter>
+impl<'this, 'src, 'item, Iter> HibitTreeCursorTypes<'this> for Cursor<'src, 'item, Iter>
 where
-    Iter: Iterator<Item: Ref<Type: BitmapTree>> + Clone
+    Iter: Iterator<Item: Ref<Type: HibitTree>> + Clone
 {
     type Data = CursorData<'this, 'item, Iter>;
 }
 
-impl<'src, 'item, Iter, T> BitmapTreeCursor<'src> for Cursor<'src, 'item, Iter>
+impl<'src, 'item, Iter, T> HibitTreeCursor<'src> for Cursor<'src, 'item, Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: BitmapTree + 'item
+    T: HibitTree + 'item
 {
     type Src = MultiUnion<Iter>;
 
@@ -156,7 +156,7 @@ where
         let states = ArrayVec::from_iter(
             src.iter.clone()
                 .map(|array|{
-                    let state = BitmapTreeCursor::new(array.borrow()); 
+                    let state = HibitTreeCursor::new(array.borrow()); 
                     (array, state)
                 })
         );
@@ -170,7 +170,7 @@ where
 
     #[inline]
     unsafe fn select_level_node<N: ConstInteger>(&mut self, src: &'src Self::Src, level_n: N, level_index: usize) 
-        -> <Self::Src as BitmapTree>::LevelMask 
+        -> <Self::Src as HibitTree>::LevelMask 
     {
         // unchecked version already deal with non-existent elements
         self.select_level_node_unchecked(src, level_n, level_index)
@@ -178,7 +178,7 @@ where
 
     #[inline]
     unsafe fn select_level_node_unchecked<N: ConstInteger>(&mut self, src: &'src Self::Src, level_n: N, level_index: usize) 
-        -> <Self::Src as BitmapTree>::LevelMask 
+        -> <Self::Src as HibitTree>::LevelMask 
     {
         let mut acc_mask = BitBlock::zero();
         
@@ -223,9 +223,9 @@ where
 
     #[inline]
     unsafe fn data<'a>(&'a self, src: &'src Self::Src, level_index: usize) 
-        -> Option<<Self as BitmapTreeCursorTypes<'a>>::Data> 
+        -> Option<<Self as HibitTreeCursorTypes<'a>>::Data> 
     {
-        if <Self::Src as BitmapTree>::LevelCount::VALUE == 1 {
+        if <Self::Src as HibitTree>::LevelCount::VALUE == 1 {
             todo!("TODO: compile-time special case for 1-level SparseHierarchy");
         }
         
@@ -244,7 +244,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked<'a>(&'a self, src: &'src Self::Src, level_index: usize) 
-        -> <Self as BitmapTreeCursorTypes<'a>>::Data 
+        -> <Self as HibitTreeCursorTypes<'a>>::Data 
     {
         self.data(src, level_index).unwrap_unchecked()
     }
@@ -252,7 +252,7 @@ where
 
 pub struct CursorData<'cursor, 'item, I>
 where
-    I: Iterator<Item: Ref<Type: BitmapTree>>
+    I: Iterator<Item: Ref<Type: HibitTree>>
 {
     lvl_non_empty_states: slice::Iter<'cursor, CursorIndex>,
     cursors: &'cursor [CursorsItem<'item, I>],
@@ -262,10 +262,10 @@ where
 impl<'cursor, 'item, I, T> Iterator for CursorData<'cursor, 'item, I>
 where
     I: Iterator<Item = &'item T> + Clone,
-    T: BitmapTree + 'item
+    T: HibitTree + 'item
 {
     /// <I::Item as SparseHierarchy2>::Data<'a>
-    type Item = <IterItemCursor<'item, I> as BitmapTreeCursorTypes<'cursor>>::Data;
+    type Item = <IterItemCursor<'item, I> as HibitTreeCursorTypes<'cursor>>::Data;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -302,23 +302,23 @@ where
     }
 }
 
-impl<Iter> LazyBitmapTree for MultiUnion<Iter>
+impl<Iter> LazyHibitTree for MultiUnion<Iter>
 where
-    MultiUnion<Iter>: BitmapTree
+    MultiUnion<Iter>: HibitTree
 {}
 
-impl<'item, 'this, Iter, T> MultiBitmapTreeTypes<'this> for MultiUnion<Iter>
+impl<'item, 'this, Iter, T> MultiHibitTreeTypes<'this> for MultiUnion<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: RegularBitmapTree + 'item
+    T: RegularHibitTree + 'item
 { 
-    type IterItem = BitmapTreeData<'item, T>; 
+    type IterItem = HibitTreeData<'item, T>; 
 }
 
-impl<'item, Iter, T> MultiBitmapTree for MultiUnion<Iter>
+impl<'item, Iter, T> MultiHibitTree for MultiUnion<Iter>
 where
     Iter: Iterator<Item = &'item T> + Clone,
-    T: RegularBitmapTree + 'item
+    T: RegularHibitTree + 'item
 {}
 
 impl<Iter> Borrowable for MultiUnion<Iter>{ type Borrowed = Self; }
@@ -327,7 +327,7 @@ impl<Iter> Borrowable for MultiUnion<Iter>{ type Borrowed = Self; }
 pub fn multi_union<Iter>(iter: Iter) 
     -> MultiUnion<Iter>
 where
-    Iter: Iterator<Item: Ref<Type: BitmapTree>> + Clone,
+    Iter: Iterator<Item: Ref<Type: HibitTree>> + Clone,
 {
     MultiUnion{ iter }
 }
@@ -337,7 +337,7 @@ mod tests{
     use super::*;
     use itertools::assert_equal;
     use crate::dense_tree::DenseTree;
-    use crate::bitmap_tree::BitmapTree;
+    use crate::hibit_tree::HibitTree;
     use crate::utils::LendingIterator;
 
     #[test]

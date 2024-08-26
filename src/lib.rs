@@ -2,7 +2,7 @@
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 
 //! {TODO: This is changed}
-//! The core of the lib is [SparseTree] container and [BitmapTree] 
+//! The core of the lib is [SparseTree] container and [HibitTree] 
 //! interface. They represent concept of data structure that filled
 //! with "empty" elements across whole range, and populated with values.    
 //! 
@@ -96,7 +96,7 @@ mod sparse_tree_levels;
 mod dense_tree;
 mod bit_utils;
 mod bit_block;
-mod bitmap_tree;
+mod hibit_tree;
 mod iter;
 mod level;
 mod level_block;
@@ -114,7 +114,7 @@ pub use bit_block::BitBlock;
 pub use req_default::ReqDefault;
 pub use sparse_tree::SparseTree;
 pub use dense_tree::DenseTree;
-pub use bitmap_tree::*;
+pub use hibit_tree::*;
 pub use iter::*;
 pub use ops::map::map;
 pub use ops::multi_map_fold::multi_map_fold;
