@@ -17,7 +17,7 @@ use crate::bit_queue::BitQueue;
 use crate::const_utils::{const_loop, ConstArray, ConstArrayType, ConstBool, ConstFalse, ConstInteger, ConstTrue, ConstUsize};
 use crate::level_indices;
 use crate::hibit_tree::{HibitTree, HibitTreeCursor};
-use crate::utils::{Array, Borrowable, Primitive, Take};
+use crate::utils::{Array, Borrowable, Primitive};
 
 use node::{NodePtr, empty_node};
 
@@ -32,7 +32,7 @@ type DataIndex = u32;
 /// Nodes store children pointers in dense array. 
 /// This means that array size roughly equals to children count.
 /// 
-/// TODO: Description
+/// See the readme for how it works.
 /// 
 /// # Design choices
 /// 
@@ -50,9 +50,12 @@ type DataIndex = u32;
 /// 
 /// # Performance
 /// 
-/// With `bmi2` enabled, access operations almost identical to [SparseArray].
-/// Insert and remove operations are slower, since they need to keep child nodes 
-/// in order. TODO: swap to non-compressed after certain threshold to amortize this.
+/// With `bmi2` enabled, access operations are just 20% slower then 64bit [SparseTree] access.
+/// Insert and remove operations have additional performance impact too, since 
+/// they need to keep child nodes in order. 
+/// TODO: swap to non-compressed after certain threshold to amortize this.
+/// 
+/// [SparseTree]: crate::SparseTree 
 ///
 /// # `target-feature`s
 /// 
@@ -66,7 +69,7 @@ type DataIndex = u32;
 /// ???
 /// 
 /// In addition, to lib's `popcnt` and `bmi1` requirement, on x86 arch
-/// CompactSparseArray also benefits from `bmi2`'s [bzhi] instruction.
+/// CompactSparseArray also benefits from `bmi2`'s `bzhi` instruction.
 pub struct DenseTree<T, const DEPTH: usize>
 where
     ConstUsize<DEPTH>: ConstInteger

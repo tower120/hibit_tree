@@ -1,6 +1,8 @@
-//! Hierarchy configurations for [SparseArray].
+//! Hierarchy configurations for [SparseTree].
 //! 
-//! General rule: use the smallest depth possible. 
+//! General rule: use the smallest depth possible.
+//!
+//! [SparseTree]: crate::SparseTree 
 
 pub use crate::sparse_tree_levels::SparseTreeLevels;
 

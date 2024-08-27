@@ -6,7 +6,7 @@ use crate::const_utils::{ConstArray, ConstInteger};
 use crate::iter::Iter;
 use crate::level_indices;
 use crate::ops::{Map, MapFunction, MultiMapFold};
-use crate::utils::{BinaryFunction, Borrowable, NullaryFunction, Take};
+use crate::utils::{BinaryFunction, Borrowable, NullaryFunction};
 
 // Should be just <const WIDTH: usize, const DEPTH: usize>, but RUST not yet
 // support that for our case.
@@ -64,7 +64,7 @@ for
     /// Panics if index is not in SparseHierarchy<LevelMaskType, LevelCount> range.
     #[inline]
     fn from(index: usize) -> Self {
-        let range_end = LevelMaskType::SIZE.pow(LevelCount::VALUE as _);
+        let range_end = LevelMaskType::SIZE.saturating_pow(LevelCount::VALUE as _);
         assert!(index < range_end, "Index {index} is out of SparseHierarchy range.");
         unsafe{ Self::new_unchecked(index) }
     }
@@ -93,14 +93,20 @@ pub trait HibitTreeTypes<'this, ImplicitBounds = &'this Self>{
 /// HibitTree is a base trait for [RegularHibitTree] and [MultiHibitTree],
 /// which you will use most of the time. Only multi_* operations over non-[RegularHibitTree]'ies
 /// return bare `HibitTree`.
+/// 
+/// # Design choices
 ///
 /// This split is needed, because multi_* operations ([MultiHibitTree]'ies) 
-/// return Iterators, that produce values on the fly. [data()], [data_unchecked()] 
-/// and [iter()] - all get source data from different functions, and also
+/// return Items as Iterators, that produce values on the fly. [Self::data()], [Self::data_unchecked()] 
+/// and [Self::iter()] - all get source data from different functions, and also
 /// process it in different ways. Alternative to this would be collect all items
-/// into intermediate container, and then return it to the user. That is what
-/// [multi_map_fold] do - aggregates iterator into one value, and thus makes 
-/// [MultiHibitTree] Regular again(!).
+/// into intermediate container, and then return it to the user. Or aggregate them
+/// during access call - but this way you would not have a meaningful way of processing
+/// individual items. So we split process - multi_* returns [MultiHibitTree], which
+/// you can iterate with [LendingIterator], or you can aggregate it to [RegularHibitTree]
+/// with [multi_map_fold]. 
+/// 
+/// [LendingIterator]: crate::utils::LendingIterator
 ///
 /// # HibitTreeTypes
 /// 
@@ -127,11 +133,14 @@ pub trait HibitTree: Sized + Borrowable<Borrowed=Self>
 where
 	Self: for<'this> HibitTreeTypes<'this>,
 {
-    /// TODO: Decription form hi_sparse_bitset TRUSTED_HIERARCHY
+    /// Marker that this tree as a bitmap hierarchy does not have
+    /// false-positive bits in bitmasks.
     const EXACT_HIERARCHY: bool;
     
     /// Hierarchy levels count (without a data level).
     type LevelCount: ConstInteger;
+    
+    /// Bitmask used in each Node.
     type LevelMask : BitBlock;
  
     /// # Safety
@@ -140,6 +149,8 @@ where
     /// correspond to `index`.
     /// 
     /// `level_indices` must be [LevelCount] size[^1].
+    /// 
+    /// [LevelCount]: Self::LevelCount
     /// 
     /// [^1]: It is not just `[usize; LevelCount::VALUE]` due to troublesome 
     ///       Rust const expressions in generic context. 
@@ -152,6 +163,8 @@ where
     /// corresponds to `index`.
     /// 
     /// `level_indices` must be [LevelCount] size[^1].
+    /// 
+    /// [LevelCount]: Self::LevelCount
     /// 
     /// [^1]: It is not just `[usize; LevelCount::VALUE]` due to troublesome 
     ///       Rust const expressions in generic context. 
@@ -232,7 +245,9 @@ pub trait HibitTreeCursorTypes<'this, ImplicitBounds = &'this Self>{
 /// For example, for 3-level hierarchy you select level 0, 1, 2 and then you can
 /// access data level. But if after that, you change/select level 1 block - 
 /// you should select level 2 block too, before accessing data level again. 
-/// Imagine that you are traversing a tree.    
+/// Imagine that you are traversing a tree.
+///
+///[select_level_node]: Self::select_level_node    
 ///
 /// # Example
 /// 
@@ -296,13 +311,11 @@ pub trait RegularHibitTreeTypes<'this, ImplicitBounds = &'this Self>
     >
 {}
 
-// TODO: better naming?
-
-/// [HibitTree] where all operations return same type - [Self::Data].
+/// [HibitTree] where all access functions return [HibitTreeData].
 /// 
-/// Think of it as of "the usual" [HibitTree].  
+/// Think of it as "the usual" [HibitTree].
 /// 
-/// All containers and all "non-multi" operations results are MonoSparseHierarchy. 
+/// All containers and all "non-multi" operations results are `RegularHibitTree`. 
 pub trait RegularHibitTree: HibitTree
 where
     Self: for<'this> RegularHibitTreeTypes<'this>
@@ -355,13 +368,11 @@ pub trait MultiHibitTreeTypes<'this, ImplicitBounds = &'this Self>
     type IterItem;
 }
 
-/// [HibitTree], that returns `impl Iterator<Self::IterItem>`
-/// for all operations.
+/// [HibitTree], where all access functions return `impl Iterator<Self::IterItem>`.
 /// 
 /// `multi_*` operations return [MultiHibitTree]'ies.
 /// 
-/// You can convert `MultiHibitTree` to [RegularHibitTree],
-/// with [multi_map_fold()]. 
+/// You can convert `MultiHibitTree` to [RegularHibitTree] with [multi_map_fold()]. 
 pub trait MultiHibitTree: HibitTree
 where
     Self: for<'this> MultiHibitTreeTypes<'this>

@@ -5,7 +5,7 @@ use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
 use crate::hibit_tree::{HibitTree, HibitTreeCursor};
 use crate::{BitBlock, LazyHibitTree, HibitTreeCursorTypes, HibitTreeTypes};
 use crate::bit_queue::BitQueue;
-use crate::utils::{Array, Borrowable, Take};
+use crate::utils::{Array, Borrowable};
 
 pub struct Union<S0, S1>{
     s0: S0,
@@ -134,7 +134,7 @@ where
 
         // mask0.take_or_clone() |= mask1.borrow() 
         {
-            let mut mask = mask0.take_or_clone();
+            let mut mask = mask0;
             mask |= mask1.borrow();
             mask
         }

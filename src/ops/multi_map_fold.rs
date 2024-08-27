@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use crate::{LazyHibitTree, MultiHibitTree, MultiHibitTreeTypes, HibitTree, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes};
+use crate::{LazyHibitTree, MultiHibitTree, MultiHibitTreeTypes, HibitTree, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes, RegularHibitTree};
 use crate::const_utils::ConstInteger;
 use crate::utils::{BinaryFunction, Borrowable, NullaryFunction, UnaryFunction};
 

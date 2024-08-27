@@ -103,7 +103,7 @@ pub trait ConstInteger: ConstIntegerPrivate + Default + Copy + Eq + Debug + 'sta
     /// [T; Self::N]
     type SelfSizeArray<T>: ConstArray<Item=T, Cap=Self>;
     
-    /// Same as [SelfSizeArray], but with additional type bounds.
+    /// Same as [Self::SelfSizeArray], but with additional type bounds.
     /// 
     /// N.B. We can't **just** forward Copy for SelfSizeArray if T: Copy in Rust.
     type SelfSizeCopyArray<T: Copy>: ConstArray<Item=T, Cap=Self, DecArray:Copy> + Copy;

@@ -6,7 +6,6 @@ use crate::{
     BitBlock, FromHibitTree, HibitTree, HibitTreeCursor,
     HibitTreeCursorTypes, HibitTreeTypes
 };
-use crate::utils::Take;
 
 use super::node::{empty_node, NodePtr};
 use super::{DenseTree, DataIndex, Mask};
@@ -66,8 +65,7 @@ where
 {
     assert!(L::EXACT_HIERARCHY);
     
-    let mask = other_cursor.select_level_node_unchecked(other, n, index)
-               .take_or_clone();
+    let mask = other_cursor.select_level_node_unchecked(other, n, index);
     let len = mask.count_ones() as u8;
     let cap = len + 1;
     
@@ -109,8 +107,7 @@ where
     F: for<'a> FnMut(usize, CursorData<'src, 'a, L>) -> DataIndex,
     N: ConstInteger,
 {
-    let mask = other_cursor.select_level_node_unchecked(other, n, index)
-               .take_or_clone();
+    let mask = other_cursor.select_level_node_unchecked(other, n, index);
     
     if N::VALUE == L::LevelCount::VALUE - 1 {
         // terminal node with data

@@ -5,6 +5,8 @@
 /// (forwarding reference), that can be taken by ref or value.
 /// 
 /// Everything zero overhead.
+/// 
+/// [Borrow]: [borrow::Borrow]
 pub trait Take<T>{
     /// Takes self as T.
     /// 

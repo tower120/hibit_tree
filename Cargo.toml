@@ -23,6 +23,7 @@ version = "0.7.24"
 criterion = "0.5.1"
 itertools = "0.13.0"
 nohash-hasher = "0.2.0"
+ahash = "0.8.11"
 rand = "0.8.5"
 
 [package.metadata.docs.rs]

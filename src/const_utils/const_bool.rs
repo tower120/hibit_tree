@@ -7,7 +7,7 @@ pub trait ConstBool: Default + Copy {
     const VALUE: bool;
     /// T if true, F otherwise.
     type Conditional<T, F>;
-    /// Same as [Conditional] but with [ConstInteger] bounds.
+    /// Same as [Self::Conditional] but with [ConstInteger] bounds.
     type ConditionalInt<T: ConstInteger, F: ConstInteger>: ConstInteger;
     
     fn value(self) -> bool {

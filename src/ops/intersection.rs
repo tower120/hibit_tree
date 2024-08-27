@@ -4,7 +4,7 @@ use std::ops::BitAnd;
 use crate::const_utils::{ConstArray, ConstInteger};
 use crate::{LazyHibitTree, RegularHibitTree, HibitTreeCursorTypes, HibitTreeTypes};
 use crate::hibit_tree::{HibitTree, HibitTreeCursor};
-use crate::utils::{Borrowable, Take};
+use crate::utils::{Borrowable};
 
 pub struct Intersection<S0, S1>{
     s0: S0,
@@ -122,7 +122,7 @@ where
        
         // mask0.take_or_clone() &= mask1.borrow()
         {
-            let mut mask = mask0.take_or_clone();
+            let mut mask = mask0;
             mask &= mask1.borrow();
             mask
         }
@@ -141,7 +141,7 @@ where
         
         // mask0.take_or_clone() &= mask1.borrow()
         {
-            let mut mask = mask0.take_or_clone();
+            let mut mask = mask0;
             mask &= mask1.borrow();
             mask
         }

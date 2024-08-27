@@ -53,27 +53,27 @@
 //! 
 //! ### Benchmarks data
 //! 
+//! TODO: move this somewhere?
+//! 
 //! #### Against HashMap
 //! 
 //! Comparing random access against `no_hash` HashMap with usize uniformly distributed keys 
 //! (ideal HashMap scenario):
-//! * 4-6 levels (u32 range) both containers are faster.
-//! * 8 levels (u64 range) [SparseTree] with 256bit have the same performance.
+//! * 64x5  [DenseTree]  (~u32 range) 5% slower.
+//! * 256x4 [SparseTree] (u32 range)  60% faster. 
+//! * 256x8 [SparseTree] (u64 range)  25% slower.
 //! 
-//! TODO: add graphic image
-//! 
-//! Against `ahash` - both containers always faster.
-//! 
-//! TODO: add graphic image
+//! TODO: add graphic image?
 //! 
 //! In general, performance does not depends on data distribution across index range.
+//! But tree depth matters.
 //!
 //! Random insert is not benchmarked yet.
 //! 
 //! Bulk insert with [materialize] is not benchmarked yet. Should be **significantly** 
 //! faster then random insert.
 //! 
-//! Intersection is order of magnitudes faster then HashMap's per-element "contains". 
+//! Intersection is order of magnitudes faster then HashMap's per-element "contains"/"get". 
 //!
 //! Unordered iteration is faster then current [hashbrown](https://crates.io/crates/hashbrown)
 //! implementation.   
@@ -81,7 +81,7 @@
 //! ## Inter HibitTree operations
 //! 
 //! As you can see [HibitTree] is a form of set/map, and hence, can be used for
-//! inter set operations, such as [intersection], [merge], etc. 
+//! inter set operations, such as [intersection], [union], etc. 
 //! 
 //! Due to the fact, that each hierarchy block supplemented with bitmask, finding
 //! intersection is just a matter of ANDing bitmasks.
@@ -114,9 +114,9 @@
 //! 
 //! Speeds up following operations:
 //! - [FromHibitTree]
-//! - TODO [Eq]
-//! - TODO [is_empty()]
-//! - TODO [contains()]
+//! - TODO `Eq`
+//! - TODO `is_empty()`
+//! - TODO `contains()`
 //! 
 //! [EXACT_HIERARCHY]: HibitTree::EXACT_HIERARCHY
 //! 

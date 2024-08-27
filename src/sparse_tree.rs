@@ -26,9 +26,11 @@ use crate::hibit_tree::{HibitTree, HibitTreeCursor};
 /// are used. Root level use u8 for indices, first level - u16, everything below - u32.
 /// 
 /// It is slightly faster than [DenseTree], and can have wider nodes with 
-/// SIMD-accelerated bitmasks. 
+/// SIMD-accelerated bitmasks.
 ///
-/// # Universal set (better naming?)
+/// [DenseTree]: crate::DenseTree 
+///
+/// # `get_or_default`
 ///
 /// Pass [ReqDefault] as `R` argument, to unlock [get_or_default] operation[^1].
 /// This will require `Data` to be [Default] to construct container.
@@ -36,13 +38,9 @@ use crate::hibit_tree::{HibitTree, HibitTreeCursor};
 /// [get_or_default] is as fast as [get_unchecked] and has no
 /// performance hit from branching[^2]. 
 ///
-/// Accessing items through [get_or_default] effectively makes container 
-/// [universal set](https://en.wikipedia.org/wiki/Universal_set)[^3].
-///
 /// [^1]: We can't just treat container with `Data: Default` as `ReqDefault`,
 ///       due to stable Rust limitations - we need specialization for that.
 /// [^2]: All non-existent items just point to the very first default item.
-/// [^3]: Container acts as it has all items across index range.
 ///
 /// [get_or_default]: SparseTree::get_or_default 
 /// [get_unchecked]: SparseTree::get_unchecked
@@ -342,7 +340,7 @@ where
                     level_block_index: usize,
                     inner_index: usize,
                     data_block_index: usize
-                };
+                }
                 impl<M> MutVisitor<M> for V {
                     type Out = ();
     
@@ -382,6 +380,8 @@ where
     ///
     /// Somewhat faster than *[get_or_insert()] = `value`, since it will not insert intermediate
     /// default value [^1], if `index` unoccupied.
+    /// 
+    /// [get_or_insert()]: Self::get_or_insert()
     ///
     /// [^1]: Thou, if empty constructor is not complex - compiler may be 
     /// able to optimize away intermediate value anyway. But better safe then sorry.

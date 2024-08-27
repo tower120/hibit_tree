@@ -7,7 +7,7 @@ use arrayvec::ArrayVec;
 use crate::{BitBlock, LazyHibitTree, RegularHibitTree, MultiHibitTree, MultiHibitTreeTypes, HibitTreeData, HibitTreeCursorTypes, HibitTreeTypes};
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
 use crate::hibit_tree::{HibitTree, HibitTreeCursor};
-use crate::utils::{Array, Borrowable, Ref, Take};
+use crate::utils::{Array, Borrowable, Ref};
 
 /// Intersection between all iterator items.
 ///
@@ -325,7 +325,7 @@ where
     cursors: ArrayVec<CursorsItem<'item, I>, N>,    
     empty_below_n: usize,
     terminal_node_mask: <IterItem<I> as HibitTree>::LevelMask,
-    phantom_data: PhantomData<(&'src MultiIntersection<I>)>
+    phantom_data: PhantomData<&'src MultiIntersection<I>>
 }
 
 impl<'this, 'src, 'item, Iter> HibitTreeCursorTypes<'this> for Cursor<'src, 'item, Iter>
@@ -459,11 +459,16 @@ where
     cursors_iter: slice::Iter<'cursor, CursorsItem<'item, I>>,
 }
 
-/// Iterator for [MultiIntersection] resolve function.
+/// Iterator for [MultiIntersection] [Cursor::Data].
 /// 
 /// Prefer using [fold]-based[^1] operations over [next]-ing.
 ///
-/// [^1]: Such as [for_each], [sum], etc... 
+/// [^1]: Such as [for_each], [sum], etc...
+///
+/// [fold]: Iterator::fold
+/// [next]: Iterator::next 
+/// [for_each]: Iterator::for_each
+/// [sum]: Iterator::sum
 impl<'cursor, 'item, I, T> Iterator for CursorData<'cursor, 'item, I>
 where
     I: Iterator<Item = &'item T> + Clone,
