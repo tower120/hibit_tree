@@ -5,7 +5,7 @@ use std::borrow::Borrow;
 /// Using this over [Borrow], allow accepting T or &T
 /// as argument with type-deduction:
 /// ```
-/// # use hi_sparse_array::utils::Borrowable;
+/// # use hibit_tree::utils::Borrowable;
 /// # use std::fmt::Debug;
 /// #[derive(Debug)]
 /// struct S;

@@ -12,7 +12,7 @@ use crate::utils::{BinaryFunction, Borrowable, NullaryFunction};
 // support that for our case.
 /// Range checked index. 
 /// 
-/// Known to be in range for `SparseHierarchy<LevelMaskType, LevelCount>`.
+/// Known to be within `HibitTree<LevelMaskType, LevelCount>::index_range()`.
 /// 
 /// Whenever you see `impl Into<Index<_, _>>` - you can just use your `usize` index
 /// as usual.
@@ -22,25 +22,33 @@ use crate::utils::{BinaryFunction, Borrowable, NullaryFunction};
 /// purpose of `Index`.  
 ///
 /// ```
-/// #use hi_sparse_array::Index;
-///  
+/// # use hibit_tree::{HibitTree, Index};
+/// # fn example<T: HibitTree>(array: &T, array2: &T){ 
 /// // use it just as usize
 /// array.get(12);
-/// 
+///
 /// // zero-cost unsafe construction
 /// array.get(unsafe{ Index::new_unchecked(12) });
-/// 
+///
 /// // safe construct once, then reuse
 /// {
 ///     let i = Index::from(12);
 ///     array.get(i);
 ///     array2.get(i);
 /// }
+/// # }
 /// ``` 
-#[derive(Copy, Clone)]
 pub struct Index<LevelMask: BitBlock, LevelCount: ConstInteger>(
     usize, PhantomData<(LevelMask, LevelCount)>
 );
+
+impl<LevelMask: BitBlock, LevelCount: ConstInteger> Clone for Index<LevelMask, LevelCount>{
+    #[inline]
+    fn clone(&self) -> Self {
+        Self(self.0, PhantomData)
+    }
+}
+impl<LevelMask: BitBlock, LevelCount: ConstInteger> Copy for Index<LevelMask, LevelCount>{}
 
 impl<LevelMaskType: BitBlock, LevelCount: ConstInteger> 
     Index<LevelMaskType, LevelCount>
@@ -117,10 +125,11 @@ pub trait HibitTreeTypes<'this, ImplicitBounds = &'this Self>{
 /// [MultiHibitTreeIterItem] helpers. Or get them from [HibitTreeTypes],
 /// as if it were super-trait:
 /// ```
-/// let i: <MySparseContainer as HibitTreeTypes>::Data = my_sparse_container.get(1).unwrap();
-/// ```
-/// ```
-/// type MyData<'i> = <MySparseContainer as HibitTreeTypes<'i>>::Data; 
+/// # use hibit_tree::{DenseTree, HibitTree, HibitTreeData, HibitTreeTypes};
+/// # fn myfn<MyTree: HibitTree>(my_sparse_container: MyTree){
+/// let i: HibitTreeData<MyTree> = my_sparse_container.get(1).unwrap();
+/// let i: <MyTree as HibitTreeTypes>::Data = my_sparse_container.get(1).unwrap();
+/// # }
 /// ```
 /// 
 /// Same technique used for other HibitTree related traits.
@@ -252,13 +261,25 @@ pub trait HibitTreeCursorTypes<'this, ImplicitBounds = &'this Self>{
 /// # Example
 /// 
 /// For 2-level 64bit hierarchy:
-/// ```
-/// // Select the only level0 block (corresponds to array indices [0..4096))
-/// let mask0 = state.select_level_node(array, ConstInt::<0>, 0);
-/// // Select 4th level1 block (corresponds to array indices [192..256))
-/// let mask1 = state.select_level_node(array, ConstInt::<1>, 3);
-/// // Select 9th data block (array index 201)
-/// let data = state.data(array, 9);
+///```
+/// use hibit_tree::{HibitTreeTypes, HibitTreeCursor, DenseTree};
+/// use hibit_tree::const_utils::ConstUsize;
+/// 
+/// type Array = DenseTree<usize, 2>; 
+/// let mut array = Array::default();
+/// array.insert(201, 500);
+/// 
+/// let mut cursor = <Array as HibitTreeTypes>::Cursor::new(&array);
+/// unsafe{
+///    // Select the only level0 block (corresponds to array indices [0..4096))
+///    let mask0 = cursor.select_level_node(&array, ConstUsize::<0>, 0);
+///    // Select 4th level1 block (corresponds to array indices [192..256))
+///    let mask1 = cursor.select_level_node(&array, ConstUsize::<1>, 3);
+///    // Select 9th data block (array index 201)
+///    let data = cursor.data(&array, 9);
+/// 
+///    assert_eq!(data, Some(&500));
+/// }
 /// ``` 
 pub trait HibitTreeCursor<'src>
 where

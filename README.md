@@ -141,7 +141,7 @@ same performance characteristics.
 
 ## Intersection
 
-The bread and butter of hibit-tree is super-fast[^fast-intersection] intersection.
+The bread and butter of hibit-tree is superfast intersection.
 Intersected (or you may say - common) part of the tree computed on the fly, 
 by simply AND-ing nodes bitmasks. Then resulted bitmask can be traversed. Nodes with indexes of 1 bits used to dive deeper, until the terminal node. Hence, tree branches 
 that does not have common keys discarded early. The more trees you intersect at once -
@@ -150,8 +150,6 @@ the greater the technique benefit.
 Alas, it is possible that only at terminal node we get empty bitmask. But even in this
 case it is faster then other solutions, since we check multiple intersection possibilities
 at once. In worst case, it degenerates to case of intersecting bitvecs without empty blocks. Which is quite fast by itself.
-
-[^fast-intersection]: And this is arguably THE fastest way to intersect.
 
 ## Laziness
 
@@ -164,7 +162,8 @@ TODO: EXAMPLE
 
 Tree have compile-time defined depth and width. This performs **significantly**
 better, then traditional *dynamic* structure. And since we have integer as key,
-we need only 8-11 levels depth max - any mem-overhead is neglectable due to tiny node sizes. But we assume, that most of the time user will work near u32 index space (4-6 levels).
+we need only 8-11 levels depth max - any mem-overhead is neglectable due to tiny node sizes. 
+But we assume, that most of the time user will work near u32 index space (4-6 levels).
 
 ### Dynamic tree
 

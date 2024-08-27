@@ -156,9 +156,9 @@ impl<S, F> Borrowable for Map<S, F> { type Borrowed = Self; }
 /// or you can implement [UnaryFunction] with generics.
 ///
 /// ```
-/// # use hi_sparse_array::CompactSparseArray;
-/// # use hi_sparse_array::utils::UnaryFunction;
-/// let a: CompactSparseArray<usize, 4> = Default::default();
+/// # use hibit_tree::{map, DenseTree};
+/// # use hibit_tree::utils::UnaryFunction;
+/// let a: DenseTree<usize, 4> = Default::default();
 ///
 /// // This will fail to compile:
 /// // let m = map(&a, |d| { d.clone() } );
@@ -166,11 +166,11 @@ impl<S, F> Borrowable for Map<S, F> { type Borrowed = Self; }
 /// // Lambdas with concrete input type will work.    
 /// let m = map(&a, |d: &usize| { d.clone() } );
 ///
-/// // Function pointers will work too.
-/// fn cloned<T: Clone>(d: T) -> T{ d.clone() }
-/// let m = map(&a, cloned );
+/// // Function pointers with concrete type argument will work too.
+/// fn bypass(d: &usize) -> &usize { d }
+/// let m = map(&a, bypass );
 ///
-/// // As well as UnaryFunction implementation.
+/// // As well as generic UnaryFunction implementation.
 /// struct Cloned;
 /// impl<T: Clone> UnaryFunction<T> for Cloned{
 ///     type Output = T;
