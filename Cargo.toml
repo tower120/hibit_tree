@@ -1,8 +1,10 @@
 [package]
 name = "hibit_tree"
-version = "0.1.0"
+license = "MIT OR Apache-2.0"
+version = "0.1.0-alpha.1"
 rust-version = "1.79.0"
 edition = "2021"
+categories = ["data-structures"]
 
 [features]
 default = ["simd"]
@@ -13,7 +15,6 @@ may_dangle = []
 
 [dependencies]
 arrayvec = "0.7.4"
-#thin-vec = "0.2.13"
 
 [dependencies.wide]
 optional = true
