@@ -450,6 +450,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct CursorData<'cursor, 'item, I>
 where
     I: Iterator<Item: Ref<Type: HibitTree>>
@@ -487,6 +488,8 @@ where
             })
     }
 
+    // TODO: We probably don't need this fold implementation.
+    //       Looks like compiler able to optimize next() into the same code.
     #[inline]
     fn fold<B, F>(mut self, mut init: B, mut f: F) -> B
     where

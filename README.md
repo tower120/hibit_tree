@@ -2,7 +2,7 @@
 
 Hierarchical bitmap tree is an integer-indexed fixed-depth prefix-tree without
 memory overhead[^mem_overhead] and performance[^hasmap_perf] of a no-hasher 
-HashMap[^hashmap_conf]. With unique capability of superfast[^intersection_speed] intersection[^unparalleled_intersection],
+HashMap[^hashmap_conf]. With unique capability of superfast intersection[^unparalleled_intersection],
 and other[^unique_ops] set-like operations between containers.
 
 * Always stable O(1) random access.
@@ -12,6 +12,10 @@ and other[^unique_ops] set-like operations between containers.
 * Ordered by key[^sorting]. Have unordered contiguous iteration[^unordered_iter] as well.
 
 * Fast inter-container equality and ordering [Not yet implemented].
+
+Intersection operation directly over data container is much faster, than intersecting 
+set + getting items from tree/map. Since with intersection directly over tree - we
+are skipping additional tree traverse phase for actually getting data.
 
 [^hasmap_perf]: Even without hasher, HashMap performance is not stable, and 
 depends on how much filled buckets are.
@@ -30,6 +34,104 @@ it naturally acts as intersection acceleration structure.
 [^sorting]: Which means, that it can be used for sort acceleration.
 
 [^unordered_iter]: Unordered iteration is as fast as iterating Vec.
+
+## Examples
+
+### Sparse vector dot product
+
+[examples/readme_sparse_vec_dot.rs](https://github.com/tower120/hibit_tree/blob/main/examples/readme_sparse_vec_dot.rs)
+
+```rust
+type SparseVec = DenseTree<f32, 4>;
+
+let mut v1: SparseVec = Default::default();
+v1.insert(10, 1.0);
+v1.insert(20, 10.0);
+v1.insert(30, 100.0);
+
+let mut v2: SparseVec = Default::default();
+v2.insert(10, 1.0);
+v2.insert(30, 0.5);
+
+let mul = intersection(&v1, &v2)            // lazy element-wise mul
+    .map(|(e1, e2): (&f32, &f32)| e1 * e2);
+let dot: f32 = mul.iter().map(|(_index, element)| element).sum();
+
+assert_eq!(dot, 51.0);
+```
+
+### Multi-type intersection
+
+[examples/readme_multi_type_example.rs](https://github.com/tower120/hibit_tree/blob/main/examples/readme_multi_type_example.rs)
+
+```rust
+// index as user-id.
+type Tree<T> = DenseTree<T, 4>;
+let mut ages : Tree<usize>  = Default::default();
+ages.insert(100, 20);
+ages.insert(200, 30);
+ages.insert(300, 40);
+
+let mut names: Tree<String> = Default::default();
+names.insert(200, "John".into());
+names.insert(234, "Zak".into());
+names.insert(300, "Ernie".into());
+
+let users = intersection(&ages, &names)
+    .map(|(i, s): (&usize, &String)| format!("{s} age: {i}"));
+
+assert_equal(users.iter(), [
+    (200, String::from("John age: 30")),
+    (300, String::from("Ernie age: 40")),
+]);
+```
+
+### Multi-tree intersection with in-place filter[^inplace_filter]:
+
+[examples/readme_store_example.rs](https://github.com/tower120/hibit_tree/blob/main/examples/readme_store_example.rs)
+
+```rust
+/// [store_id; good_amount]
+type Goods = DenseTree<usize, 4>;
+
+let mut apples : Goods = Default::default();
+apples.insert(0, 12);
+apples.insert(3, 40);
+
+let mut oranges: Goods = Default::default();
+oranges.insert(0, 4);
+oranges.insert(1, 15);
+oranges.insert(3, 40);     
+
+let mut carrots: Goods = Default::default();
+carrots.insert(1, 5);
+carrots.insert(3, 100);
+
+// We want 5 apples, 20 oranges, 7 carrots - from the SAME store.
+let goods            = [&apples, &oranges, &carrots];
+let min_goods_amount = [5      , 20      , 7       ];
+
+let intersection = multi_intersection(goods.iter().copied());
+let mut iter = intersection.iter();
+while let Some((store_id, goods_amount /*: impl Iterator<usize> */)) = 
+    LendingIterator::next(&mut iter)
+{
+    // `goods_amount` iterator has the same order as `goods`.
+    let contains = 
+        iter::zip(goods_amount.clone(), min_goods_amount.iter())
+        .find(|(amount, min)| min <= amount )
+        .is_some();
+    if !contains{ continue }
+    
+    println!("found at store {store_id} : {:?}", goods_amount.collect::<Vec<_>>());
+    
+    break;
+}
+```
+
+[^inplace_filter]: hibit_tree acquire intersected data as we go. This is much 
+faster than doing set intersection, and then getting data by keys. Since there
+is no additional tree traverse. 
 
 ## Use cases
 
