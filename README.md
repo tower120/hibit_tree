@@ -1,5 +1,9 @@
 # **HI**erarchical **BIT**map **TREE**
 
+[![crates.io](https://img.shields.io/crates/v/hibit_tree.svg)](https://crates.io/crates/hibit_tree)
+[![license](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue?style=flat-square)](#license)
+[![Docs](https://docs.rs/hibit_tree/badge.svg)](https://docs.rs/hibit_tree)
+
 Hierarchical bitmap tree is an integer-key fixed-depth prefix-tree 
 with no memory overhead[^mem_overhead].
 That have unique[^unique_ops], blazingly fast inter-container intersection[^unparalleled_intersection] and union.
@@ -39,7 +43,7 @@ it naturally acts as intersection acceleration structure.
 
 ### Sparse vector dot product
 
-[examples/readme_sparse_vec_dot.rs](https://github.com/tower120/hibit_tree/blob/main/examples/readme_sparse_vec_dot.rs)
+[examples/readme_sparse_vec_dot.rs](./examples/readme_sparse_vec_dot.rs)
 
 ```rust
 type SparseVec = DenseTree<f32, 4>;
@@ -62,7 +66,7 @@ assert_eq!(dot, 51.0);
 
 ### Multi-type intersection
 
-[examples/readme_multi_type_example.rs](https://github.com/tower120/hibit_tree/blob/main/examples/readme_multi_type_example.rs)
+[examples/readme_multi_type_example.rs](./examples/readme_multi_type_example.rs)
 
 ```rust
 // index as user-id.
@@ -88,7 +92,7 @@ assert_equal(users.iter(), [
 
 ### Multi-tree intersection with in-place filter[^inplace_filter]:
 
-[examples/readme_store_example.rs](https://github.com/tower120/hibit_tree/blob/main/examples/readme_store_example.rs)
+[examples/readme_store_example.rs](./examples/readme_store_example.rs)
 
 ```rust
 /// [store_id; good_amount]
@@ -148,7 +152,7 @@ elements into tree. Intersection of two such trees will return pairs of non-zero
 By mapping pairs to multiplication operation - we get element-wise multiplied sparse vector. 
 By summing it's all elements - we get dot product.
 
-See [examples/sparse_vector.rs](https://github.com/tower120/hibit_tree/blob/main/examples/sparse_vector.rs)
+See [examples/sparse_vector.rs](./examples/sparse_vector.rs)
 
 ### Compressed bitset
 
