@@ -1,11 +1,12 @@
 [package]
 name = "hibit_tree"
 license = "MIT OR Apache-2.0"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.3"
 rust-version = "1.79.0"
 edition = "2021"
 repository = "https://github.com/tower120/hibit_tree"
 categories = ["data-structures"]
+keywords = ["tree", "map", "compressed", "bitset", "bitmap"]
 description = "Hierarchical bitmap tree. Prefix tree without memory overhead that act as herarchical bitmap."
 
 [features]
@@ -16,11 +17,11 @@ simd = ["dep:wide"]
 may_dangle = []
 
 [dependencies]
-arrayvec = "0.7.4"
+arrayvec = "0.7"
 
 [dependencies.wide]
 optional = true
-version = "0.7.24"
+version = "0.7"
 
 [dev-dependencies]
 criterion = "0.5.1"

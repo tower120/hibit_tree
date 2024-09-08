@@ -9,7 +9,7 @@ with no memory overhead[^mem_overhead].
 That have unique[^unique_ops], blazingly fast inter-container intersection[^unparalleled_intersection] and union.
 That outperforms `HashMap<u32, T>`[^hashmap_conf] most of the time.
 
-Think of it as a map that can do set things. And MUCH more effectively[^intersection_efficiency]
+Think of it as a map that can do set things. And MUCH more efficiently[^intersection_efficiency]
 then traditional set operations combined with map lookups.
 
 * Always stable O(1) random access.
@@ -24,8 +24,8 @@ then traditional set operations combined with map lookups.
 set + getting items from tree/map. Since with intersection directly over tree - we
 are skipping additional tree traverse phase for actually getting data.
 
-[^mem_overhead]: Tree nodes store child-pointers in dense format. Null-pointers are not stored.
-While still have O(1) access.
+[^mem_overhead]: Tree nodes store child-pointers in a dense format - null-pointers are not stored.
+While still have O(1) child access, like in traditional sparse format.
 
 [^hashmap_conf]: HashMap<u32, T> with nohash-hasher and uniform key distribution -
 ideal condition for HashMap.
@@ -156,7 +156,8 @@ See [examples/sparse_vector.rs](./examples/sparse_vector.rs)
 
 ### Compressed bitset
 
-TODO
+[hi_sparse_bitset](https://crates.io/crates/hi_sparse_bitset) basically use the same structure as
+`hibit_tree`. Can be considered as special case of `hibit_tree`.
 
 ## How it works
 
