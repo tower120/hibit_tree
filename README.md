@@ -10,7 +10,7 @@ That have unique[^unique_ops], blazingly fast inter-container intersection[^unpa
 That outperforms `HashMap<u32, T>`[^hashmap_conf] most of the time.
 
 Think of it as a map that can do set things. And MUCH more effectively[^intersection_efficiency]
-then traditional set operation + map get.
+then traditional set operations combined with map lookups.
 
 * Always stable O(1) random access.
 
