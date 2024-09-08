@@ -1,26 +1,26 @@
 # **HI**erarchical **BIT**map **TREE**
 
-Hierarchical bitmap tree is an integer-indexed fixed-depth prefix-tree without
-memory overhead[^mem_overhead] and performance[^hasmap_perf] of a no-hasher 
-HashMap[^hashmap_conf]. With unique capability of superfast intersection[^unparalleled_intersection],
-and other[^unique_ops] set-like operations between containers.
+Hierarchical bitmap tree is an integer-key fixed-depth prefix-tree 
+with no memory overhead[^mem_overhead].
+That have unique[^unique_ops], blazingly fast inter-container intersection[^unparalleled_intersection] and union.
+That outperforms `HashMap<u32, T>`[^hashmap_conf] most of the time.
+
+Think of it as a map that can do set things. And MUCH more effectively[^intersection_efficiency]
+then traditional set operation + map get.
 
 * Always stable O(1) random access.
 
-* Predictable insert performance - no tree-balancing, or any hidden performance impact.
+* Predictable insert/remove performance - no tree-balancing, or any hidden performance impact.
 
 * Ordered by key[^sorting]. Have unordered contiguous iteration[^unordered_iter] as well.
 
 * Fast inter-container equality and ordering [Not yet implemented].
 
-Intersection operation directly over data container is much faster, than intersecting 
+[^intersection_efficiency]: Intersection operation directly over data container is much faster, than intersecting 
 set + getting items from tree/map. Since with intersection directly over tree - we
 are skipping additional tree traverse phase for actually getting data.
 
-[^hasmap_perf]: Even without hasher, HashMap performance is not stable, and 
-depends on how much filled buckets are.
-
-[^mem_overhead]: Tree nodes store child-pointers in dense. Null-pointers are not stored.
+[^mem_overhead]: Tree nodes store child-pointers in dense format. Null-pointers are not stored.
 While still have O(1) access.
 
 [^hashmap_conf]: HashMap<u32, T> with nohash-hasher and uniform key distribution -
