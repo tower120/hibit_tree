@@ -1,26 +1,30 @@
 # **HI**erarchical **BIT**map **TREE**
 
-Hierarchical bitmap tree is an integer-indexed fixed-depth prefix-tree without
-memory overhead[^mem_overhead] and performance[^hasmap_perf] of a no-hasher 
-HashMap[^hashmap_conf]. With unique capability of superfast intersection[^unparalleled_intersection],
-and other[^unique_ops] set-like operations between containers.
+[![crates.io](https://img.shields.io/crates/v/hibit_tree.svg)](https://crates.io/crates/hibit_tree)
+[![license](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue?style=flat-square)](#license)
+[![Docs](https://docs.rs/hibit_tree/badge.svg)](https://docs.rs/hibit_tree)
+
+Hierarchical bitmap tree is an integer-key fixed-depth prefix-tree 
+with no memory overhead[^mem_overhead].
+That have unique[^unique_ops], blazingly fast inter-container intersection[^unparalleled_intersection] and union.
+That outperforms `HashMap<u32, T>`[^hashmap_conf] most of the time.
+
+Think of it as a map that can do set things. And MUCH more effectively[^intersection_efficiency]
+then traditional set operations combined with map lookups.
 
 * Always stable O(1) random access.
 
-* Predictable insert performance - no tree-balancing, or any hidden performance impact.
+* Predictable insert/remove performance - no tree-balancing, or any hidden performance impact.
 
 * Ordered by key[^sorting]. Have unordered contiguous iteration[^unordered_iter] as well.
 
 * Fast inter-container equality and ordering [Not yet implemented].
 
-Intersection operation directly over data container is much faster, than intersecting 
+[^intersection_efficiency]: Intersection operation directly over data container is much faster, than intersecting 
 set + getting items from tree/map. Since with intersection directly over tree - we
 are skipping additional tree traverse phase for actually getting data.
 
-[^hasmap_perf]: Even without hasher, HashMap performance is not stable, and 
-depends on how much filled buckets are.
-
-[^mem_overhead]: Tree nodes store child-pointers in dense. Null-pointers are not stored.
+[^mem_overhead]: Tree nodes store child-pointers in dense format. Null-pointers are not stored.
 While still have O(1) access.
 
 [^hashmap_conf]: HashMap<u32, T> with nohash-hasher and uniform key distribution -
@@ -39,7 +43,7 @@ it naturally acts as intersection acceleration structure.
 
 ### Sparse vector dot product
 
-[examples/readme_sparse_vec_dot.rs](https://github.com/tower120/hibit_tree/blob/main/examples/readme_sparse_vec_dot.rs)
+[examples/readme_sparse_vec_dot.rs](./examples/readme_sparse_vec_dot.rs)
 
 ```rust
 type SparseVec = DenseTree<f32, 4>;
@@ -62,7 +66,7 @@ assert_eq!(dot, 51.0);
 
 ### Multi-type intersection
 
-[examples/readme_multi_type_example.rs](https://github.com/tower120/hibit_tree/blob/main/examples/readme_multi_type_example.rs)
+[examples/readme_multi_type_example.rs](./examples/readme_multi_type_example.rs)
 
 ```rust
 // index as user-id.
@@ -88,7 +92,7 @@ assert_equal(users.iter(), [
 
 ### Multi-tree intersection with in-place filter[^inplace_filter]:
 
-[examples/readme_store_example.rs](https://github.com/tower120/hibit_tree/blob/main/examples/readme_store_example.rs)
+[examples/readme_store_example.rs](./examples/readme_store_example.rs)
 
 ```rust
 /// [store_id; good_amount]
@@ -148,7 +152,7 @@ elements into tree. Intersection of two such trees will return pairs of non-zero
 By mapping pairs to multiplication operation - we get element-wise multiplied sparse vector. 
 By summing it's all elements - we get dot product.
 
-See [examples/sparse_vector.rs](https://github.com/tower120/hibit_tree/blob/main/examples/sparse_vector.rs)
+See [examples/sparse_vector.rs](./examples/sparse_vector.rs)
 
 ### Compressed bitset
 
