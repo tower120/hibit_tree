@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::slice;
 use arrayvec::ArrayVec;
-use crate::{BitBlock, LazyHibitTree, RegularHibitTree, MultiHibitTree, MultiHibitTreeTypes, HibitTree, HibitTreeData, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes};
+use crate::{BitBlock, LazyHibitTree, RegularHibitTree, MultiHibitTree, MultiHibitTreeTypes, HibitTree, HibitTreeData, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex};
 use crate::const_utils::{ConstArrayType, ConstInteger};
 use crate::utils::{Array, Borrowable, Ref};
 
@@ -34,14 +34,14 @@ where
     type LevelMask  = T::LevelMask;
 
     #[inline]
-    unsafe fn data(&self, index: usize, level_indices: &[usize]) 
+    fn data(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
         -> Option<<Self as HibitTreeTypes<'_>>::Data> 
     {
+        // TODO: we can have custom iterator here, without gathering everything into array.
         // Gather items - then return as iter.
         let mut datas: ArrayVec<_, N> = Default::default();
         for array in self.iter.clone(){
-            let array = NonNull::from(array.borrow()); // drop borrow lifetime
-            let data = unsafe{ array.as_ref().data(index, level_indices) };
+            let data = unsafe{ array.borrow().data(index) };
             if let Some(data) = data {
                 datas.push(data);
             }
@@ -54,13 +54,12 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize])
+    unsafe fn data_unchecked(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
         -> <Self as HibitTreeTypes<'_>>::DataUnchecked 
     {
         DataUnchecked {
             iter: self.iter.clone(),
-            index,
-            level_indices: Array::from_fn(|i| unsafe{ *level_indices.get_unchecked(i) }),
+            hi_index: index.clone(),
         }
     }
 }
@@ -72,11 +71,10 @@ where
     Iter: Iterator<Item: Ref<Type: HibitTree>>,
 {
     iter: Iter,
-    index: usize, 
-    // This is copy from level_indices &[usize]. 
-    // Compiler optimize away the very act of cloning and directly use &[usize].
-    // At least, if value used immediately, and not stored for latter use. 
-    level_indices: ConstArrayType<usize, <IterItem<Iter> as HibitTree>::LevelCount>,
+    hi_index: HierarchyIndex<
+        <IterItem<Iter> as HibitTree>::LevelMask,
+        <IterItem<Iter> as HibitTree>::LevelCount,
+    >,
 }
 impl<'item, Iter, T> Iterator for DataUnchecked<Iter>
 where
@@ -89,7 +87,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.find_map(|array|{
             unsafe{
-                array.data(self.index, self.level_indices.as_ref())
+                array.data(&self.hi_index)
             }
         })
     }
@@ -102,7 +100,7 @@ where
     {
         for array in self.iter {
             unsafe{
-                if let Some(item) = array.data(self.index, self.level_indices.as_ref()){
+                if let Some(item) = array.data(&self.hi_index){
                     init = f(init, item)    
                 }
             }

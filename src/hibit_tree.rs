@@ -1,10 +1,9 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::RangeTo;
-use crate::{multi_map_fold, BitBlock};
+use crate::{multi_map_fold, BitBlock, HierarchyIndex};
 use crate::const_utils::{ConstArray, ConstInteger};
 use crate::iter::Iter;
-use crate::level_indices;
 use crate::ops::{Map, MapFunction, MultiMapFold};
 use crate::utils::{BinaryFunction, Borrowable, NullaryFunction};
 
@@ -78,7 +77,7 @@ for
     }
 }
 
-/// SparseHierarchyIndex -> usize 
+/// Index -> usize 
 impl<LevelMaskType: BitBlock, LevelCount: ConstInteger> 
     From<Index<LevelMaskType, LevelCount>>
 for 
@@ -90,6 +89,7 @@ for
     }
 }
 
+/// [HibitTree] lifetime-dependent types.
 pub trait HibitTreeTypes<'this, ImplicitBounds = &'this Self>{
     type Data;
     type DataUnchecked;
@@ -163,9 +163,10 @@ where
     /// 
     /// [^1]: It is not just `[usize; LevelCount::VALUE]` due to troublesome 
     ///       Rust const expressions in generic context. 
-    unsafe fn data(&self, index: usize, level_indices: &[usize]) 
+    fn data(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
         -> Option<<Self as HibitTreeTypes<'_>>::Data>;
  
+    // TODO: try pass HierarchyIndex by value
     /// # Safety
     /// 
     /// pointed element must exist, and `level_indices` must
@@ -177,7 +178,7 @@ where
     /// 
     /// [^1]: It is not just `[usize; LevelCount::VALUE]` due to troublesome 
     ///       Rust const expressions in generic context. 
-    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
+    unsafe fn data_unchecked(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
         -> <Self as HibitTreeTypes<'_>>::DataUnchecked;
     
     #[inline]
@@ -190,9 +191,8 @@ where
     fn get(&self, index: impl Into<Index<<Self as HibitTree>::LevelMask, Self::LevelCount>>) 
         -> Option<<Self as HibitTreeTypes<'_>>::Data> 
     {
-        let index: usize = index.into().into();
-        let indices = level_indices::<Self::LevelMask, Self::LevelCount>(index);
-        unsafe{ self.data(index, indices.as_ref()) }
+        let index = HierarchyIndex::from(index.into());
+        self.data(&index)
     }
 
     /// # Safety
@@ -202,8 +202,8 @@ where
     unsafe fn get_unchecked(&self, index: usize) 
         -> <Self as HibitTreeTypes<'_>>::DataUnchecked 
     {
-        let indices = level_indices::<Self::LevelMask, Self::LevelCount>(index);
-        self.data_unchecked(index, indices.as_ref())
+        let index = HierarchyIndex::from(Index::new_unchecked(index));
+        self.data_unchecked(&index)
     }
     
     /// Index range this SparseHierarchy can handle - `0..width^depth`.
@@ -237,6 +237,7 @@ pub trait FromHibitTree<From: HibitTree> {
     fn from_sparse_hierarchy(from: From) -> Self;
 }
 
+/// [HibitTreeCursor] lifetime-dependent types.
 pub trait HibitTreeCursorTypes<'this, ImplicitBounds = &'this Self>{
     type Data;
     // Looks like we don't need DataUnchecked in State yet.
@@ -320,9 +321,15 @@ where
     ) -> <Self as HibitTreeCursorTypes<'a>>::Data;        
 }
 
+/// [HibitTree]::Data
 pub type HibitTreeData<'a, T> = <T as HibitTreeTypes<'a>>::Data;
+/// [MultiHibitTree]::Data
 pub type MultiHibitTreeIterItem<'a, T> = <T as MultiHibitTreeTypes<'a>>::IterItem;
 
+/// [RegularHibitTree] lifetime-dependent types.
+/// 
+/// This is actually requirement/bound for [HibitTreeTypes], that all
+/// Data types are the same.  
 pub trait RegularHibitTreeTypes<'this, ImplicitBounds = &'this Self>
     : HibitTreeTypes<'this, ImplicitBounds,
         DataUnchecked = <Self as HibitTreeTypes<'this, ImplicitBounds>>::Data, 
@@ -332,7 +339,12 @@ pub trait RegularHibitTreeTypes<'this, ImplicitBounds = &'this Self>
     >
 {}
 
-/// [HibitTree] where all access functions return [HibitTreeData].
+/// [HibitTree] where all Data types are the same.
+/// [Data] = [DataUnchecked] = [Cursor::Data].
+/// 
+/// [Data]: HibitTreeTypes::Data
+/// [DataUnchecked]: HibitTreeTypes::DataUnchecked
+/// [Cursor::Data]: HibitTreeCursorTypes::Data
 /// 
 /// Think of it as "the usual" [HibitTree].
 /// 
@@ -377,6 +389,10 @@ where
     T: for<'this> RegularHibitTreeTypes<'this>
 {}
 
+/// [MultiHibitTree] lifetime-dependent types. 
+/// 
+/// This is actually requirement/bound for [HibitTreeTypes], that all
+/// Data types implement .
 pub trait MultiHibitTreeTypes<'this, ImplicitBounds = &'this Self>
     : HibitTreeTypes<'this, ImplicitBounds, 
         Data: Iterator<Item=Self::IterItem>,
@@ -386,10 +402,11 @@ pub trait MultiHibitTreeTypes<'this, ImplicitBounds = &'this Self>
         >,
     >
 {
+    /// [Iterator::Item] of all Data types: [Data], [DataUnchecked], [Cursor::Data]. 
     type IterItem;
 }
 
-/// [HibitTree], where all access functions return `impl Iterator<Self::IterItem>`.
+/// [HibitTree], where all Data types are `Iterator<Self::IterItem>`.
 /// 
 /// `multi_*` operations return [MultiHibitTree]'ies.
 /// 

@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::BitAnd;
 use crate::const_utils::{ConstArray, ConstInteger};
-use crate::{LazyHibitTree, RegularHibitTree, HibitTreeCursorTypes, HibitTreeTypes};
+use crate::{LazyHibitTree, RegularHibitTree, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex};
 use crate::hibit_tree::{HibitTree, HibitTreeCursor};
 use crate::utils::{Borrowable};
 
@@ -46,23 +46,25 @@ where
     type LevelMask  = <S0::Borrowed as HibitTree>::LevelMask;
 
     #[inline]
-    unsafe fn data(&self, index: usize, level_indices: &[usize]) 
+    fn data(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
         -> Option<<Self as HibitTreeTypes<'_>>::Data> 
     {
-        let d0 = self.s0.borrow().data(index, level_indices);
-        let d1 = self.s1.borrow().data(index, level_indices);
+        let d0 = self.s0.borrow().data(index);
+        let d1 = self.s1.borrow().data(index);
         if d0.is_none() | d1.is_none(){
             return None;
         }
-        Some((d0.unwrap_unchecked(), d1.unwrap_unchecked()))
+        unsafe{
+            Some((d0.unwrap_unchecked(), d1.unwrap_unchecked()))
+        }
     }
 
     #[inline]
-    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
+    unsafe fn data_unchecked(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
         -> <Self as HibitTreeTypes<'_>>::DataUnchecked
     {
-        let d0 = self.s0.borrow().data_unchecked(index, level_indices);
-        let d1 = self.s1.borrow().data_unchecked(index, level_indices);
+        let d0 = self.s0.borrow().data_unchecked(index);
+        let d1 = self.s1.borrow().data_unchecked(index);
         (d0, d1)
     }
 }

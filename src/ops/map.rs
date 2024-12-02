@@ -1,6 +1,6 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
-use crate::{LazyHibitTree, RegularHibitTree, HibitTree, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes};
+use crate::{LazyHibitTree, RegularHibitTree, HibitTree, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex};
 use crate::const_utils::ConstInteger;
 use crate::utils::{Borrowable, UnaryFunction};
 
@@ -53,10 +53,10 @@ where
     type LevelMask  = <S::Borrowed as HibitTree>::LevelMask;
 
     #[inline]
-    unsafe fn data(&self, index: usize, level_indices: &[usize]) 
+    fn data(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
         -> Option<<Self as HibitTreeTypes<'_>>::Data> 
     {
-        let data = self.s.borrow().data(index, level_indices);
+        let data = self.s.borrow().data(index);
         if let Some(data) = data {
             Some( self.f.exec(data) )
         } else {
@@ -65,10 +65,10 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
+    unsafe fn data_unchecked(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
         -> <Self as HibitTreeTypes<'_>>::DataUnchecked 
     {
-        let data = self.s.borrow().data_unchecked(index, level_indices);
+        let data = self.s.borrow().data_unchecked(index);
         self.f.exec(data)
     }
 }

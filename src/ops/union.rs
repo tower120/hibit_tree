@@ -3,7 +3,7 @@ use std::borrow::Borrow;
 use std::ops::{BitAnd, BitOr};
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
 use crate::hibit_tree::{HibitTree, HibitTreeCursor};
-use crate::{BitBlock, LazyHibitTree, HibitTreeCursorTypes, HibitTreeTypes};
+use crate::{BitBlock, LazyHibitTree, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex};
 use crate::bit_queue::BitQueue;
 use crate::utils::{Array, Borrowable};
 
@@ -46,11 +46,11 @@ where
     type LevelMask  = <S0::Borrowed as HibitTree>::LevelMask;
 
     #[inline]
-    unsafe fn data(&self, index: usize, level_indices: &[usize]) 
+    fn data(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
         -> Option<<Self as HibitTreeTypes<'_>>::Data> 
     {
-        let d0 = self.s0.borrow().data(index, level_indices);
-        let d1 = self.s1.borrow().data(index, level_indices);
+        let d0 = self.s0.borrow().data(index);
+        let d1 = self.s1.borrow().data(index);
         if d0.is_none() & d1.is_none(){
             None
         } else {
@@ -59,10 +59,10 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
+    unsafe fn data_unchecked(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
         -> <Self as HibitTreeTypes<'_>>::Data
     {
-        self.data(index, level_indices).unwrap_unchecked()
+        self.data(index).unwrap_unchecked()
     }
 }
 

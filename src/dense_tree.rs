@@ -12,7 +12,7 @@ mod node;
 
 use std::{mem, ptr};
 use std::marker::PhantomData;
-use crate::{BitBlock, Index, HibitTreeCursorTypes, HibitTreeTypes};
+use crate::{BitBlock, Index, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex};
 use crate::bit_queue::BitQueue;
 use crate::const_utils::{const_loop, ConstArray, ConstArrayType, ConstBool, ConstFalse, ConstInteger, ConstTrue, ConstUsize};
 use crate::level_indices;
@@ -362,26 +362,28 @@ where
     type LevelMask = Mask;
     
     #[inline]
-    unsafe fn data(&self, index: usize, level_indices: &[usize]) 
+    fn data(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
         -> Option<&T> 
     {
-        let (node, inner_index) = self.get_terminal_node(level_indices);
+    unsafe{
+        let (node, inner_index) = self.get_terminal_node(index.level_indices.as_ref());
         // point to SOME valid item
         let data_index = node.get_child::<DataIndex>(inner_index).as_usize();
 
         // The element may be wrong thou, so we check its index.
-        if *self.keys.get_unchecked(data_index) == index {
+        if *self.keys.get_unchecked(data_index) == index.index {
             Some(self.data.get_unchecked(data_index))
         } else {
             None
         }
     }
+    }
 
     #[inline]
-    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
+    unsafe fn data_unchecked(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
         -> &T 
     {
-        self.data(index, level_indices).unwrap_unchecked()
+        self.data(index).unwrap_unchecked()
     }
 }
 

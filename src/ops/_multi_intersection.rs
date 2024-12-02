@@ -4,7 +4,7 @@ use std::mem::MaybeUninit;
 use std::ptr::NonNull;
 use std::slice;
 use arrayvec::ArrayVec;
-use crate::{BitBlock, LazyHibitTree, RegularHibitTree, MultiHibitTree, MultiHibitTreeTypes, HibitTreeData, HibitTreeCursorTypes, HibitTreeTypes};
+use crate::{BitBlock, LazyHibitTree, RegularHibitTree, MultiHibitTree, MultiHibitTreeTypes, HibitTreeData, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex};
 use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
 use crate::hibit_tree::{HibitTree, HibitTreeCursor};
 use crate::utils::{Array, Borrowable, Ref};
@@ -40,7 +40,7 @@ where
     type LevelMask  = T::LevelMask;
 
     #[inline]
-    unsafe fn data(&self, index: usize, level_indices: &[usize]) 
+    fn data(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
         -> Option<<Self as HibitTreeTypes<'_>>::Data> 
     {
         // There are few ways to do it:
@@ -91,20 +91,8 @@ where
         // But no "special cases" from user perspective.
         {
             let mut datas: ArrayVec<_, N> = Default::default();
-            for array in self.iter.clone(){
-                // TODO: This is only OK, if:
-                //
-                //     SparseHierarchy<Data:'static>
-                //     ||
-                //     Iterator<Item = &impl SparseHierarchy>
-                //
-                //  Or just accept only Iterator<Item = &impl SparseHierarchy> instead of Borrowable
-                
-                // TODO: AS-IS this is wrong, if self.iter returns arrays as values,
-                //       while array.data() contains pointer/reference to array.
-                //
-                let array = NonNull::from(array.borrow()); // drop borrow lifetime
-                let data = unsafe{ array.as_ref().data(index, level_indices) };
+            for container in self.iter.clone(){
+                let data = unsafe{ container.borrow().data(index) };
                 if let Some(data) = data{
                     datas.push(data);
                 } else {
@@ -140,12 +128,11 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked<'a>(&'a self, index: usize, level_indices: &'a [usize]) 
-        -> <Self as HibitTreeTypes<'a>>::DataUnchecked
+    unsafe fn data_unchecked(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
+        -> <Self as HibitTreeTypes<'_>>::DataUnchecked
     {
         DataUnchecked {
-            index, 
-            level_indices: Array::from_fn(|i| unsafe{ *level_indices.get_unchecked(i) }), 
+            hi_index: index.clone(), 
             iter: self.iter.clone(),
         }
     }
@@ -268,11 +255,10 @@ pub struct DataUnchecked<Iter>
 where
     Iter: Iterator<Item: Ref<Type: HibitTree>>,
 {
-    index: usize, 
-    // This is copy from level_indices &[usize]. 
-    // Compiler optimize away the very act of cloning and directly use &[usize].
-    // At least, if value used immediately, and not stored for latter use. 
-    level_indices: ConstArrayType<usize, <IterItem<Iter> as HibitTree>::LevelCount>,
+    hi_index: HierarchyIndex<
+        <IterItem<Iter> as HibitTree>::LevelMask,
+        <IterItem<Iter> as HibitTree>::LevelCount,
+    >,
     iter: Iter,
 }
 impl<'item, Iter, T> Iterator for DataUnchecked<Iter>
@@ -287,7 +273,7 @@ where
         self.iter
             .next()
             .map(|array| unsafe {
-                array.data_unchecked(self.index, self.level_indices.as_ref())
+                array.data_unchecked(&self.hi_index)
             })
     }
 
@@ -298,7 +284,7 @@ where
         F: FnMut(B, Self::Item) -> B,
     {
         self.iter.fold(init, |init, array| unsafe {
-            let data = array.data_unchecked(self.index, self.level_indices.as_ref());
+            let data = array.data_unchecked(&self.hi_index);
             f(init, data)
         })
     }

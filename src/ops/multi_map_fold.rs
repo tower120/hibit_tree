@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use crate::{LazyHibitTree, MultiHibitTree, MultiHibitTreeTypes, HibitTree, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes, RegularHibitTree};
+use crate::{LazyHibitTree, MultiHibitTree, MultiHibitTreeTypes, HibitTree, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes, RegularHibitTree, HierarchyIndex};
 use crate::const_utils::ConstInteger;
 use crate::utils::{BinaryFunction, Borrowable, NullaryFunction, UnaryFunction};
 
@@ -39,10 +39,10 @@ where
     type LevelMask = S::LevelMask;
 
     #[inline]
-    unsafe fn data(&self, index: usize, level_indices: &[usize]) 
+    fn data(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
         -> Option<<Self as HibitTreeTypes<'_>>::Data> 
     {
-        if let Some(data_iter) = self.s.data(index, level_indices) {
+        if let Some(data_iter) = self.s.data(index) {
             let init = self.init.exec();
             let out = data_iter.fold(init, |init, data| self.f.exec(init, data) );
             Some(out)
@@ -52,10 +52,10 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) 
+    unsafe fn data_unchecked(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
         -> <Self as HibitTreeTypes<'_>>::DataUnchecked 
     {
-        let data_iter = self.s.data_unchecked(index, level_indices);
+        let data_iter = self.s.data_unchecked(index);
         let init = self.init.exec();
         let out = data_iter.fold(init, |init, data| self.f.exec(init, data) );
         out

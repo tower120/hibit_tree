@@ -10,7 +10,7 @@ use crate::level::ILevel;
 use crate::const_utils::const_int::{ConstInteger, ConstIntVisitor, ConstUsize};
 use crate::const_utils::const_array::{ConstArray, ConstArrayType, ConstCopyArrayType};
 use crate::const_utils::{const_loop, ConstBool, ConstFalse, ConstTrue};
-use crate::{Empty, Index, HibitTreeCursorTypes, HibitTreeTypes};
+use crate::{Empty, Index, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex};
 use crate::req_default::{DefaultInit, DefaultInitFor, DefaultRequirement, ReqDefault};
 use crate::utils::Primitive;
 use crate::utils::Array;
@@ -612,19 +612,21 @@ where
     }*/    
 
     #[inline]
-    unsafe fn data(&self, index: usize, level_indices: &[usize]) -> Option<&Data> {
-        let data_block_index = self.fetch_block_index(level_indices);
+    fn data(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>) -> Option<&Data> {
+    unsafe{
+        let data_block_index = self.fetch_block_index(index.level_indices.as_ref());
         if data_block_index == 0 {
             None
         } else {
             Some( self.values.get_unchecked(data_block_index) )    
         }
     }
+    }
 
     // This is also data_or_default
     #[inline]
-    unsafe fn data_unchecked(&self, index: usize, level_indices: &[usize]) -> &Data {
-        self.data(index, level_indices).unwrap_unchecked()
+    unsafe fn data_unchecked(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>) -> &Data {
+        self.data(index).unwrap_unchecked()
         /*let data_block_index = self.fetch_block_index(level_indices);
         self.values.get_unchecked(data_block_index)*/
     }

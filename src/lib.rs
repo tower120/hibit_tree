@@ -164,6 +164,7 @@ pub use ops::_multi_intersection::multi_intersection;
 pub use ops::_multi_union::multi_union;
 
 use std::borrow::Borrow;
+use std::marker::PhantomData;
 use std::ops::BitAnd;
 use const_utils::const_int::{ConstInteger, ConstIntVisitor};
 use utils::Primitive;
@@ -215,7 +216,26 @@ pub(crate) fn data_block_index<LevelCount: ConstInteger, LevelMaskType: BitBlock
     acc
 }
 
-// TODO: make public
+#[derive(Clone)]
+pub struct HierarchyIndex<LevelMask: BitBlock, LevelsCount: ConstInteger> {
+    pub(crate) index: usize,
+    // TODO: try smaller u32,u16 or u8
+    pub(crate) level_indices: ConstCopyArrayType<usize, LevelsCount>,
+    phantom_data : PhantomData<(LevelMask, LevelsCount)>
+} 
+
+impl<LevelMask: BitBlock, LevelsCount: ConstInteger> From<Index<LevelMask, LevelsCount>> for
+    HierarchyIndex<LevelMask, LevelsCount>
+{
+    #[inline]
+    fn from(index: Index<LevelMask, LevelsCount>) -> Self {
+        let index: usize = index.into();
+        let level_indices = level_indices::<LevelMask, LevelsCount>(index);
+        Self{ index, level_indices, phantom_data: PhantomData }
+    }
+}
+
+// TODO: hide completely
 // Compile-time loop inside. Ends up with N (AND + SHR)s.
 #[inline]
 pub(crate) fn level_indices<LevelMask, LevelsCount>(index: usize)
@@ -224,11 +244,11 @@ where
     LevelMask: BitBlock,
     LevelsCount: ConstInteger,
 {
-    // TODO: need uninit?
     let mut level_indices = ConstCopyArrayType::<usize, LevelsCount>::from_fn(|_|0);
     
     let mut level_remainder = index;
     let level_count = LevelsCount::VALUE;
+    // TODO: const_for?
     for level in 0..level_count - 1 {
         // LevelMask::SIZE * 2^(level_count - level - 1)
         let level_capacity_exp = LevelMask::SIZE.ilog2() as usize * (level_count - level - 1);
