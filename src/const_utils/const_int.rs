@@ -6,6 +6,7 @@ use crate::const_utils::const_bool::{ConstBool, ConstTrue, ConstFalse};
 use crate::const_utils::const_array::{ConstArray};
 use crate::utils::Array;
 
+// TODO: consider removing visiting machinery over ConstInt. We have const_for now.
 pub trait ConstIntVisitor {
     type Out;
     fn visit<I: ConstInteger>(&mut self, i: I) -> ControlFlow<Self::Out>;
@@ -101,12 +102,12 @@ pub trait ConstInteger: ConstIntegerPrivate + Default + Copy + Eq + Debug + 'sta
     }
     
     /// [T; Self::N]
-    type SelfSizeArray<T>: ConstArray<Item=T, Cap=Self>;
+    type ArrayOf<T>: ConstArray<Item=T, Cap=Self>;
     
-    /// Same as [Self::SelfSizeArray], but with additional type bounds.
+    /// Same as [Self::ArrayOf], but with additional type bounds.
     /// 
-    /// N.B. We can't **just** forward Copy for SelfSizeArray if T: Copy in Rust.
-    type SelfSizeCopyArray<T: Copy>: ConstArray<Item=T, Cap=Self, DecArray:Copy> + Copy;
+    /// N.B. We can't **just** forward Copy for ArrayOf if T: Copy in Rust.
+    type CopyArrayOf<T: Copy>: ConstArray<Item=T, Cap=Self, DecArray:Copy> + Copy;
     
     /*type IsZero: BoolType;
     fn is_zero(self) -> Self::IsZero{
@@ -157,8 +158,8 @@ macro_rules! gen_const_int {
             type Dec    = ConstIntInvalid;
             type SatDec = ConstUsize<{$i}>;
             type Inc = ConstUsize<{$i+1}>;
-            type SelfSizeArray<T> = [T; $i];
-            type SelfSizeCopyArray<T: Copy> = [T; $i];
+            type ArrayOf<T> = [T; $i];
+            type CopyArrayOf<T: Copy> = [T; $i];
 
             //type IsZero = TrueType;
         }
@@ -172,8 +173,8 @@ macro_rules! gen_const_int {
             type Dec    = ConstUsize<{$i-1}>;
             type SatDec = ConstUsize<{$i-1}>;
             type Inc = ConstUsize<{$i+1}>;
-            type SelfSizeArray<T> = [T; $i];
-            type SelfSizeCopyArray<T: Copy> = [T; $i];
+            type ArrayOf<T> = [T; $i];
+            type CopyArrayOf<T: Copy> = [T; $i];
             
             //type IsZero = FalseType;
         }
@@ -187,8 +188,8 @@ macro_rules! gen_const_int {
             type Dec    = ConstUsize<{$i-1}>;
             type SatDec = ConstUsize<{$i-1}>;
             type Inc = ConstIntInvalid;
-            type SelfSizeArray<T> = [T; $i];
-            type SelfSizeCopyArray<T: Copy> = [T; $i];
+            type ArrayOf<T> = [T; $i];
+            type CopyArrayOf<T: Copy> = [T; $i];
             
             //type IsZero = FalseType;
         }
@@ -207,6 +208,11 @@ macro_rules! gen_const_seq {
 
 gen_const_seq!(0,1,2,3,4,5,6,7,8;9);
 
+// TODO: gen_single
+gen_const_seq!(63,64;65);
+gen_const_seq!(127,128;129);
+gen_const_seq!(255,256;257);
+
 const MAX: usize = usize::MAX;
 impl ConstIntegerPrivate for ConstUsize<MAX> {}
 impl ConstInteger for ConstUsize<MAX>{ 
@@ -216,8 +222,8 @@ impl ConstInteger for ConstUsize<MAX>{
     type Dec    = ConstUsize<MAX>;
     type SatDec = ConstUsize<MAX>;
     type Inc = ConstUsize<MAX>;
-    type SelfSizeArray<T> = [T; MAX];
-    type SelfSizeCopyArray<T: Copy> = [T; MAX];
+    type ArrayOf<T> = [T; MAX];
+    type CopyArrayOf<T: Copy> = [T; MAX];
     
     //type IsZero = FalseType;
 }

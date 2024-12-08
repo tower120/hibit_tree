@@ -22,6 +22,8 @@ impl ConstBool for ConstTrue {
     type Conditional<T, F> = T;
     type ConditionalInt<T: ConstInteger, F: ConstInteger> = T;
 }
+pub trait IsConstTrue{}
+impl IsConstTrue for ConstTrue{}
 
 #[derive(Default, Clone, Copy)]
 pub struct ConstFalse;
@@ -30,6 +32,8 @@ impl ConstBool for ConstFalse {
     type Conditional<T, F> = F;
     type ConditionalInt<T: ConstInteger, F: ConstInteger> = F;
 }
+pub trait IsConstFalse{}
+impl IsConstFalse for ConstFalse{}
 
 #[cfg(test)]
 mod test{

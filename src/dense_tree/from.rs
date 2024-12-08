@@ -19,7 +19,7 @@ type CursorData<'src, 'state, L> =
 #[inline]
 fn block_start<S: HibitTree, N: ConstInteger>(index: usize) -> usize {
     index << (
-        <S as HibitTree>::LevelMask::SIZE.ilog2() as usize * 
+        <<S as HibitTree>::LevelMask as BitBlock>::Size::VALUE.ilog2() as usize * 
         (S::LevelCount::VALUE - N::VALUE - 1)
     )
 }
@@ -117,12 +117,12 @@ where
     }
     
     let mut node_mask = Mask::zero();
-    let mut childs: ArrayVec<NodePtr, {Mask::SIZE}> = Default::default(); 
+    let mut childs: ArrayVec<NodePtr, {<Mask as BitBlock>::Size::VALUE}> = Default::default(); 
     
     mask.traverse_bits(|index| {
         let key_acc = key_acc + block_start::<L, N>(index);
         if let Some(child_node) = from_sparse_hierarchy(other, other_cursor, n.inc(), index, key_acc, push_data){
-            node_mask.set_bit::<true>(index);
+            node_mask.set_bit_unchecked::<true>(index);
             childs.push_unchecked(child_node);
         }
         Continue(())

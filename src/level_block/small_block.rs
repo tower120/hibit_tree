@@ -3,6 +3,7 @@ use std::ops::{Deref, DerefMut};
 use std::ops::ControlFlow::Continue;
 use std::ptr;
 use crate::{BitBlock, Empty, MaybeEmptyIntrusive};
+use crate::const_utils::ConstInteger;
 use crate::level_block::HiBlock;
 use crate::utils::{Array, Primitive};
 
@@ -129,13 +130,13 @@ where
         -> Option<usize> 
     {
         let u64_index =
-            if Mask::SIZE == 64 {
+            if Mask::Size::VALUE == 64 {
                 0
             } else {
                 index / 64
             };
         let bit_index =
-            if Mask::SIZE == 64 {
+            if Mask::Size::VALUE == 64 {
                 index
             } else {
                 index % 64
@@ -231,12 +232,12 @@ where
                     ptr::write(p, MaybeUninit::new(value));
                 }
                 
-                for i in (index/64)+1..Mask::SIZE/64 {
+                for i in (index/64)+1..Mask::Size::VALUE/64 {
                     *mask_u64_populations.as_mut().get_unchecked_mut(i) += 1;
                 }
             }
         }
-        self.mask.set_bit::<true>(index);
+        self.mask.set_bit_unchecked::<true>(index);
     }      
 }
 
@@ -340,7 +341,7 @@ where
 
     #[inline]
     unsafe fn remove_unchecked(&mut self, index: usize) {
-        let prev = self.mask.set_bit::<false>(index);
+        let prev = self.mask.set_bit_unchecked::<false>(index);
         debug_assert!(prev);
         
         if self.big_small.is_big(){
@@ -357,7 +358,7 @@ where
                 ptr::copy(p.offset(1), p, len - inner_index);
             }
             
-            for i in (index/64)+1..Mask::SIZE/64 {
+            for i in (index/64)+1..Mask::Size::VALUE/64 {
                 *mask_u64_populations.as_mut().get_unchecked_mut(i) -= 1;
             }            
         }

@@ -6,10 +6,12 @@ pub struct ReqDefault<const B: bool = true>;
 pub trait DefaultRequirement{
     const REQUIRED: bool;
 }
-
 impl<const B: bool> DefaultRequirement for ReqDefault<B>{
     const REQUIRED: bool = B;
 } 
+
+pub trait IsReqDefault{}
+impl IsReqDefault for ReqDefault<true>{}
 
 pub(crate) trait DefaultInit {
     unsafe fn init_default(value: *mut u8);

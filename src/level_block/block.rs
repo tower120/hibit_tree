@@ -86,7 +86,7 @@ where
         if !block_index.is_zero(){
             (block_index, false)
         } else {
-            self.mask.set_bit::<true>(index);
+            self.mask.set_bit_unchecked::<true>(index);
             
             let block_index = f();
             *block_index_mut = block_index; 
@@ -100,13 +100,13 @@ where
         index: usize,
         item: Self::Item
     ) {
-        self.mask.set_bit::<true>(index);
+        self.mask.set_bit_unchecked::<true>(index);
         *self.block_indices.as_mut().get_unchecked_mut(index) = item; 
     }
 
     #[inline]
     unsafe fn remove_unchecked(&mut self, index: usize) {
-        self.mask.set_bit::<false>(index);
+        self.mask.set_bit_unchecked::<false>(index);
         *self.block_indices.as_mut().get_unchecked_mut(index) = Primitive::ZERO;
     }
 

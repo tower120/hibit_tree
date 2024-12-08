@@ -417,7 +417,7 @@ where
     unsafe fn data<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
         -> Option<<Self as HibitTreeCursorTypes<'a>>::Data> 
     {
-        if !self.terminal_node_mask.get_bit(level_index){
+        if !self.terminal_node_mask.get_bit_unchecked(level_index){
             return None;
         }
         

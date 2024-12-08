@@ -2,6 +2,7 @@ use std::mem;
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, ControlFlow};
 use crate::bit_queue::{ArrayBitQueue, BitQueue, EmptyBitQueue, PrimitiveBitQueue};
 use crate::bit_utils;
+use crate::const_utils::{ConstInteger, ConstUsize};
 use crate::utils::Array;
 
 pub trait BitBlock
@@ -15,7 +16,7 @@ pub trait BitBlock
     + Sized + Clone + 'static
 {
     /// Size in bits
-    const SIZE: usize;
+    type Size: ConstInteger;
     
     fn zero() -> Self;
     
@@ -26,9 +27,11 @@ pub trait BitBlock
     
     /// Returns previous bit
     /// 
-    /// `bit_index` is guaranteed to be valid
+    /// # Safety
+    /// 
+    /// `bit_index` must be < SIZE
     #[inline]
-    fn set_bit<const BIT: bool>(&mut self, bit_index: usize) -> bool {
+    unsafe fn set_bit_unchecked<const BIT: bool>(&mut self, bit_index: usize) -> bool {
         let array = self.as_array_mut().as_mut();
         if Self::Array::CAP == 1{
             unsafe{
@@ -41,9 +44,11 @@ pub trait BitBlock
         }
     }
 
-    /// `bit_index` is guaranteed to be valid
+    /// # Safety
+    /// 
+    /// `bit_index` must be < SIZE
     #[inline]
-    fn get_bit(&self, bit_index: usize) -> bool{
+    unsafe fn get_bit_unchecked(&self, bit_index: usize) -> bool {
         let array = self.as_array().as_ref();
         if Self::Array::CAP == 1{
             unsafe{
@@ -84,7 +89,7 @@ pub trait BitBlock
 }
 
 impl BitBlock for u64{
-    const SIZE: usize = 64;
+    type Size = ConstUsize<64>;
 
     fn zero() -> Self { 0 }
 
@@ -118,7 +123,7 @@ impl BitBlock for u64{
 #[cfg(feature = "simd")]
 #[cfg_attr(docsrs, doc(cfg(feature = "simd")))]
 impl BitBlock for wide::u64x2{
-    const SIZE: usize = 128;
+    type Size = ConstUsize<128>;
 
     #[inline]
     fn zero() -> Self {
@@ -157,7 +162,7 @@ impl BitBlock for wide::u64x2{
 #[cfg(feature = "simd")]
 #[cfg_attr(docsrs, doc(cfg(feature = "simd")))]
 impl BitBlock for wide::u64x4{
-    const SIZE: usize = 256;
+    type Size = ConstUsize<256>;
 
     #[inline]
     fn zero() -> Self {

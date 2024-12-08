@@ -71,7 +71,7 @@ for
     /// Panics if index is not in SparseHierarchy<LevelMaskType, LevelCount> range.
     #[inline]
     fn from(index: usize) -> Self {
-        let range_end = LevelMaskType::SIZE.saturating_pow(LevelCount::VALUE as _);
+        let range_end = LevelMaskType::Size::VALUE.saturating_pow(LevelCount::VALUE as _);
         assert!(index < range_end, "Index {index} is out of SparseHierarchy range.");
         unsafe{ Self::new_unchecked(index) }
     }
@@ -213,7 +213,9 @@ where
     /// Act as `const`.
     #[inline]
     /*const*/ fn index_range() -> RangeTo<usize> {
-        RangeTo{ end: Self::LevelMask::SIZE.pow(Self::LevelCount::VALUE as _) }
+        RangeTo{ 
+            end: <Self::LevelMask as BitBlock>::Size::VALUE.pow(Self::LevelCount::VALUE as _) 
+        }
     }
 }
 

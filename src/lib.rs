@@ -148,6 +148,7 @@ pub mod bit_queue;
 pub mod const_utils;
 pub mod utils;
 pub mod config;
+pub mod tree;
 
 //pub use ref_or_val::*;
 pub use bit_block::BitBlock;
@@ -211,7 +212,7 @@ pub(crate) fn data_block_index<LevelCount: ConstInteger, LevelMaskType: BitBlock
     let level_count = LevelCount::VALUE;
     let mut acc = data_index;
     for n in 0..level_count - 1 {
-        acc += level_indices.as_ref()[n] << (LevelMaskType::SIZE.ilog2() as usize * (level_count - n - 1));
+        acc += level_indices.as_ref()[n] << (LevelMaskType::Size::VALUE.ilog2() as usize * (level_count - n - 1));
     }
     acc
 }
@@ -219,7 +220,8 @@ pub(crate) fn data_block_index<LevelCount: ConstInteger, LevelMaskType: BitBlock
 #[derive(Clone)]
 pub struct HierarchyIndex<LevelMask: BitBlock, LevelsCount: ConstInteger> {
     pub(crate) index: usize,
-    // TODO: try smaller u32,u16 or u8
+    // We could use smaller index size, like u8. 
+    // But usize - show best performance so far.
     pub(crate) level_indices: ConstCopyArrayType<usize, LevelsCount>,
     phantom_data : PhantomData<(LevelMask, LevelsCount)>
 } 
@@ -232,6 +234,15 @@ impl<LevelMask: BitBlock, LevelsCount: ConstInteger> From<Index<LevelMask, Level
         let index: usize = index.into();
         let level_indices = level_indices::<LevelMask, LevelsCount>(index);
         Self{ index, level_indices, phantom_data: PhantomData }
+    }
+}
+impl<LevelMask: BitBlock, LevelsCount: ConstInteger> From<usize> for
+    HierarchyIndex<LevelMask, LevelsCount>
+{
+    #[inline]
+    fn from(index: usize) -> Self {
+        let index: Index<LevelMask, LevelsCount> = index.into();
+        Self::from(index)
     }
 }
 
@@ -251,7 +262,7 @@ where
     // TODO: const_for?
     for level in 0..level_count - 1 {
         // LevelMask::SIZE * 2^(level_count - level - 1)
-        let level_capacity_exp = LevelMask::SIZE.ilog2() as usize * (level_count - level - 1);
+        let level_capacity_exp = LevelMask::Size::VALUE.ilog2() as usize * (level_count - level - 1);
         let level_capacity = 1 << level_capacity_exp;
         
         // level_remainder / level_capacity_exp
