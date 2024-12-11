@@ -1,4 +1,4 @@
-#![feature(closure_lifetime_binder)]
+//#![feature(closure_lifetime_binder)]
 
 use itertools::assert_equal;
 use rand::{Rng, SeedableRng};
