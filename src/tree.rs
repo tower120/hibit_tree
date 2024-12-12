@@ -228,6 +228,8 @@ where
 
 #[cfg(test)]
 mod test{
+    use ahash::{HashMap, HashSet};
+    use rand::{Rng, SeedableRng};
     use crate::tree::{Config64bit, Tree};
 
     #[test]
@@ -236,8 +238,42 @@ mod test{
         tree.insert(1, 1);
         tree.insert(1, 1);
         
-        assert_eq!(tree.get_mut(1), Some(&mut 1));
-        assert_eq!(tree.get_mut(0), None);
-        assert_eq!(tree.get_mut(4000), None);
+        assert_eq!(tree.get/*_mut*/(1), Some(&/*mut*/ 1));
+        assert_eq!(tree.get/*_mut*/(0), None);
+        assert_eq!(tree.get/*_mut*/(4000), None);
+    }
+    
+    #[test]
+    fn fuzzy_read_test(){
+        const REPEATS: usize = 100;
+        const RANGE  : usize = 10000;
+        const MAX_INSERTS: usize = 10000;
+        const MAX_READS  : usize = 10000;
+        
+        let mut rng = rand::rngs::StdRng::seed_from_u64(0xe15bb9db3dee3a0f);
+        
+        for _ in 0..REPEATS {
+            let mut array: Tree<usize, Config64bit<3>> = Tree::new();
+            let mut set  : HashMap<usize, usize> = Default::default();
+            for _ in 0..rng.gen_range(0..MAX_INSERTS){
+                let v = rng.gen_range(0..RANGE);
+                array.insert(v, v);
+                set.insert(v, v);
+            }
+            
+            // random read
+            for _ in 0..rng.gen_range(0..MAX_READS){
+                let i = rng.gen_range(0..RANGE);
+                let a = array.get(i); 
+                let s = set.get(&i);
+                assert_eq!(a,s);
+            }
+            
+            // read existent
+            for (i, v) in set {
+                let a = array.get(i);
+                assert_eq!(a, Some(&v));
+            }
+        }
     }
 }
