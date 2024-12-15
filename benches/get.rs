@@ -37,7 +37,7 @@ type CompactArray = DenseTree<DataBlock, 5>;
 //type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>, IntrusiveListLevel<Lvl2Block>), DataBlock>;
 type BlockArray = SparseTree<config::width_64::depth_3, DataBlock>;
 type BlockArrayNew = Tree<DataBlock, Config64bit<3>, ReqDefault>;
-type BlockArrayNew2 = tree2::Tree<DataBlock, tree2::Config64bit<3>>;
+type BlockArrayNew2 = tree2::Tree<DataBlock, tree2::Config64bit<3>, ReqDefault>;
 
 //type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<CompactLvl1Block>, IntrusiveListLevel<CompactLvl2Block>), DataBlock>;
 //type SmallBlockArray = SparseArray<config::sbo::width_64::depth_6, DataBlock>;
@@ -93,13 +93,13 @@ fn array_new_get(array: &BlockArrayNew, indices: &[usize]) -> u64 {
     s
 }
 
-fn array_new_get2(array: &mut BlockArrayNew2, indices: &[usize]) -> u64 {
+fn array_new_get2(array: &BlockArrayNew2, indices: &[usize]) -> u64 {
     let mut s = 0;
     for &i in indices{
         unsafe{
-        s += array.get_mut(Index::new_unchecked(i))
-            .unwrap_or(&mut DataBlock(0)).0;
-         //s += array.get_or_default(Index::new_unchecked(i)).0;            
+        /*s += array.get(Index::new_unchecked(i))
+            .unwrap_or(&mut DataBlock(0)).0;*/
+        s += array.get_or_default(Index::new_unchecked(i)).0;            
         }
     }
     s
@@ -156,7 +156,7 @@ pub fn bench_iter(c: &mut Criterion) {
     }*/
     random_indices.shuffle(&mut rng);
 
-    c.bench_function("new array2", |b| b.iter(|| array_new_get2(black_box(&mut new_array2), black_box(&random_indices))));
+    c.bench_function("new array2", |b| b.iter(|| array_new_get2(black_box(&new_array2), black_box(&random_indices))));
     c.bench_function("new array", |b| b.iter(|| array_new_get(black_box(&new_array), black_box(&random_indices))));
     c.bench_function("level_block array", |b| b.iter(|| array_get(black_box(&block_array), black_box(&random_indices))));
     c.bench_function("compact array", |b| b.iter(|| compact_array_get(black_box(&compact_array), black_box(&random_indices))));

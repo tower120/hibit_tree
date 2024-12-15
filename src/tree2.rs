@@ -1,9 +1,11 @@
 use std::alloc::{alloc, dealloc, realloc, Layout};
 use std::marker::PhantomData;
 use std::{cmp, mem, ptr};
-use std::ptr::{addr_of_mut, NonNull};
-use crate::{BitBlock, HierarchyIndex};
+use std::ptr::{addr_of_mut, null, NonNull};
+use crate::{BitBlock, HierarchyIndex, ReqDefault};
 use crate::const_utils::{const_loop, ArrayOf, ConstInteger, ConstUsize};
+use crate::req_default::{MakeDefault, DefaultInitFor, MakeDefaultFor, DefaultRequirement, IsReqDefault};
+use crate::utils::Array;
 
 pub trait Config {
     type Mask: BitBlock;
@@ -55,9 +57,17 @@ impl<T, Conf:Config> BlockHeader<T, Conf>{
     }
 }
 
-/// Owning ptr
-// TODO: rename to just Block?
+// TODO: Try everything with self instead of &self
 struct BlockPtr<T, Conf:Config>(NonNull<BlockHeader<T, Conf>>);
+
+impl<T, Conf:Config> Clone for BlockPtr<T, Conf>{
+    #[inline]
+    fn clone(&self) -> Self {
+        Self(self.0)
+    }
+}
+impl<T, Conf:Config> Copy for BlockPtr<T, Conf>{}
+
 impl<T, Conf:Config> BlockPtr<T, Conf>{
     #[inline]
     fn layout(cap: u8, childs_type: ChildsType) -> Layout {
@@ -91,6 +101,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
             let block = alloc(layout) as *mut BlockHeader<T, Conf>;
             
             addr_of_mut!((*block).mask).write(BitBlock::zero());
+            addr_of_mut!((*block).child_indices).write_bytes(0, 1);
             addr_of_mut!((*block).len).write(0);
             addr_of_mut!((*block).cap).write(cap);
             addr_of_mut!((*block).childs_type).write(childs_type);
@@ -100,7 +111,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
     }
     
     #[inline]
-    /*const*/ fn children_ptr_mut(&mut self, child_align: usize) -> *mut u8 {
+    /*const*/ fn children_ptr(&self, child_align: usize) -> *mut u8 {
         let ptr = self.0.as_ptr() as *mut u8;
         unsafe{
             ptr.add(BlockHeader::<T, Conf>::children_addr_offset(child_align))
@@ -115,7 +126,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         block.mask.clone().into_bits_iter()
             .map(move |i| unsafe {
                 let i = *block.child_indices.as_ref().get_unchecked(i) as usize;
-                &mut *self.children_ptr_mut(align_of::<V>()).cast::<V>().add(i)
+                &mut *self.children_ptr(align_of::<V>()).cast::<V>().add(i)
             })
     }    
     
@@ -123,7 +134,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
     unsafe fn push_within_capacity_unchecked<V>(&mut self, value: V) -> *mut V {
         let block = self.0.as_mut();
         debug_assert!(block.len < block.cap);
-        let ptr: *mut V = self.children_ptr_mut(align_of::<V>()).cast::<V>()
+        let ptr: *mut V = self.children_ptr(align_of::<V>()).cast::<V>()
                          .add(block.len as usize);
         ptr.write(value);
         block.len += 1;
@@ -184,7 +195,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         if let Ok(child) = this.as_mut().insert_impl(index, child){
             return child;
         }
-        this.as_mut().get_unchecked_mut::<V>(index)
+        &mut*this.as_mut().get_unchecked_ptr::<V>(index)
     }
     
     #[inline]
@@ -194,61 +205,139 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         child: V
     ) {
         if let Err(child) = self.insert_impl(index, ||child){
-            *self.get_unchecked_mut::<V>(index) = child();
+            *self.get_unchecked_ptr::<V>(index) = child();
         }
     }
     
+    /// For both mut and const scenarios.
     #[inline]
-    pub unsafe fn get_unchecked_mut<V> (
-        &mut self, 
+    pub unsafe fn get_unchecked_ptr<V> (
+        &self, 
         index: usize,
-    ) -> &mut V {
+    ) -> *mut V {
         let block = self.0.as_ref();
         let i = *block.child_indices.as_ref().get_unchecked(index);
-        &mut *self.children_ptr_mut(align_of::<V>()).cast::<V>().add(i as usize)
-    }     
+        self.children_ptr(align_of::<V>()).cast::<V>().add(i as usize)
+    }
 
     #[inline]
     pub unsafe fn have_child_unchecked(&self, index: usize) -> bool {
         let block = self.0.as_ref();
         block.mask.get_bit_unchecked(index)
-    }  
-}
-impl<T, Conf:Config> Drop for BlockPtr<T, Conf>{
-    fn drop(&mut self) {
-        unsafe{
-            let block = self.0.as_ref();
-            
-            // TODO: this switch can be compiletime
-            // 1. destruct children
-            match block.childs_type{
-                ChildsType::Blocks => {
-                    for child in self.children_iter_mut::<BlockPtr<T, Conf>>(){
-                        ptr::drop_in_place(child);
-                    }
-                }
-                ChildsType::DataBlocks => {
-                    for child in self.children_iter_mut::<T>(){
-                        ptr::drop_in_place(child);
-                    }
+    }
+    
+    /// Destructs each first child in "empty branch".
+    pub unsafe fn destruct_empty_block<R: DefaultRequirement>(&mut self){
+        let block = self.0.as_ref();
+        
+        // TODO: this switch can be compiletime
+        // 1. destruct children
+        match block.childs_type{
+            ChildsType::Blocks => {
+                let mut child = &mut *self.children_ptr(align_of::<BlockPtr<T, Conf>>()).cast::<BlockPtr<T, Conf>>();
+                child.destruct_empty_block::<R>();
+                ptr::drop_in_place(child);
+            }
+            ChildsType::DataBlocks => {
+                if R::REQUIRED {
+                    let child = &mut *self.children_ptr(align_of::<T>()).cast::<T>();
+                    ptr::drop_in_place(child);
                 }
             }
-            
-            // 2. Deallocate self
-            let layout = Self::layout(block.cap, block.childs_type);
-            dealloc(self.0.as_ptr().cast(), layout);
         }
+        
+        // 2. Deallocate self
+        let layout = Self::layout(block.cap, block.childs_type);
+        dealloc(self.0.as_ptr().cast(), layout);
+    }
+    
+    pub unsafe fn destruct(&mut self){
+        let block = self.0.as_ref();
+        
+        // TODO: this switch can be compiletime
+        // 1. destruct children
+        match block.childs_type{
+            ChildsType::Blocks => {
+                let mut iter = self.children_iter_mut::<BlockPtr<T, Conf>>();
+                for child in iter {
+                    child.destruct();
+                    ptr::drop_in_place(child);
+                }
+            }
+            ChildsType::DataBlocks => {
+                let mut iter = self.children_iter_mut::<T>();
+                for child in iter {
+                    ptr::drop_in_place(child);
+                }
+            }
+        }
+        
+        // 2. Deallocate self
+        let layout = Self::layout(block.cap, block.childs_type);
+        dealloc(self.0.as_ptr().cast(), layout);         
     }
 }
 
-pub struct Tree<T, Conf:Config>{
-    root: BlockPtr<T, Conf>
+type EmptyBranchBlocks<T, Conf: Config> = ArrayOf<BlockPtr<T, Conf>, /*<*/Conf::LevelCount/* as ConstInteger>::Inc*/>;
+
+
+pub struct Tree<T, Conf:Config, R: DefaultRequirement = ReqDefault<false>>{
+    root: BlockPtr<T, Conf>,
+    
+    // TODO: root level empty block never used - remove?
+    /// Sequence of empty blocks with child at pos 0.
+    /// This lets us have branchless get().
+    empty_branch_blocks: EmptyBranchBlocks<T, Conf>,
+    
+    phantom_data: PhantomData<R>
 }
 
-impl<T, Conf:Config> Tree<T, Conf>{
+impl<T, Conf:Config, R: DefaultRequirement> Tree<T, Conf, R>
+where
+    MakeDefaultFor<T, R>: MakeDefault<T>
+{
     pub fn new() -> Self{
+        // construct empty branch
+        let empty_branch_blocks: EmptyBranchBlocks<T, Conf> = {
+            let mut empty_branch_blocks = EmptyBranchBlocks::<T, Conf>::uninit_array();
+            // in reverse order - from terminal node to the root.
+            let mut block = BlockPtr::new(ChildsType::DataBlocks, 1);
+            if R::REQUIRED {
+                unsafe {
+                    block.push_within_capacity_unchecked(
+                        <MakeDefaultFor<T, R> as MakeDefault<T>>::make_default()
+                    );
+                }
+            }
+            empty_branch_blocks.as_mut()[Conf::LevelCount::VALUE-1].write(block);
+            for I in (0..Conf::LevelCount::VALUE-1).rev() {
+                let mut new_block = BlockPtr::new(ChildsType::Blocks, 1);
+                unsafe{
+                    new_block.push_within_capacity_unchecked(block);
+                }
+                block = new_block;
+                empty_branch_blocks.as_mut()[I].write(block);
+            }
+            unsafe{ Array::assume_init_array(empty_branch_blocks) }
+        };
+        
+        let mut root = BlockPtr::new(ChildsType::Blocks, 2 );
+        unsafe{
+            if <Conf::LevelCount as ConstInteger>::VALUE == 1 {
+                if R::REQUIRED {
+                    root.push_within_capacity_unchecked(
+                        <MakeDefaultFor<T, R> as MakeDefault<T>>::make_default()
+                    );
+                }                
+            } else {            
+                root.push_within_capacity_unchecked(empty_branch_blocks.as_ref()[1]);
+            }
+        }
+        
         Self{
-            root: BlockPtr::new(ChildsType::Blocks, 1 ),
+            root,
+            empty_branch_blocks,
+            phantom_data: PhantomData,
         }
     }
     
@@ -267,21 +356,21 @@ impl<T, Conf:Config> Tree<T, Conf>{
                     child_index, 
                     ||{
                         if I == Conf::LevelCount::VALUE-2 {
-                            /*if R::REQUIRED {
-                                let mut block = Block::with_capacity(ChildsType::DataBlocks, 2);
-                                <DefaultInitFor<T, R> as DefaultInit>::init_default(childs::as_mut_ptr(&mut block).cast());
-                                childs::set_len(&mut block, 1);
+                            if R::REQUIRED {
+                                let mut block = BlockPtr::new(ChildsType::DataBlocks, 2);
+                                unsafe {
+                                    block.push_within_capacity_unchecked(
+                                        <MakeDefaultFor<T, R> as MakeDefault<T>>::make_default()
+                                    );
+                                }
                                 block
                             } else {
-                                Block::with_capacity(ChildsType::DataBlocks, 1)
-                            }*/
-                            BlockPtr::new(ChildsType::DataBlocks, 1)
+                                BlockPtr::new(ChildsType::DataBlocks, 1)    
+                            }
                         } else {
-                            /*let empty_child = Self::make_empty_block::<{I+1}>(&self.empty_branch_block_childs);
-                            let mut block = Block::with_capacity(ChildsType::Blocks, 2);
-                            childs::push_within_capacity_unchecked(&mut block, empty_child);
-                            block*/
-                            BlockPtr::new(ChildsType::Blocks, 1)
+                            let mut block = BlockPtr::new(ChildsType::Blocks, 2);
+                            block.push_within_capacity_unchecked(self.empty_branch_blocks.as_ref()[I+1]);
+                            block
                         }
                     }
                 )
@@ -293,28 +382,53 @@ impl<T, Conf:Config> Tree<T, Conf>{
     }
     
     #[inline]
-    pub fn get_mut(&mut self, index: impl Into<HierarchyIndex<Conf::Mask, Conf::LevelCount>>) -> Option<&mut T> {
+    fn get_impl(&self, index: impl Into<HierarchyIndex<Conf::Mask, Conf::LevelCount>>) -> Option<*mut T> {
         let index = index.into();
-        let mut block = &mut self.root;
+        let mut block = self.root;
         const_loop!(I in 0..{Conf::LevelCount::VALUE-1} => {
             let child_index = index.level_indices.as_ref()[I];
-            block = unsafe {
-                if !block.have_child_unchecked(child_index) {
-                    return None;
-                }
-                block.get_unchecked_mut(child_index)
-            };
+            block = unsafe{ *block.get_unchecked_ptr(child_index) };
         });
         
         let child_index = index.level_indices.as_ref()[Conf::LevelCount::VALUE-1];
         unsafe{
             if block.have_child_unchecked(child_index) {
-                Some(block.get_unchecked_mut(child_index))
+                Some( block.get_unchecked_ptr(child_index) )
             } else {
                 None
             }
         }
     }    
+    
+    #[inline]
+    pub fn get_mut(&mut self, index: impl Into<HierarchyIndex<Conf::Mask, Conf::LevelCount>>) -> Option<&mut T> {
+        self.get_impl(index).map(|v| unsafe{ &mut *v })
+    }
+    
+    #[inline]
+    pub fn get(&self, index: impl Into<HierarchyIndex<Conf::Mask, Conf::LevelCount>>) -> Option<&T> {
+        self.get_impl(index).map(|v| unsafe{ &*v })
+    }    
+    
+    #[inline]
+    pub fn get_or_default(
+        &self, 
+        index: impl Into<HierarchyIndex<Conf::Mask, Conf::LevelCount>>
+    ) -> &T
+    where
+        R: IsReqDefault
+    {
+        unsafe{ self.get(index).unwrap_unchecked() }
+    }    
+    
+}
+impl<T, Conf: Config, R: DefaultRequirement> Drop for Tree<T, Conf, R> {
+    fn drop(&mut self) {
+        unsafe{
+            self.root.destruct();
+            self.empty_branch_blocks.as_mut()[0].destruct_empty_block::<R>();
+        }
+    }
 }
 
 #[cfg(test)]
@@ -327,7 +441,7 @@ mod test{
         tree.insert(0, 0);
         tree.insert(0, 0);
         assert_eq!(tree.get_mut(0), Some(&mut 0));
-        assert_eq!(tree.get_mut(1000), None);
+        assert_eq!(tree.get_mut(4000), None);
         
     }
 }

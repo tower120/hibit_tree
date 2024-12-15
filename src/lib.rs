@@ -1,3 +1,4 @@
+#![feature(maybe_uninit_array_assume_init)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 

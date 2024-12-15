@@ -1,4 +1,4 @@
-use std::array;
+use std::{array, mem};
 use std::mem::MaybeUninit;
 
 /// [Item; CAP]
@@ -17,6 +17,8 @@ pub trait Array
     /// Array of MaybeUninit items
     type UninitArray: Array<Item = MaybeUninit<Self::Item>>;
     fn uninit_array() -> Self::UninitArray;
+    
+    unsafe fn assume_init_array(uninit_array: Self::UninitArray) -> Self;
 }
 
 impl<T, const N: usize> Array for [T; N]{
@@ -35,6 +37,19 @@ impl<T, const N: usize> Array for [T; N]{
 
     #[inline]
     fn uninit_array() -> Self::UninitArray {
-        unsafe { MaybeUninit::<[MaybeUninit<T>; N]>::uninit().assume_init() }
+        [const { MaybeUninit::uninit() }; N]
+    }
+
+    #[inline]
+    unsafe fn assume_init_array(uninit_array: Self::UninitArray) -> Self {
+        MaybeUninit::array_assume_init(uninit_array)
+        
+        // Compiler SHOULD optimize away this copy.
+        // This should be just transmute, but compiler can't work with "dependently-sized types"
+        //mem::transmute_copy(&uninit_array)
+        /*mem::transmute::<
+            [MaybeUninit::<Self::Item>; N],
+            [Self::Item; N]
+        >(uninit_array)*/
     }
 }
