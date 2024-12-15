@@ -149,6 +149,7 @@ pub mod const_utils;
 pub mod utils;
 pub mod config;
 pub mod tree;
+pub mod tree2;
 
 //pub use ref_or_val::*;
 pub use bit_block::BitBlock;

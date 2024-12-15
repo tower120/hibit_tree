@@ -1,26 +1,20 @@
+//! get 50% existent, ~50% non-existent
+
 use std::collections::BTreeMap;
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
 use rand::{Rng, SeedableRng};
 use rand::seq::SliceRandom;
-use hibit_tree::{config, SparseTree, Index};
+use hibit_tree::{config, SparseTree, Index, ReqDefault, tree2};
 use hibit_tree::DenseTree;
 //use hi_sparse_array::level_block::{Block, ClusterBlock, SmallBlock};
 //use hi_sparse_array::Iter;
 //use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
 use hibit_tree::HibitTree;
 use hibit_tree::ops::multi_intersection::Data;
+use hibit_tree::tree::{Config128bit, Config256bit, Config64bit, Tree};
 
 const RANGE: usize = 260_000;
-const COUNT: usize = /*4000*/100;
-
-/*type Lvl0Block = Block<u64, [u8;64]>;
-type Lvl1Block = Block<u64, [u16;64]>;
-type Lvl2Block = Block<u64, [u32;64]>;
-
-type CompactLvl1Block = SmallBlock<u64, [u8;1], [u16;64], [u16;7]>;
-type CompactLvl2Block = SmallBlock<u64, [u8;1], [u32;64], [u32;7]>;
-
-type ClusterLvl1Block = ClusterBlock<u64, [u16;4], [u16;16]>;*/
+const COUNT: usize = 4000;
 
 #[derive(Default, Clone)]
 struct DataBlock(u64);
@@ -41,7 +35,9 @@ type BTree = BTreeMap<u32, DataBlock>;
 type CompactArray = DenseTree<DataBlock, 5>;
 
 //type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>, IntrusiveListLevel<Lvl2Block>), DataBlock>;
-type BlockArray = SparseTree<config::width_256::depth_4, DataBlock>;
+type BlockArray = SparseTree<config::width_64::depth_3, DataBlock>;
+type BlockArrayNew = Tree<DataBlock, Config64bit<3>, ReqDefault>;
+type BlockArrayNew2 = tree2::Tree<DataBlock, tree2::Config64bit<3>>;
 
 //type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<CompactLvl1Block>, IntrusiveListLevel<CompactLvl2Block>), DataBlock>;
 //type SmallBlockArray = SparseArray<config::sbo::width_64::depth_6, DataBlock>;
@@ -85,6 +81,30 @@ fn array_get(array: &BlockArray, indices: &[usize]) -> u64 {
     s
 }
 
+fn array_new_get(array: &BlockArrayNew, indices: &[usize]) -> u64 {
+    let mut s = 0;
+    for &i in indices{
+        unsafe{
+        s += array.get(Index::new_unchecked(i))
+            .unwrap_or(&DataBlock(0)).0;
+         //s += array.get_or_default(Index::new_unchecked(i)).0;            
+        }
+    }
+    s
+}
+
+fn array_new_get2(array: &mut BlockArrayNew2, indices: &[usize]) -> u64 {
+    let mut s = 0;
+    for &i in indices{
+        unsafe{
+        s += array.get_mut(Index::new_unchecked(i))
+            .unwrap_or(&mut DataBlock(0)).0;
+         //s += array.get_or_default(Index::new_unchecked(i)).0;            
+        }
+    }
+    s
+}
+
 fn hashmap_get(array: &Map, indices: &[usize]) -> u64 {
     let mut s = 0;
     for i in indices{
@@ -103,6 +123,8 @@ fn btree_get(array: &BTree, indices: &[usize]) -> u64 {
 
 
 pub fn bench_iter(c: &mut Criterion) {
+    let mut new_array = BlockArrayNew::new();
+    let mut new_array2 = BlockArrayNew2::new();
     let mut block_array = BlockArray::default();
     //let mut small_block_array = SmallBlockArray::default();
     let mut compact_array = CompactArray::default();
@@ -118,14 +140,24 @@ pub fn bench_iter(c: &mut Criterion) {
         random_indices.push(v);
         
         block_array.insert(v, DataBlock(v as _));
+        new_array.insert(v, DataBlock(v as _));
+        new_array2.insert(v, DataBlock(v as _));
         //*small_block_array.get_mut(v) = DataBlock(v as u64);
         *compact_array.get_or_insert(v)= DataBlock(v as u64);
         /* *cluster_block_array.get_or_insert(v) = DataBlock(v as u64);*/
         hashmap.insert(v as _, DataBlock(v as u64));
         btree.insert(v as _, DataBlock(v as u64));
     }
+    
+    // add 100% random as well
+    /*for _ in 0..COUNT {
+        let v = rng.gen_range(0..RANGE);
+        random_indices.push(v);
+    }*/
     random_indices.shuffle(&mut rng);
 
+    c.bench_function("new array2", |b| b.iter(|| array_new_get2(black_box(&mut new_array2), black_box(&random_indices))));
+    c.bench_function("new array", |b| b.iter(|| array_new_get(black_box(&new_array), black_box(&random_indices))));
     c.bench_function("level_block array", |b| b.iter(|| array_get(black_box(&block_array), black_box(&random_indices))));
     c.bench_function("compact array", |b| b.iter(|| compact_array_get(black_box(&compact_array), black_box(&random_indices))));
     //c.bench_function("small level_block array", |b| b.iter(|| small_array_get(black_box(&small_block_array), black_box(&random_indices))));
