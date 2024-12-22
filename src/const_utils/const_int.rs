@@ -74,6 +74,7 @@ trait ConstIntegerPrivate{
 /// With this, we can do const {Self::N+1} in stable rust. 
 pub trait ConstInteger: ConstIntegerPrivate + Default + Copy + Eq + Debug + 'static {
     const VALUE: usize;
+    /// const Default::default()
     const DEFAULT: Self;
     
     #[inline]

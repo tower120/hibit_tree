@@ -1,4 +1,5 @@
 #![feature(maybe_uninit_array_assume_init)]
+#![feature(const_alloc_layout)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 
@@ -169,7 +170,7 @@ pub use ops::_multi_union::multi_union;
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::BitAnd;
-use const_utils::const_int::{ConstInteger, ConstIntVisitor};
+use const_utils::{ConstInteger, ConstIntVisitor};
 use utils::Primitive;
 use utils::Array;
 use level::IntrusiveListLevel;

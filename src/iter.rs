@@ -2,8 +2,8 @@ use std::ops::ControlFlow;
 use crate::hibit_tree::{HibitTree, HibitTreeCursor};
 use crate::{BitBlock, data_block_index, RegularHibitTree, HibitTreeCursorTypes, HibitTreeTypes};
 use crate::bit_queue::BitQueue;
-use crate::const_utils::const_int::{const_for_rev, ConstInteger, ConstIntVisitor, ConstUsize};
-use crate::const_utils::const_array::ConstArrayType;
+use crate::const_utils::{const_for_rev, ConstInteger, ConstIntVisitor, ConstUsize};
+use crate::const_utils::ConstArrayType;
 use crate::utils::LendingIterator;
 use crate::utils::Array;
 

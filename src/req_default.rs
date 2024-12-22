@@ -1,9 +1,10 @@
 use std::marker::PhantomData;
 
-/// Marker for container's item [Default] requirement. 
+/// Marker for container's item [Default] requirement.
+#[derive(Default, Copy, Clone)] 
 pub struct ReqDefault<const B: bool = true>;
 
-pub trait DefaultRequirement{
+pub trait DefaultRequirement: Default {
     const REQUIRED: bool;
 }
 impl<const B: bool> DefaultRequirement for ReqDefault<B>{

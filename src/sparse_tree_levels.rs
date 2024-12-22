@@ -3,7 +3,7 @@ use std::mem::MaybeUninit;
 use std::ops::ControlFlow;
 use crate::BitBlock;
 use crate::const_utils::{const_for_rev, ConstIntVisitor};
-use crate::const_utils::const_int::{ConstUsize, ConstInteger};
+use crate::const_utils::{ConstUsize, ConstInteger};
 use crate::level::ILevel;
 use crate::level_block::HiBlock;
 

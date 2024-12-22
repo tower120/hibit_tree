@@ -4,7 +4,7 @@ use std::{cmp, mem, ptr};
 use std::ptr::{addr_of_mut, null, NonNull};
 use wide::u64x2;
 use crate::{BitBlock, HierarchyIndex, ReqDefault};
-use crate::const_utils::{const_loop, ArrayOf, ConstInteger, ConstUsize};
+use crate::const_utils::{const_loop, max, ArrayOf, ConstInteger, ConstUsize};
 use crate::req_default::{MakeDefault, MakeDefaultFor, DefaultRequirement, IsReqDefault};
 use crate::utils::{Array, RefLt};
 
@@ -47,25 +47,23 @@ struct BlockHeader<T, Conf:Config> {
     cap: u8,
     /// FREE_CHILD_INDEX_SENTINEL = NONE
     free_child_index: u8,
-    // TODO: remove
-    childs_type: ChildsType,
     
     phantom_data: PhantomData<T>
 }
 impl<T, Conf:Config> BlockHeader<T, Conf>{
     #[inline]
-    /*const*/ fn layout(child_align: usize) -> Layout {
+    const fn layout(child_align: usize) -> Layout {
         unsafe {
             Layout::from_size_align_unchecked(
                 size_of::<Self>(),
-                cmp::max(child_align, align_of::<Self>())
+                max!(child_align, align_of::<Self>())
             )
             .pad_to_align()
         }
     }
     
     #[inline]
-    /*const*/ fn children_addr_offset(child_align: usize) -> usize {
+    const fn children_addr_offset(child_align: usize) -> usize {
         Self::layout(child_align).size()
     }
 }
@@ -83,20 +81,9 @@ impl<T, Conf:Config> Copy for BlockPtr<T, Conf>{}
 
 impl<T, Conf:Config> BlockPtr<T, Conf>{
     #[inline]
-    fn layout(cap: u8, childs_type: ChildsType) -> Layout {
-        let (child_size, child_align) = match childs_type {
-            ChildsType::Blocks => (
-                size_of::<BlockPtr<T, Conf>>(),
-                align_of::<BlockPtr<T, Conf>>()
-            ),
-            ChildsType::DataBlocks => (
-                size_of::<T>(),
-                align_of::<T>()
-            )
-        };
-        
-        let array_size = child_size * cap as usize;
-        let header_layout = BlockHeader::<T, Conf>::layout(child_align); 
+    const fn layout<Child>(cap: u8) -> Layout {
+        let array_size = size_of::<Child>() * cap as usize;
+        let header_layout = BlockHeader::<T, Conf>::layout(align_of::<Child>()); 
         let size = header_layout.size() + array_size;
         
         unsafe {
@@ -108,8 +95,8 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
     }
     
     #[inline]
-    pub fn new(childs_type: ChildsType, cap: u8) -> Self {
-        let layout = Self::layout(cap, childs_type);
+    pub fn new<Child>(cap: u8) -> Self {
+        let layout = Self::layout::<Child>(cap);
         unsafe{
             let block = alloc(layout) as *mut BlockHeader<T, Conf>;
             
@@ -118,14 +105,13 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
             addr_of_mut!((*block).len).write(0);
             addr_of_mut!((*block).cap).write(cap);
             addr_of_mut!((*block).free_child_index).write(FREE_CHILD_INDEX_SENTINEL);
-            addr_of_mut!((*block).childs_type).write(childs_type);
             
             Self(NonNull::new_unchecked(block))
         }
     }
     
     #[inline]
-    /*const*/ fn children_ptr(&self, child_align: usize) -> *mut u8 {
+    const fn children_ptr(&self, child_align: usize) -> *mut u8 {
         let ptr = self.0.as_ptr() as *mut u8;
         unsafe{
             ptr.add(BlockHeader::<T, Conf>::children_addr_offset(child_align))
@@ -242,9 +228,8 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
                 let new_capacity = block.cap * 2;
                 let new_ptr = realloc(
                     self.0.as_ptr() as *mut u8,
-                    // TODO: childs_type can be compiletime
-                    Self::layout(block.cap, block.childs_type),
-                    Self::layout(new_capacity, block.childs_type).size(),
+                    Self::layout::<Child>(block.cap),
+                    Self::layout::<Child>(new_capacity).size(),
                 ) as *mut BlockHeader<T, Conf>;
                 (*new_ptr).cap = new_capacity; 
                 self.0 = NonNull::new_unchecked(new_ptr);
@@ -306,60 +291,52 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
     }
     
     /// Destructs each first child in "empty branch".
-    pub unsafe fn destruct_empty_branch<R: DefaultRequirement>(&mut self){
-        let block = self.0.as_ref();
-        
-        // TODO: this switch can be compiletime
-        // 1. destruct children
-        match block.childs_type{
-            ChildsType::Blocks => {
-                let mut child = &mut *self.children_ptr(align_of::<BlockPtr<T, Conf>>()).cast::<BlockPtr<T, Conf>>();
-                child.destruct_empty_branch::<R>();
+    /// 
+    /// `Height` - distance to terminal node. 0 - means this IS a terminal node. 
+    #[inline]
+    pub unsafe fn destruct_empty_branch<Height: ConstInteger, R: DefaultRequirement>(&mut self, height: Height, req: R) {
+        if Height::VALUE == 0 {
+            // terminal node
+            if R::REQUIRED {
+                let child = &mut *self.children_ptr(align_of::<T>()).cast::<T>();
                 ptr::drop_in_place(child);
             }
-            ChildsType::DataBlocks => {
-                if R::REQUIRED {
-                    let child = &mut *self.children_ptr(align_of::<T>()).cast::<T>();
-                    ptr::drop_in_place(child);
-                }
-            }
+            self.destruct_empty::<T>();
+        } else {
+            let mut child = &mut *self.children_ptr(align_of::<BlockPtr<T, Conf>>()).cast::<BlockPtr<T, Conf>>();
+            child.destruct_empty_branch(height.dec(), req);
+            ptr::drop_in_place(child);
+            self.destruct_empty::<BlockPtr<T, Conf>>();
         }
-        
-        // 2. Destruct empty block 
-        self.destruct_empty();
     }
     
-    /// Destruct block and it's children.
-    pub unsafe fn destruct(&mut self){
-        let block = self.0.as_mut();
-        
-        // TODO: this switch can be compiletime
-        // 1. destruct children
-        match block.childs_type{
-            ChildsType::Blocks => {
-                let mut iter = self.children_iter_mut::<BlockPtr<T, Conf>>();
-                for child in iter {
-                    child.destruct();
-                    ptr::drop_in_place(child);
-                }
+    /// Destruct block and it's children "recursively".
+    /// 
+    /// `Height` - distance to terminal node. 0 - means this IS a terminal node. 
+    #[inline]
+    pub unsafe fn destruct<Height: ConstInteger>(&mut self, height: Height){
+        if Height::VALUE == 0 {
+            // terminal level
+            let mut iter = self.children_iter_mut::<T>();
+            for child in iter {
+                ptr::drop_in_place(child);
             }
-            ChildsType::DataBlocks => {
-                let mut iter = self.children_iter_mut::<T>();
-                for child in iter {
-                    ptr::drop_in_place(child);
-                }
+            self.destruct_empty::<T>();
+        } else {
+            let mut iter = self.children_iter_mut::<BlockPtr<T, Conf>>();
+            for child in iter {
+                child.destruct(height.dec());
+                ptr::drop_in_place(child);
             }
+            self.destruct_empty::<BlockPtr<T, Conf>>();
         }
-        
-        // 2. Destruct empty block 
-        self.destruct_empty();
     }
     
     /// Destruct block without children.
     #[inline]
-    pub unsafe fn destruct_empty(&mut self) {
+    pub unsafe fn destruct_empty<Child>(&mut self) {
         let block = self.0.as_mut();
-        let layout = Self::layout(block.cap, block.childs_type);
+        let layout = Self::layout::<Child>(block.cap);
         ptr::drop_in_place(block);
         dealloc(self.0.as_ptr().cast(), layout);
     }
@@ -367,7 +344,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
 
 #[test]
 fn block_free_inidces_test(){
-    let mut block: BlockPtr<usize, Config64bit<2>> = BlockPtr::new(ChildsType::DataBlocks, 16);
+    let mut block: BlockPtr<usize, Config64bit<2>> = BlockPtr::new::<usize>(16);
     unsafe{
         block.push_free_child_index::<usize>(2);
         block.push_free_child_index::<usize>(4);
@@ -378,13 +355,13 @@ fn block_free_inidces_test(){
         assert_eq!(block.pop_free_child_index::<usize>(), Some(2));
         assert_eq!(block.pop_free_child_index::<usize>(), None);
         
-        block.destruct(); 
+        block.destruct(ConstUsize::<0>); 
     }
 }
 
 #[test]
 fn block_free_inidces_test2(){
-    let mut block: BlockPtr<usize, Config64bit<2>> = BlockPtr::new(ChildsType::DataBlocks, 16);
+    let mut block: BlockPtr<usize, Config64bit<2>> = BlockPtr::new::<usize>(16);
     unsafe{
         block.push_free_child_index::<usize>(2);
         block.push_free_child_index::<usize>(4);
@@ -395,7 +372,7 @@ fn block_free_inidces_test2(){
         assert_eq!(block.pop_free_child_index::<usize>(), Some(2));
         assert_eq!(block.pop_free_child_index::<usize>(), None);
         
-        block.destruct(); 
+        block.destruct(ConstUsize::<0>); 
     }
 }
 
@@ -422,7 +399,7 @@ where
         let empty_branch_blocks: EmptyBranchBlocks<T, Conf> = {
             let mut empty_branch_blocks = EmptyBranchBlocks::<T, Conf>::uninit_array();
             // in reverse order - from terminal node to the root.
-            let mut block = BlockPtr::new(ChildsType::DataBlocks, 1);
+            let mut block = BlockPtr::new::<T>(1);
             if R::REQUIRED {
                 unsafe {
                     block.write_child_at(
@@ -434,7 +411,7 @@ where
             }
             empty_branch_blocks.as_mut()[Conf::LevelCount::VALUE-1].write(block);
             for I in (0..Conf::LevelCount::VALUE-1).rev() {
-                let mut new_block = BlockPtr::new(ChildsType::Blocks, 1);
+                let mut new_block = BlockPtr::new::<BlockPtr<T, Conf>>(1);
                 unsafe{
                     new_block.write_child_at(block, 0);
                     new_block.set_len(1);
@@ -445,7 +422,7 @@ where
             unsafe{ Array::assume_init_array(empty_branch_blocks) }
         };
         
-        let mut root = BlockPtr::new(ChildsType::Blocks, 2);
+        let mut root = BlockPtr::new::<BlockPtr<T, Conf>>(2);
         unsafe{
             if <Conf::LevelCount as ConstInteger>::VALUE == 1 {
                 if const{R::REQUIRED} {
@@ -486,8 +463,8 @@ where
                     child_index, 
                     ||{
                         if I == Conf::LevelCount::VALUE-2 {
-                            if R::REQUIRED {
-                                let mut block = BlockPtr::new(ChildsType::DataBlocks, 2);
+                            if const {R::REQUIRED} {
+                                let mut block = BlockPtr::new::<T>(2);
                                 block.write_child_at(
                                     <MakeDefaultFor<T, R> as MakeDefault<T>>::make_default(),
                                     0
@@ -495,10 +472,10 @@ where
                                 block.set_len(1);
                                 block
                             } else {
-                                BlockPtr::new(ChildsType::DataBlocks, 1)    
+                                BlockPtr::new::<T>(1)    
                             }
                         } else {
-                            let mut block = BlockPtr::new(ChildsType::Blocks, 2);
+                            let mut block = BlockPtr::new::<BlockPtr<T, Conf>>(2);
                             block.write_child_at(
                                 self.empty_branch_blocks.as_ref()[I+1],
                                 0
@@ -515,7 +492,7 @@ where
         unsafe{ block.insert_unchecked(child_index, value); }
     }
     
-    // TODO: Do not track root block - it always only one.
+    // TODO: Do not track root block - it is always only one.
     fn get_branch(&self, index: &HierarchyIndex<Conf::Mask, Conf::LevelCount>) 
         -> ArrayOf< BlockPtr<T, Conf>, Conf::LevelCount >  
     {
@@ -550,7 +527,7 @@ where
             terminal_node.remove_unchecked::<T>(terminal_child_index);
 
             if terminal_node.is_empty() {
-                terminal_node.destruct();
+                terminal_node.destruct_empty::<T>();
                 
                 // climb up the tree, and remove empty nodes
                 const_loop!(I in 0..{Conf::LevelCount::VALUE-1} rev => 'out: {
@@ -565,7 +542,7 @@ where
                     }
 
                     if I != 0 {
-                        node.destruct_empty();
+                        node.destruct_empty::<BlockPtr<T, Conf>>();
                     }
                 //}
                 });                
@@ -617,8 +594,9 @@ where
 impl<T, Conf: Config, R: DefaultRequirement> Drop for Tree<T, Conf, R> {
     fn drop(&mut self) {
         unsafe{
-            self.root.destruct();
-            self.empty_branch_blocks.as_mut()[0].destruct_empty_branch::<R>();
+            let height = Conf::LevelCount::DEFAULT.dec();
+            self.root.destruct(height);
+            self.empty_branch_blocks.as_mut()[0].destruct_empty_branch(height, R::default());
         }
     }
 }
