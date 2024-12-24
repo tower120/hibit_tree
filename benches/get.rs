@@ -32,7 +32,7 @@ type Map = nohash_hasher::IntMap<u32, DataBlock>;
 //type Map = ahash::AHashMap<u32, DataBlock>;
 type BTree = BTreeMap<u32, DataBlock>;
 
-type CompactArray = DenseTree<DataBlock, 5>;
+type CompactArray = DenseTree<DataBlock, 3>;
 
 //type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>, IntrusiveListLevel<Lvl2Block>), DataBlock>;
 type BlockArray = SparseTree<config::width_64::depth_3, DataBlock>;
@@ -97,9 +97,9 @@ fn array_new_get2(array: &BlockArrayNew2, indices: &[usize]) -> u64 {
     let mut s = 0;
     for &i in indices{
         unsafe{
-        /*s += array.get(Index::new_unchecked(i))
-            .unwrap_or(&mut DataBlock(0)).0;*/
-        s += array.get_or_default(Index::new_unchecked(i)).0;            
+        s += array.get(Index::new_unchecked(i))
+            .unwrap_or(&mut DataBlock(0)).0;
+        //s += array.get_or_default(Index::new_unchecked(i)).0;            
         }
     }
     s

@@ -93,7 +93,7 @@ for
 pub trait HibitTreeTypes<'this, ImplicitBounds = &'this Self>{
     type Data;
     type DataUnchecked;
-    type Cursor: HibitTreeCursor<'this, Src=Self>;
+    type Cursor: HibitTreeCursor<'this, Tree=Self>;
 }
 
 /// Hierarchical bitmap tree interface.
@@ -284,41 +284,41 @@ pub trait HibitTreeCursorTypes<'this, ImplicitBounds = &'this Self>{
 ///    assert_eq!(data, Some(&500));
 /// }
 /// ``` 
-pub trait HibitTreeCursor<'src>
+pub trait HibitTreeCursor<'tree>
 where
 	Self: for<'this> HibitTreeCursorTypes<'this>,
 {
-    type Src: HibitTree;
+    type Tree: HibitTree;
     
-    fn new(src: &'src Self::Src) -> Self;
+    fn new(tree: &'tree Self::Tree) -> Self;
     
     /// Item at index may not exist. Will return empty mask in such case.
     unsafe fn select_level_node<N: ConstInteger>(
         &mut self,
-        src: &'src Self::Src,
+        tree: &'tree Self::Tree,
         level_n: N,
         level_index: usize,
-    ) -> <Self::Src as HibitTree>::LevelMask;
+    ) -> <Self::Tree as HibitTree>::LevelMask;
     
     /// Pointed node must exists
     unsafe fn select_level_node_unchecked<N: ConstInteger>(
         &mut self,
-        src: &'src Self::Src,
+        tree: &'tree Self::Tree,
         level_n: N,
         level_index: usize
-    ) -> <Self::Src as HibitTree>::LevelMask;
+    ) -> <Self::Tree as HibitTree>::LevelMask;
     
     /// Item at index may not exist.
     unsafe fn data<'a>(
         &'a self,
-        src: &'src Self::Src,
+        tree: &'tree Self::Tree,
         level_index: usize
     ) -> Option<<Self as HibitTreeCursorTypes<'a>>::Data>;      
  
     /// Pointed data must exists
     unsafe fn data_unchecked<'a>(
         &'a self,
-        src: &'src Self::Src,
+        tree: &'tree Self::Tree,
         level_index: usize
     ) -> <Self as HibitTreeCursorTypes<'a>>::Data;        
 }

@@ -326,10 +326,10 @@ where
     Iter: Iterator<Item = &'item T> + Clone,
     T: HibitTree + 'item
 {
-    type Src = MultiIntersection<Iter>;
+    type Tree = MultiIntersection<Iter>;
 
     #[inline]
-    fn new(src: &'src Self::Src) -> Self {
+    fn new(src: &'src Self::Tree) -> Self {
         let cursors = ArrayVec::from_iter(
             src.iter.clone()
                 .map(|array|{
@@ -347,8 +347,8 @@ where
 
     #[inline]
     unsafe fn select_level_node<N: ConstInteger>(
-        &mut self, src: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as HibitTree>::LevelMask {
+        &mut self, src: &'src Self::Tree, level_n: N, level_index: usize
+    ) -> <Self::Tree as HibitTree>::LevelMask {
         // if we know that upper levels returned empty - return early.
         if N > self.empty_below_n {
             return BitBlock::zero(); 
@@ -379,7 +379,7 @@ where
             usize::MAX
         };
         
-        /*const*/ if N::VALUE == <Self::Src as HibitTree>::LevelCount::VALUE - 1 {
+        /*const*/ if N::VALUE == <Self::Tree as HibitTree>::LevelCount::VALUE - 1 {
             self.terminal_node_mask = acc_mask.clone(); 
         }
         
@@ -388,8 +388,8 @@ where
 
     #[inline]
     unsafe fn select_level_node_unchecked<N: ConstInteger> (
-        &mut self, src: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as HibitTree>::LevelMask {
+        &mut self, src: &'src Self::Tree, level_n: N, level_index: usize
+    ) -> <Self::Tree as HibitTree>::LevelMask {
         // TODO: Almost the same as in checked version. Reuse somehow. 
         let mut cursors_iter = self.cursors.iter_mut();
         let mut array_iter  = src.iter.clone();
@@ -414,7 +414,7 @@ where
     }
 
     #[inline]
-    unsafe fn data<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
+    unsafe fn data<'a>(&'a self, this: &'src Self::Tree, level_index: usize) 
         -> Option<<Self as HibitTreeCursorTypes<'a>>::Data> 
     {
         if !self.terminal_node_mask.get_bit_unchecked(level_index){
@@ -426,7 +426,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked<'a>(
-        &'a self, src: &'src Self::Src, level_index: usize
+        &'a self, src: &'src Self::Tree, level_index: usize
     ) -> <Self as HibitTreeCursorTypes<'a>>::Data {
         CursorData { 
             level_index,

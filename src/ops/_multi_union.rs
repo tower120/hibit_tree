@@ -147,10 +147,10 @@ where
     Iter: Iterator<Item = &'item T> + Clone,
     T: HibitTree + 'item
 {
-    type Src = MultiUnion<Iter>;
+    type Tree = MultiUnion<Iter>;
 
     #[inline]
-    fn new(src: &'src Self::Src) -> Self {
+    fn new(src: &'src Self::Tree) -> Self {
         let states = ArrayVec::from_iter(
             src.iter.clone()
                 .map(|array|{
@@ -167,16 +167,16 @@ where
     }
 
     #[inline]
-    unsafe fn select_level_node<N: ConstInteger>(&mut self, src: &'src Self::Src, level_n: N, level_index: usize) 
-        -> <Self::Src as HibitTree>::LevelMask 
+    unsafe fn select_level_node<N: ConstInteger>(&mut self, src: &'src Self::Tree, level_n: N, level_index: usize) 
+        -> <Self::Tree as HibitTree>::LevelMask 
     {
         // unchecked version already deal with non-existent elements
         self.select_level_node_unchecked(src, level_n, level_index)
     }
 
     #[inline]
-    unsafe fn select_level_node_unchecked<N: ConstInteger>(&mut self, src: &'src Self::Src, level_n: N, level_index: usize) 
-        -> <Self::Src as HibitTree>::LevelMask 
+    unsafe fn select_level_node_unchecked<N: ConstInteger>(&mut self, src: &'src Self::Tree, level_n: N, level_index: usize) 
+        -> <Self::Tree as HibitTree>::LevelMask 
     {
         let mut acc_mask = BitBlock::zero();
         
@@ -220,10 +220,10 @@ where
     }
 
     #[inline]
-    unsafe fn data<'a>(&'a self, src: &'src Self::Src, level_index: usize) 
+    unsafe fn data<'a>(&'a self, src: &'src Self::Tree, level_index: usize) 
         -> Option<<Self as HibitTreeCursorTypes<'a>>::Data> 
     {
-        if <Self::Src as HibitTree>::LevelCount::VALUE == 1 {
+        if <Self::Tree as HibitTree>::LevelCount::VALUE == 1 {
             todo!("TODO: compile-time special case for 1-level SparseHierarchy");
         }
         
@@ -241,7 +241,7 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked<'a>(&'a self, src: &'src Self::Src, level_index: usize) 
+    unsafe fn data_unchecked<'a>(&'a self, src: &'src Self::Tree, level_index: usize) 
         -> <Self as HibitTreeCursorTypes<'a>>::Data 
     {
         self.data(src, level_index).unwrap_unchecked()

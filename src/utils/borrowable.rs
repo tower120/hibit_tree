@@ -39,6 +39,7 @@ use std::borrow::Borrow;
 /// }
 /// ```
 pub trait Borrowable: Borrow<Self::Borrowed>{
+    /// Borrowed = Self 
     type Borrowed;
 }
 

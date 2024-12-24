@@ -86,10 +86,10 @@ where
         Output = I::Output
     >,
 {
-    type Src = MultiMapFold<S, I, F>;
+    type Tree = MultiMapFold<S, I, F>;
 
     #[inline]
-    fn new(this: &'src Self::Src) -> Self {
+    fn new(this: &'src Self::Tree) -> Self {
         Self(
             HibitTreeCursor::new(&this.s),
             PhantomData
@@ -98,20 +98,20 @@ where
 
     #[inline]
     unsafe fn select_level_node<N: ConstInteger>(
-        &mut self, src: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as HibitTree>::LevelMask {
+        &mut self, src: &'src Self::Tree, level_n: N, level_index: usize
+    ) -> <Self::Tree as HibitTree>::LevelMask {
         self.0.select_level_node(&src.s, level_n, level_index)
     }
 
     #[inline]
     unsafe fn select_level_node_unchecked<N: ConstInteger>(
-        &mut self, src: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as HibitTree>::LevelMask {
+        &mut self, src: &'src Self::Tree, level_n: N, level_index: usize
+    ) -> <Self::Tree as HibitTree>::LevelMask {
         self.0.select_level_node_unchecked(&src.s, level_n, level_index)
     }
 
     #[inline]
-    unsafe fn data<'a>(&'a self, src: &'src Self::Src, level_index: usize) 
+    unsafe fn data<'a>(&'a self, src: &'src Self::Tree, level_index: usize) 
         -> Option<<Self as HibitTreeCursorTypes<'a>>::Data> 
     {
         if let Some(data_iter) = self.0.data(&src.s, level_index){
@@ -124,7 +124,7 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked<'a>(&'a self, src: &'src Self::Src, level_index: usize) 
+    unsafe fn data_unchecked<'a>(&'a self, src: &'src Self::Tree, level_index: usize) 
         -> <Self as HibitTreeCursorTypes<'a>>::Data 
     {
         let init = src.init.exec();

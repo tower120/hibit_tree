@@ -3,10 +3,10 @@ use std::marker::PhantomData;
 use std::{cmp, mem, ptr};
 use std::ptr::{addr_of_mut, null, NonNull};
 use wide::u64x2;
-use crate::{BitBlock, HierarchyIndex, ReqDefault};
+use crate::{BitBlock, HibitTree, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex, ReqDefault};
 use crate::const_utils::{const_loop, max, ArrayOf, ConstInteger, ConstUsize};
 use crate::req_default::{MakeDefault, MakeDefaultFor, DefaultRequirement, IsReqDefault};
-use crate::utils::{Array, RefLt};
+use crate::utils::{Array, Borrowable};
 
 pub trait Config {
     type Mask: BitBlock;
@@ -197,6 +197,11 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         
         let mut block = self.0.as_mut();
         block.mask.set_bit_unchecked::<false>(index);
+    }
+    
+    #[inline]
+    pub fn mask(&self) -> &Conf::Mask {
+        unsafe{ &self.0.as_ref().mask }
     }
     
     #[inline]
@@ -391,6 +396,28 @@ pub struct Tree<T, Conf:Config, R: DefaultRequirement = ReqDefault<false>>{
 }
 
 impl<T, Conf:Config, R: DefaultRequirement> Tree<T, Conf, R>
+{
+    #[inline]
+    fn get_impl(&self, index: &HierarchyIndex<Conf::Mask, Conf::LevelCount>) -> Option<*mut T> {
+        let mut block = self.root;
+        const_loop!(I in 0..{Conf::LevelCount::VALUE-1} => {
+            let child_index = index.level_indices.as_ref()[I];
+            block = unsafe{ *block.get_unchecked_ptr(child_index) };
+        });
+        
+        let child_index = index.level_indices.as_ref()[Conf::LevelCount::VALUE-1];
+        unsafe{
+            if block.have_child_unchecked(child_index) {
+                Some( block.get_unchecked_ptr(child_index) )
+            } else {
+                None
+            }
+        }
+    }       
+}
+
+
+impl<T, Conf:Config, R: DefaultRequirement> Tree<T, Conf, R>
 where
     MakeDefaultFor<T, R>: MakeDefault<T>
 {
@@ -448,7 +475,6 @@ where
         }
     }
     
-    #[inline]
     pub fn insert(
         &mut self,
         index: impl Into<HierarchyIndex<Conf::Mask, Conf::LevelCount>>,
@@ -551,32 +577,13 @@ where
     }
     
     #[inline]
-    fn get_impl(&self, index: impl Into<HierarchyIndex<Conf::Mask, Conf::LevelCount>>) -> Option<*mut T> {
-        let index = index.into();
-        let mut block = self.root;
-        const_loop!(I in 0..{Conf::LevelCount::VALUE-1} => {
-            let child_index = index.level_indices.as_ref()[I];
-            block = unsafe{ *block.get_unchecked_ptr(child_index) };
-        });
-        
-        let child_index = index.level_indices.as_ref()[Conf::LevelCount::VALUE-1];
-        unsafe{
-            if block.have_child_unchecked(child_index) {
-                Some( block.get_unchecked_ptr(child_index) )
-            } else {
-                None
-            }
-        }
-    }    
-    
-    #[inline]
     pub fn get_mut(&mut self, index: impl Into<HierarchyIndex<Conf::Mask, Conf::LevelCount>>) -> Option<&mut T> {
-        self.get_impl(index).map(|v| unsafe{ &mut *v })
+        self.get_impl(&index.into()).map(|v| unsafe{ &mut *v })
     }
     
     #[inline]
     pub fn get(&self, index: impl Into<HierarchyIndex<Conf::Mask, Conf::LevelCount>>) -> Option<&T> {
-        self.get_impl(index).map(|v| unsafe{ &*v })
+        self.get_impl(&index.into()).map(|v| unsafe{ &*v })
     }    
     
     #[inline]
@@ -601,8 +608,108 @@ impl<T, Conf: Config, R: DefaultRequirement> Drop for Tree<T, Conf, R> {
     }
 }
 
+impl<T, Conf: Config, R: DefaultRequirement> Borrowable for Tree<T, Conf, R> {
+    type Borrowed = Self;
+}
+
+impl<'a, T, Conf: Config, R: DefaultRequirement> HibitTreeTypes<'a> for Tree<T, Conf, R> {
+    type Data = &'a T;
+    type DataUnchecked = &'a T;
+    type Cursor = TreeCursor<'a, T, Conf, R>;
+}
+
+impl<T, Conf: Config, R: DefaultRequirement> HibitTree for Tree<T, Conf, R> {
+    const EXACT_HIERARCHY: bool = true;
+    type LevelCount = Conf::LevelCount;
+    type LevelMask  = Conf::Mask;
+
+    #[inline]
+    fn data(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>) 
+        -> Option<<Self as HibitTreeTypes<'_>>::Data> 
+    {
+        self.get_impl(index).map(|v| unsafe{ &*v })
+    }
+
+    #[inline]
+    unsafe fn data_unchecked(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>) 
+        -> <Self as HibitTreeTypes<'_>>::DataUnchecked 
+    {
+        self.data(index).unwrap_unchecked()
+    }
+}
+
+type CursorBranch<T, Conf: Config> = ArrayOf<
+    Option<BlockPtr<T, Conf>>, 
+    Conf::LevelCount
+>; 
+pub struct TreeCursor<'tree, T, Conf: Config, R: DefaultRequirement>{
+    branch: CursorBranch<T, Conf>, 
+    phantom_data: PhantomData<&'tree Tree<T, Conf, R>>
+}
+impl<'a, 'tree, T, Conf: Config, R: DefaultRequirement> HibitTreeCursorTypes<'a> for TreeCursor<'tree, T, Conf, R> {
+    type Data = &'tree T;
+}
+impl<'tree, T, Conf: Config, R: DefaultRequirement> HibitTreeCursor<'tree> for TreeCursor<'tree, T, Conf, R> {
+    type Tree = Tree<T, Conf, R>;
+
+    #[inline]
+    fn new(src: &'tree Self::Tree) -> Self {
+        let mut branch: CursorBranch<T, Conf> = Array::from_fn(|_|None);
+        branch.as_mut()[0] = Some(src.root);
+        
+        Self{
+            branch,
+            phantom_data: Default::default(),
+        }
+    }
+
+    #[inline]
+    unsafe fn select_level_node<N: ConstInteger>(&mut self, _: &'tree Self::Tree, level_n: N, level_index: usize) 
+        -> <Self::Tree as HibitTree>::LevelMask 
+    {
+        if N::VALUE == 0 {
+            return self.branch.as_ref()[0].unwrap_unchecked().mask().clone();
+        }      
+        
+        let parrent_node = self.branch.as_ref().get_unchecked(level_n.value() - 1).unwrap_unchecked();
+        let node = *parrent_node.get_unchecked_ptr::<BlockPtr<T, Conf>>(level_index);
+        
+        *self.branch.as_mut().get_unchecked_mut(level_n.value()) = Some(node);
+        
+        node.mask().clone()
+    }
+
+    #[inline]
+    unsafe fn select_level_node_unchecked<N: ConstInteger>(&mut self, tree: &'tree Self::Tree, level_n: N, level_index: usize) 
+        -> <Self::Tree as HibitTree>::LevelMask 
+    {
+        self.select_level_node(tree, level_n, level_index)
+    }
+
+    #[inline]
+    unsafe fn data<'a>(&'a self, tree: &'tree Self::Tree, level_index: usize) 
+        -> Option<&'tree T> 
+    {
+        let terminal_node = self.branch.as_ref().last().unwrap_unchecked().unwrap_unchecked();
+        if terminal_node.have_child_unchecked(level_index) {
+            Some(&*terminal_node.get_unchecked_ptr::<T>(level_index))
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    unsafe fn data_unchecked<'a>(&'a self, tree: &'tree Self::Tree, level_index: usize) 
+        -> &'tree T
+    {
+        let terminal_node = self.branch.as_ref().last().unwrap_unchecked().unwrap_unchecked();
+        &*terminal_node.get_unchecked_ptr::<T>(level_index)
+    }
+}
+
 #[cfg(test)]
 mod test{
+    use itertools::assert_equal;
     use super::*;
     
     #[test]
@@ -631,4 +738,21 @@ mod test{
         assert_eq!(tree.get_mut(4000), None);
     }
     
+    #[test]
+    fn iter_test(){
+        let mut tree: Tree<usize, Config64bit<3>> = Tree::new();
+        assert!(tree.iter().next().is_none());
+        
+        tree.insert(0, 0);
+        tree.insert(4000, 4000);
+        tree.insert(100, 100);
+        tree.insert(18000, 18000);
+        
+        assert_equal(tree.iter(), [
+            (0, &0),
+            (100, &100),
+            (4000, &4000),
+            (18000, &18000),
+        ])
+    }
 }

@@ -412,10 +412,10 @@ impl<'src, T, const DEPTH: usize> HibitTreeCursor<'src> for Cursor<'src, T, DEPT
 where
     ConstUsize<DEPTH>: ConstInteger
 {
-    type Src = DenseTree<T, DEPTH>;
+    type Tree = DenseTree<T, DEPTH>;
 
     #[inline]
-    fn new(_: &'src Self::Src) -> Self {
+    fn new(_: &'src Self::Tree) -> Self {
         Self{
             level_nodes: Array::from_fn(|_|None),
             phantom_data: Default::default(),
@@ -425,10 +425,10 @@ where
     #[inline]
     unsafe fn select_level_node<N: ConstInteger>(
         &mut self,
-        src: &'src Self::Src,
+        src: &'src Self::Tree,
         level_n: N,
         level_index: usize
-    ) -> <Self::Src as HibitTree>::LevelMask {
+    ) -> <Self::Tree as HibitTree>::LevelMask {
         if N::VALUE == 0 {
             return *src.root.header().mask();
         }
@@ -456,10 +456,10 @@ where
     #[inline]
     unsafe fn select_level_node_unchecked<N: ConstInteger>(
         &mut self,
-        this: &'src Self::Src,
+        this: &'src Self::Tree,
         level_n: N,
         level_index: usize
-    ) -> <Self::Src as HibitTree>::LevelMask {
+    ) -> <Self::Tree as HibitTree>::LevelMask {
         if N::VALUE == 0 {
             return *this.root.header().mask();
         }
@@ -484,7 +484,7 @@ where
     // TODO: data_or_default possible too.
     
     #[inline]
-    unsafe fn data<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
+    unsafe fn data<'a>(&'a self, this: &'src Self::Tree, level_index: usize) 
         -> Option<<Self as HibitTreeCursorTypes<'a>>::Data> 
     {
         let node = if DEPTH == 1{
@@ -507,7 +507,7 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
+    unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Tree, level_index: usize) 
         -> <Self as HibitTreeCursorTypes<'a>>::Data
     {
         let node = if DEPTH == 1{

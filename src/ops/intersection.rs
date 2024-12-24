@@ -98,10 +98,10 @@ where
         LevelMask  = <S0::Borrowed as HibitTree>::LevelMask,
     >>,
 {
-    type Src = Intersection<S0, S1>;
+    type Tree = Intersection<S0, S1>;
 
     #[inline]
-    fn new(this: &'src Self::Src) -> Self {
+    fn new(this: &'src Self::Tree) -> Self {
         Self{
             s0: HibitTreeCursor::new(this.s0.borrow()), 
             s1: HibitTreeCursor::new(this.s1.borrow()),
@@ -111,8 +111,8 @@ where
 
     #[inline]
     unsafe fn select_level_node<N: ConstInteger>(
-        &mut self, this: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as HibitTree>::LevelMask {
+        &mut self, this: &'src Self::Tree, level_n: N, level_index: usize
+    ) -> <Self::Tree as HibitTree>::LevelMask {
         // Putting "if" here is not justified for general case. 
         
         let mask0 = self.s0.select_level_node(
@@ -132,8 +132,8 @@ where
 
     #[inline]
     unsafe fn select_level_node_unchecked<N: ConstInteger> (
-        &mut self, this: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as HibitTree>::LevelMask {
+        &mut self, this: &'src Self::Tree, level_n: N, level_index: usize
+    ) -> <Self::Tree as HibitTree>::LevelMask {
         let mask0 = self.s0.select_level_node_unchecked(
             this.s0.borrow(), level_n, level_index
         );
@@ -150,7 +150,7 @@ where
     }
 
     #[inline]
-    unsafe fn data<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
+    unsafe fn data<'a>(&'a self, this: &'src Self::Tree, level_index: usize) 
         -> Option<<Self as HibitTreeCursorTypes<'a>>::Data> 
     {
         let d0 = self.s0.data(this.s0.borrow(), level_index);
@@ -165,7 +165,7 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
+    unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Tree, level_index: usize) 
         -> <Self as HibitTreeCursorTypes<'a>>::Data 
     {
         let d0 = self.s0.data_unchecked(this.s0.borrow(), level_index);

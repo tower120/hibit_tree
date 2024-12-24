@@ -101,10 +101,10 @@ where
         LevelMask  = <S0::Borrowed as HibitTree>::LevelMask,
     >>
 {
-    type Src = Union<S0, S1>;
+    type Tree = Union<S0, S1>;
 
     #[inline]
-    fn new(src: &'src Self::Src) -> Self {
+    fn new(src: &'src Self::Tree) -> Self {
         Self{
             s0: HibitTreeCursor::new(src.s0.borrow()), 
             s1: HibitTreeCursor::new(src.s1.borrow()),
@@ -114,16 +114,16 @@ where
 
     #[inline]
     unsafe fn select_level_node<N: ConstInteger>(
-        &mut self, this: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as HibitTree>::LevelMask {
+        &mut self, this: &'src Self::Tree, level_n: N, level_index: usize
+    ) -> <Self::Tree as HibitTree>::LevelMask {
         // unchecked version already deal with non-existent elements
         self.select_level_node_unchecked(this, level_n, level_index)
     }
 
     #[inline]
     unsafe fn select_level_node_unchecked<N: ConstInteger> (
-        &mut self, this: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as HibitTree>::LevelMask {
+        &mut self, this: &'src Self::Tree, level_n: N, level_index: usize
+    ) -> <Self::Tree as HibitTree>::LevelMask {
         let mask0 = self.s0.select_level_node(
             this.s0.borrow(), level_n, level_index,
         );
@@ -141,7 +141,7 @@ where
     }
 
     #[inline]
-    unsafe fn data<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
+    unsafe fn data<'a>(&'a self, this: &'src Self::Tree, level_index: usize) 
         -> Option<<Self as HibitTreeCursorTypes<'a>>::Data> 
     {
         let d0 = self.s0.data(this.s0.borrow(), level_index);
@@ -154,7 +154,7 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
+    unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Tree, level_index: usize) 
         -> <Self as HibitTreeCursorTypes<'a>>::Data 
     {
         self.data(this, level_index).unwrap_unchecked()

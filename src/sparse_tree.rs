@@ -660,10 +660,10 @@ where
     Levels: SparseTreeLevels,
     R: DefaultRequirement,
 {
-    type Src = SparseTree<Levels, Data, R>;
+    type Tree = SparseTree<Levels, Data, R>;
 
     #[inline]
-    fn new(_: &'src Self::Src) -> Self {
+    fn new(_: &'src Self::Tree) -> Self {
         Self{
             level_block_ptrs: Array::from_fn(|_|null()),
             phantom_data: Default::default(),
@@ -672,8 +672,8 @@ where
 
     #[inline(always)]
     unsafe fn select_level_node_unchecked<N: ConstInteger>(
-        &mut self, src: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as HibitTree>::LevelMask {
+        &mut self, src: &'src Self::Tree, level_n: N, level_index: usize
+    ) -> <Self::Tree as HibitTree>::LevelMask {
         self.select_level_node(src, level_n, level_index)
     }
     
@@ -681,8 +681,8 @@ where
     // So we do not need any additional branching here.
     #[inline(always)]
     unsafe fn select_level_node<N: ConstInteger>(
-        &mut self, src: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as HibitTree>::LevelMask {
+        &mut self, src: &'src Self::Tree, level_n: N, level_index: usize
+    ) -> <Self::Tree as HibitTree>::LevelMask {
         if N::VALUE == 0 {
             assert_eq!(level_index, 0); // This act as compile-time check
             let block = src.get_block(level_n, 0);
@@ -712,14 +712,14 @@ where
     }
 
     #[inline(always)]
-    unsafe fn data_unchecked<'a>(&'a self, src: &'src Self::Src, level_index: usize)
+    unsafe fn data_unchecked<'a>(&'a self, src: &'src Self::Tree, level_index: usize)
         -> <Self as HibitTreeCursorTypes<'a>>::Data 
     {
         self.data(src, level_index).unwrap_unchecked()
     }
     
     #[inline(always)]
-    unsafe fn data<'a>(&'a self, src: &'src Self::Src, level_index: usize)
+    unsafe fn data<'a>(&'a self, src: &'src Self::Tree, level_index: usize)
         -> Option<<Self as HibitTreeCursorTypes<'a>>::Data> 
     {
         let level_block: BlockPtr<Levels, <Levels::LevelCount as ConstInteger>::Dec> = 

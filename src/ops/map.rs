@@ -95,10 +95,10 @@ where
     S: Borrowable<Borrowed: RegularHibitTree>,
     F: for<'a> MapFunction<'a, <S::Borrowed as HibitTreeTypes<'a>>::Data>
 {
-    type Src = Map<S, F>;
+    type Tree = Map<S, F>;
     
     #[inline]
-    fn new(this: &'src Self::Src) -> Self {
+    fn new(this: &'src Self::Tree) -> Self {
         Self(
             HibitTreeCursor::new(this.s.borrow()),
             PhantomData
@@ -107,20 +107,20 @@ where
 
     #[inline]
     unsafe fn select_level_node<N: ConstInteger>(
-        &mut self, src: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as HibitTree>::LevelMask {
+        &mut self, src: &'src Self::Tree, level_n: N, level_index: usize
+    ) -> <Self::Tree as HibitTree>::LevelMask {
         self.0.select_level_node(src.s.borrow(), level_n, level_index)
     }
 
     #[inline]
     unsafe fn select_level_node_unchecked<N: ConstInteger>(
-        &mut self, src: &'src Self::Src, level_n: N, level_index: usize
-    ) -> <Self::Src as HibitTree>::LevelMask {
+        &mut self, src: &'src Self::Tree, level_n: N, level_index: usize
+    ) -> <Self::Tree as HibitTree>::LevelMask {
         self.0.select_level_node_unchecked(src.s.borrow(), level_n, level_index)
     }
 
     #[inline]
-    unsafe fn data<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
+    unsafe fn data<'a>(&'a self, this: &'src Self::Tree, level_index: usize) 
         -> Option<<Self as HibitTreeCursorTypes<'a>>::Data> 
     {
         let data = self.0.data(this.s.borrow(), level_index);
@@ -132,7 +132,7 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Src, level_index: usize) 
+    unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Tree, level_index: usize) 
         -> <Self as HibitTreeCursorTypes<'a>>::Data
     {
         let data = self.0.data_unchecked(this.s.borrow(), level_index);
