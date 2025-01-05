@@ -57,3 +57,58 @@ where
         self(arg0, arg1)
     }
 }
+
+/// Generates stateless generic [UnaryFunction]. Ala generic closure.
+/// 
+/// # Syntax
+/// 
+/// ```text
+/// fun!([generics list] |argument: type| -> type { .. }
+/// fun!([generics list] |argument: type| where [where bounds] -> type { .. }
+/// ```
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use hibit_tree::fun;
+/// # use hibit_tree::utils::Primitive;
+/// fun!(['a, T: Primitive, I: Iterator<Item=&'a T>] |xs: I| -> T {
+///     xs.fold(T::ZERO, |acc, v| acc + *v) 
+/// });
+/// ```
+/// 
+/// With `where` bounds:
+/// 
+/// ```
+/// # use hibit_tree::fun;
+/// # use hibit_tree::utils::Primitive;
+/// fun!(['a, T, I] |xs: I| -> T where [T: Primitive, I: Iterator<Item=&'a T>] {
+///     xs.fold(T::ZERO, |acc, v| acc + *v) 
+/// });
+/// ```
+#[macro_export]
+macro_rules! fun {
+    // --- UnaryFunction ---
+
+    ([$($generics:tt)*] |$arg:ident: $arg_type:ty| -> $output:ty $body:block) => {
+        fun!([$($generics)*] |$arg: $arg_type| -> $output where [] $body)
+    };
+    
+    ([$($generics:tt)*] |$arg:ident: $arg_type:ty| -> $output:ty where [$($bounds:tt)*] $body:block) => {
+        {
+            struct F;
+            impl<$($generics)*> $crate::utils::UnaryFunction<$arg_type> for F
+            where
+                $($bounds)*
+            {
+                type Output = $output;
+    
+                #[inline]
+                fn exec(&self, mut $arg: $arg_type) -> Self::Output {
+                    $body
+                }
+            }
+            F
+        }
+    };
+}

@@ -53,7 +53,9 @@ where
     const EXACT_HIERARCHY: bool = <S0::Borrowed as HibitTree>::EXACT_HIERARCHY 
                                 & <S1::Borrowed as HibitTree>::EXACT_HIERARCHY;
 
-    /// true if S0 & S1 are [DefaultData]-friendly.
+    /// true if S0 & S1 are having [DefaultData].
+    /// 
+    /// [DefaultData]: HibitTree::DefaultData
     type DefaultData = ConstAnd<
         <S0::Borrowed as HibitTree>::DefaultData,
         <S1::Borrowed as HibitTree>::DefaultData

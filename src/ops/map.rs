@@ -180,12 +180,10 @@ impl<S, F, D> Borrowable for Map<S, F, D> { type Borrowed = Self; }
 
 /// Maps each [HibitTree] element with [UnaryFunction].
 /// 
-/// You can make [RegularHibitTree] from [MultiHibitTree] with `map`.
-/// 
-/// # Note
+/// # [RegularHibitTree] usage
 /// 
 /// Due to current Rust limitations, type inference will not work here
-/// for lambdas. You'll have to either specify concrete type, or pass fn, 
+/// for lambdas. You'll have to either specify concrete type, pass fn 
 /// or implement [UnaryFunction] manually or with [fun!].
 ///
 /// ```
@@ -220,6 +218,37 @@ impl<S, F, D> Borrowable for Map<S, F, D> { type Borrowed = Self; }
 ///     [T: Clone] |d: T| -> T { d.clone() } 
 /// ));
 /// ```   
+/// 
+/// # [MultiHibitTree] -> [RegularHibitTree]
+/// 
+/// You can make [RegularHibitTree] from [MultiHibitTree] with `map` and [fun!]:
+/// ```
+///  # use hibit_tree::{fun, map, multi_intersection, MultiHibitTree, RegularHibitTree};
+///  # use hibit_tree::tree::*;
+///  #
+///  type Array = Tree<usize, Config64bit<3>>;
+///  let mut a1: Array = Default::default();
+///  let mut a2: Array = Default::default();
+///  let mut a3: Array = Default::default();
+///         
+///  // ...
+///         
+///  let arrays = vec![a1, a2, a3];
+///  let intersect = multi_intersection(arrays.iter());
+///  fn is_multi_tree(_:&impl MultiHibitTree){}
+///  is_multi_tree(&intersect);
+///
+///  let intersect = map(intersect, 
+///     fun!(['a, I: Iterator<Item=&'a usize>] |iter: I| -> usize {
+///         iter.sum() 
+///     })
+///  ); 
+///  fn is_regular_tree(_:&impl RegularHibitTree){}
+///  is_regular_tree(&intersect);
+/// ```
+/// 
+/// [MultiHibitTree]: crate::MultiHibitTree
+/// [fun!]: crate::fun
 #[inline]
 pub fn map<S, F>(s: S, f: F) -> Map<S, F, ConstFalse>
 where
@@ -259,69 +288,11 @@ where
     Map{ s, f, phantom: PhantomData }
 }
 
-
-/// Generates stateless generic UnaryFunction. Ala generic closure.
-/// 
-/// Made for [map].
-/// 
-/// # Syntax
-/// 
-/// ```text
-/// fun!([generics list] |argument: type| -> type { .. }
-/// fun!([generics list] |argument: type| where [where bounds] -> type { .. }
-/// ```
-/// 
-/// # Examples
-/// 
-/// ```
-/// # use hibit_tree::fun;
-/// # use hibit_tree::utils::Primitive;
-/// fun!(['a, T: Primitive, I: Iterator<Item=&'a T>] |xs: I| -> T {
-///     xs.fold(T::ZERO, |acc, v| acc + *v) 
-/// });
-/// ```
-/// 
-/// With `where` bounds:
-/// 
-/// ```
-/// # use hibit_tree::fun;
-/// # use hibit_tree::utils::Primitive;
-/// fun!(['a, T, I] |xs: I| -> T where [T: Primitive, I: Iterator<Item=&'a T>] {
-///     xs.fold(T::ZERO, |acc, v| acc + *v) 
-/// });
-/// ```
-#[macro_export]
-macro_rules! fun {
-    // --- UnaryFunction ---
-
-    ([$($generics:tt)*] |$arg:ident: $arg_type:ty| -> $output:ty $body:block) => {
-        fun!([$($generics)*] |$arg: $arg_type| -> $output where [] $body)
-    };
-    
-    ([$($generics:tt)*] |$arg:ident: $arg_type:ty| -> $output:ty where [$($bounds:tt)*] $body:block) => {
-        {
-            struct F;
-            impl<$($generics)*> $crate::utils::UnaryFunction<$arg_type> for F
-            where
-                $($bounds)*
-            {
-                type Output = $output;
-    
-                #[inline]
-                fn exec(&self, mut $arg: $arg_type) -> Self::Output {
-                    $body
-                }
-            }
-            F
-        }
-    };
-}
-
 #[cfg(test)]
 mod tests {
     use itertools::assert_equal;
     use super::*;    
-    use crate::{multi_intersection, tree, ReqDefault};
+    use crate::{fun, multi_intersection, tree, ReqDefault};
     use crate::tree::Config64bit;
     use crate::utils::Primitive;
 
@@ -393,5 +364,8 @@ mod tests {
         assert_eq!(intersect.get(30), None);
         assert_eq!(unsafe{ intersect.get_unchecked(15) }, 45);
         assert_equal(intersect.iter(), [(15, 45)]);
+        
+        fn is_regular_tree(_:&impl RegularHibitTree){}
+        is_regular_tree(&intersect);
     }    
 }
