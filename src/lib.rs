@@ -133,15 +133,11 @@
 //! Requires nightly. Allow to store references in containers.
 //! See [rustonomicon](https://doc.rust-lang.org/nomicon/dropck.html#an-escape-hatch).
 
-mod sparse_tree;
-mod sparse_tree_levels;
 mod dense_tree;
 mod bit_utils;
 mod bit_block;
 mod hibit_tree;
 mod iter;
-mod level;
-mod level_block;
 mod req_default;
 
 pub mod ops;
@@ -149,19 +145,15 @@ pub mod bit_queue;
 //mod ref_or_val;
 pub mod const_utils;
 pub mod utils;
-pub mod config;
-//pub mod tree;
-pub mod tree2;
+pub mod tree;
 
 //pub use ref_or_val::*;
 pub use bit_block::BitBlock;
 pub use req_default::ReqDefault;
-pub use sparse_tree::SparseTree;
 pub use dense_tree::DenseTree;
 pub use hibit_tree::*;
 pub use iter::*;
-pub use ops::map2_1::{map, map_w_default};
-// pub use ops::multi_map_fold::multi_map_fold;
+pub use ops::map::{map, map_w_default};
 pub use ops::intersection::intersection;
 pub use ops::union::union;
 pub use ops::_multi_intersection::multi_intersection;
@@ -173,37 +165,8 @@ use std::ops::BitAnd;
 use const_utils::{ConstInteger, ConstIntVisitor};
 use utils::Primitive;
 use utils::Array;
-use level::IntrusiveListLevel;
 use utils::Borrowable;
 use crate::const_utils::{ConstCopyArrayType, ConstUsize};
-
-// TODO: move to sparse_array / level_block ?
-pub(crate) trait Empty {
-    fn empty() -> Self;
-    fn is_empty(&self) -> bool;
-}
-
-impl<T> Empty for Option<T>{
-    #[inline]
-    fn empty() -> Self {
-        None
-    }
-
-    #[inline]
-    fn is_empty(&self) -> bool {
-        self.is_none()
-    }
-}
-
-/// [Empty] that can be used as a node in intrusive list.
-/// 
-/// Implementing this will allow your [Empty] struct in an empty state 
-/// to be used as a LinkedList node with [IntrusiveListLevel]. 
-pub(crate) trait MaybeEmptyIntrusive: Empty {
-    fn as_u64_mut(&mut self) -> &mut u64;
-    /// Restore [empty()] state, after [as_u64_mut()] mutation.
-    fn restore_empty(&mut self);
-}
 
 // TODO: try replace with accumulated key on fly calculation.
 // Compile-time loop inside. Ends up with N ADDs.

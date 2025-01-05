@@ -486,10 +486,10 @@ mod tests{
     use itertools::assert_equal;
     use crate::hibit_tree::HibitTree;
     use crate::ReqDefault;
-    use crate::tree2::Config64bit;
+    use crate::tree::Config64bit;
     use crate::utils::LendingIterator;
     
-    type Array = crate::tree2::Tree<usize, Config64bit<3>, ReqDefault>;
+    type Array = crate::tree::Tree<usize, Config64bit<3>, ReqDefault>;
 
     #[test]
     fn multi_union_test(){
