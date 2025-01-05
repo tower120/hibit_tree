@@ -2,10 +2,7 @@ use arrayvec::ArrayVec;
 use std::ops::ControlFlow::Continue;
 
 use crate::const_utils::{ConstInteger, ConstUsize};
-use crate::{
-    BitBlock, FromHibitTree, HibitTree, HibitTreeCursor,
-    HibitTreeCursorTypes, HibitTreeTypes
-};
+use crate::{BitBlock, FromHibitTree, HibitTree, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes, RegularHibitTree};
 
 use super::node::{empty_node, NodePtr};
 use super::{DenseTree, DataIndex, Mask};
@@ -34,7 +31,7 @@ unsafe fn make_terminal_node<'src, L, F>(
     mut push_data: F
 ) -> NodePtr
 where
-    L: HibitTree<LevelMask = Mask>,
+    L: RegularHibitTree<LevelMask = Mask>,
     F: for<'a> FnMut(usize, CursorData<'src, 'a, L>) -> DataIndex
 {
     let raw_node = NodePtr::raw_new::<DataIndex>(cap, mask);
@@ -59,7 +56,7 @@ unsafe fn from_exact_sparse_hierarchy<'src, L, N, F>(
     push_data: &mut F,
 ) -> NodePtr
 where
-    L: HibitTree<LevelMask = Mask>,
+    L: RegularHibitTree<LevelMask = Mask>,
     F: for<'a> FnMut(usize, CursorData<'src, 'a, L>) -> DataIndex,
     N: ConstInteger,
 {
@@ -103,7 +100,7 @@ unsafe fn from_sparse_hierarchy<'src, L, N, F>(
     push_data: &mut F,
 ) -> Option<NodePtr>
 where
-    L: HibitTree<LevelMask = Mask>,
+    L: RegularHibitTree<LevelMask = Mask>,
     F: for<'a> FnMut(usize, CursorData<'src, 'a, L>) -> DataIndex,
     N: ConstInteger,
 {
@@ -139,14 +136,15 @@ where
 impl<From, T, const DEPTH: usize> FromHibitTree<From> for DenseTree<T, DEPTH>
 where
     ConstUsize<DEPTH>: ConstInteger,
-    From: HibitTree<
+    From: RegularHibitTree<
         LevelMask  = Mask,
         LevelCount = ConstUsize<DEPTH>,
     >,
     for<'a> From: HibitTreeTypes<'a,
-        Cursor: for<'b> HibitTreeCursorTypes<'b, 
+        Data = T
+        /*Cursor: for<'b> HibitTreeCursorTypes<'b, 
             Data = T
-        >,
+        >,*/
     >,    
 {
     fn from_sparse_hierarchy(other: From) -> Self {

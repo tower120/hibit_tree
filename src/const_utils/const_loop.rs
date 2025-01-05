@@ -5,6 +5,7 @@
 macro_rules! const_loop {
     // Looks like a little bit faster to compile?
     (@internal_fwd $n:ident in {$($is:tt),*} range $start:tt..$end:tt => $break_label:lifetime : $body:block) => {
+        #[allow(unused_comparisons)]
         const{ assert!($start <= $end); }
         $(
             if $end == $is {break $break_label;}
@@ -17,6 +18,7 @@ macro_rules! const_loop {
 
     // Universal, can be used by forward loop as well.
     (@internal_rev $n:ident in {$($is:tt),*} range $start:tt..$end:tt => $body:block) => {
+        #[allow(unused_comparisons)]
         const{ assert!($start <= $end); }
         $(
             if ($start <= $is) & ($is < $end) {

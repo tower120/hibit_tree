@@ -4,7 +4,7 @@ use std::{cmp, mem, ptr};
 use std::ptr::{addr_of_mut, null, NonNull};
 use wide::u64x2;
 use crate::{BitBlock, HibitTree, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex, ReqDefault};
-use crate::const_utils::{const_loop, max, ArrayOf, ConstInteger, ConstUsize};
+use crate::const_utils::{const_loop, max, ArrayOf, ConstBool, ConstFalse, ConstInteger, ConstUsize};
 use crate::req_default::{MakeDefault, MakeDefaultFor, DefaultRequirement, IsReqDefault};
 use crate::utils::{Array, Borrowable};
 
@@ -30,6 +30,9 @@ where
     type Mask = u64x2;
     type LevelCount = ConstUsize<LEVELS>;
 }
+
+// We do not implement Config256bit, since we use one index as sentinel.
+// That would not fit u8 range (256+1 > u8::MAX).
 
 const FREE_CHILD_INDEX_SENTINEL: u8 = u8::MAX;
 
@@ -295,6 +298,8 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         block.mask.get_bit_unchecked(index)
     }
     
+    // TODO: we no longer need this - we can drop empty_branch_blocks with 
+    //      just destruct<T> + n x destruct_empty<BlockPtr>()
     /// Destructs each first child in "empty branch".
     /// 
     /// `Height` - distance to terminal node. 0 - means this IS a terminal node. 
@@ -302,7 +307,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
     pub unsafe fn destruct_empty_branch<Height: ConstInteger, R: DefaultRequirement>(&mut self, height: Height, req: R) {
         if Height::VALUE == 0 {
             // terminal node
-            if R::REQUIRED {
+            if R::Required::VALUE {
                 let child = &mut *self.children_ptr(align_of::<T>()).cast::<T>();
                 ptr::drop_in_place(child);
             }
@@ -384,7 +389,7 @@ fn block_free_inidces_test2(){
 
 type EmptyBranchBlocks<T, Conf: Config> = ArrayOf<BlockPtr<T, Conf>, /*<*/Conf::LevelCount/* as ConstInteger>::Inc*/>;
 
-pub struct Tree<T, Conf:Config, R: DefaultRequirement = ReqDefault<false>>{
+pub struct Tree<T, Conf:Config, R: DefaultRequirement = ReqDefault<ConstFalse>>{
     root: BlockPtr<T, Conf>,
     
     // TODO: root level empty block never used - remove?
@@ -395,16 +400,33 @@ pub struct Tree<T, Conf:Config, R: DefaultRequirement = ReqDefault<false>>{
     phantom_data: PhantomData<R>
 }
 
+impl<T, Conf:Config, R: DefaultRequirement> Default for Tree<T, Conf, R>
+where
+    MakeDefaultFor<T, R>: MakeDefault<T>
+{
+    #[inline]
+    fn default() -> Self {
+        Tree::new()
+    }
+}
+
 impl<T, Conf:Config, R: DefaultRequirement> Tree<T, Conf, R>
 {
     #[inline]
-    fn get_impl(&self, index: &HierarchyIndex<Conf::Mask, Conf::LevelCount>) -> Option<*mut T> {
+    fn get_terminal_block(&self, index: &HierarchyIndex<Conf::Mask, Conf::LevelCount>)
+        -> BlockPtr<T, Conf> 
+    {
         let mut block = self.root;
         const_loop!(I in 0..{Conf::LevelCount::VALUE-1} => {
             let child_index = index.level_indices.as_ref()[I];
             block = unsafe{ *block.get_unchecked_ptr(child_index) };
         });
-        
+        block
+    }
+    
+    #[inline]
+    fn get_impl(&self, index: &HierarchyIndex<Conf::Mask, Conf::LevelCount>) -> Option<*mut T> {
+        let block = self.get_terminal_block(index);
         let child_index = index.level_indices.as_ref()[Conf::LevelCount::VALUE-1];
         unsafe{
             if block.have_child_unchecked(child_index) {
@@ -427,7 +449,7 @@ where
             let mut empty_branch_blocks = EmptyBranchBlocks::<T, Conf>::uninit_array();
             // in reverse order - from terminal node to the root.
             let mut block = BlockPtr::new::<T>(1);
-            if R::REQUIRED {
+            if R::Required::VALUE {
                 unsafe {
                     block.write_child_at(
                         <MakeDefaultFor<T, R> as MakeDefault<T>>::make_default(),
@@ -452,7 +474,7 @@ where
         let mut root = BlockPtr::new::<BlockPtr<T, Conf>>(2);
         unsafe{
             if <Conf::LevelCount as ConstInteger>::VALUE == 1 {
-                if const{R::REQUIRED} {
+                if const{R::Required::VALUE} {
                     root.write_child_at(
                         <MakeDefaultFor<T, R> as MakeDefault<T>>::make_default(),
                         0
@@ -489,7 +511,7 @@ where
                     child_index, 
                     ||{
                         if I == Conf::LevelCount::VALUE-2 {
-                            if const {R::REQUIRED} {
+                            if const {R::Required::VALUE} {
                                 let mut block = BlockPtr::new::<T>(2);
                                 block.write_child_at(
                                     <MakeDefaultFor<T, R> as MakeDefault<T>>::make_default(),
@@ -503,7 +525,8 @@ where
                         } else {
                             let mut block = BlockPtr::new::<BlockPtr<T, Conf>>(2);
                             block.write_child_at(
-                                self.empty_branch_blocks.as_ref()[I+1],
+                                // I+2, because we point from child, and to it's child
+                                self.empty_branch_blocks.as_ref()[I+2],
                                 0
                             );
                             block.set_len(1);
@@ -581,7 +604,7 @@ where
         self.get_impl(&index.into()).map(|v| unsafe{ &mut *v })
     }
     
-    #[inline]
+/*    #[inline]
     pub fn get(&self, index: impl Into<HierarchyIndex<Conf::Mask, Conf::LevelCount>>) -> Option<&T> {
         self.get_impl(&index.into()).map(|v| unsafe{ &*v })
     }    
@@ -594,8 +617,19 @@ where
     where
         R: IsReqDefault
     {
-        unsafe{ self.get(index).unwrap_unchecked() }
-    }    
+        
+        let index = index.into();
+        let mut block = self.root;
+        const_loop!(I in 0..{Conf::LevelCount::VALUE-1} => {
+            let child_index = index.level_indices.as_ref()[I];
+            block = unsafe{ *block.get_unchecked_ptr(child_index) };
+        });
+        
+        let child_index = index.level_indices.as_ref()[Conf::LevelCount::VALUE-1];
+        unsafe{ &*block.get_unchecked_ptr(child_index) }
+        
+        //unsafe{ self.get(index).unwrap_unchecked() }
+    } */   
     
 }
 impl<T, Conf: Config, R: DefaultRequirement> Drop for Tree<T, Conf, R> {
@@ -615,26 +649,38 @@ impl<T, Conf: Config, R: DefaultRequirement> Borrowable for Tree<T, Conf, R> {
 impl<'a, T, Conf: Config, R: DefaultRequirement> HibitTreeTypes<'a> for Tree<T, Conf, R> {
     type Data = &'a T;
     type DataUnchecked = &'a T;
+    type DataOrDefault = &'a T;
     type Cursor = TreeCursor<'a, T, Conf, R>;
 }
 
 impl<T, Conf: Config, R: DefaultRequirement> HibitTree for Tree<T, Conf, R> {
     const EXACT_HIERARCHY: bool = true;
+    type DefaultData = R::Required;
+    
     type LevelCount = Conf::LevelCount;
     type LevelMask  = Conf::Mask;
 
     #[inline]
     fn data(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>) 
-        -> Option<<Self as HibitTreeTypes<'_>>::Data> 
+        -> Option<&T> 
     {
         self.get_impl(index).map(|v| unsafe{ &*v })
     }
 
     #[inline]
     unsafe fn data_unchecked(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>) 
-        -> <Self as HibitTreeTypes<'_>>::DataUnchecked 
+        -> &T 
     {
-        self.data(index).unwrap_unchecked()
+        let block = self.get_terminal_block(index);
+        let child_index = index.level_indices.as_ref()[Conf::LevelCount::VALUE-1];
+        &*block.get_unchecked_ptr(child_index)
+    }
+    
+    #[inline]
+    unsafe fn data_or_default(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>) 
+        -> &T 
+    {
+        self.data_unchecked(index)
     }
 }
 
@@ -648,6 +694,8 @@ pub struct TreeCursor<'tree, T, Conf: Config, R: DefaultRequirement>{
 }
 impl<'a, 'tree, T, Conf: Config, R: DefaultRequirement> HibitTreeCursorTypes<'a> for TreeCursor<'tree, T, Conf, R> {
     type Data = &'tree T;
+    type DataUnchecked = Self::Data;
+    type DataOrDefault = Self::Data;
 }
 impl<'tree, T, Conf: Config, R: DefaultRequirement> HibitTreeCursor<'tree> for TreeCursor<'tree, T, Conf, R> {
     type Tree = Tree<T, Conf, R>;
@@ -705,11 +753,20 @@ impl<'tree, T, Conf: Config, R: DefaultRequirement> HibitTreeCursor<'tree> for T
         let terminal_node = self.branch.as_ref().last().unwrap_unchecked().unwrap_unchecked();
         &*terminal_node.get_unchecked_ptr::<T>(level_index)
     }
+    
+    #[inline]
+    unsafe fn data_or_default<'a>(&'a self, tree: &'tree Self::Tree, level_index: usize) 
+        -> &'tree T
+    {
+        self.data_unchecked(tree, level_index)
+    }
 }
 
 #[cfg(test)]
 mod test{
+    use std::collections::HashMap;
     use itertools::assert_equal;
+    use rand::{Rng, SeedableRng};
     use super::*;
     
     #[test]
@@ -719,6 +776,13 @@ mod test{
         tree.insert(0, 0);
         assert_eq!(tree.get_mut(0), Some(&mut 0));
         assert_eq!(tree.get_mut(4000), None);
+    }
+    
+    #[test]
+    fn get_default_test(){
+        let mut tree: Tree<usize, Config64bit<2>, ReqDefault> = Tree::new();
+        tree.insert(200, 200);
+        assert_eq!(tree.get_or_default(10), &0);
     }
     
     #[test]
@@ -755,4 +819,38 @@ mod test{
             (18000, &18000),
         ])
     }
+    
+    #[test]
+    fn fuzzy_read_test(){
+        const REPEATS: usize = 100;
+        const RANGE  : usize = 10000;
+        const MAX_INSERTS: usize = 10000;
+        const MAX_READS  : usize = 10000;
+        
+        let mut rng = rand::rngs::StdRng::seed_from_u64(0xe15bb9db3dee3a0f);
+        
+        for _ in 0..REPEATS {
+            let mut array: Tree<usize, Config64bit<3>> = Tree::new();
+            let mut set  : HashMap<usize, usize> = Default::default();
+            for _ in 0..rng.gen_range(0..MAX_INSERTS){
+                let v = rng.gen_range(0..RANGE);
+                array.insert(v, v);
+                set.insert(v, v);
+            }
+            
+            // random read
+            for _ in 0..rng.gen_range(0..MAX_READS){
+                let i = rng.gen_range(0..RANGE);
+                let a = array.get(i); 
+                let s = set.get(&i);
+                assert_eq!(a,s);
+            }
+            
+            // read existent
+            for (i, v) in set {
+                let a = array.get(i);
+                assert_eq!(a, Some(&v));
+            }
+        }
+    }    
 }

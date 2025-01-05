@@ -1,6 +1,8 @@
+//! Deprecated - use multi_map instead
+
 use std::marker::PhantomData;
 use crate::{LazyHibitTree, MultiHibitTree, MultiHibitTreeTypes, HibitTree, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes, RegularHibitTree, HierarchyIndex};
-use crate::const_utils::ConstInteger;
+use crate::const_utils::{ConstFalse, ConstInteger};
 use crate::utils::{BinaryFunction, Borrowable, NullaryFunction, UnaryFunction};
 
 pub struct MultiMapFold<S, I, F>{
@@ -21,6 +23,7 @@ where
 {
     type Data = I::Output;
     type DataUnchecked = Self::Data;
+    type DataOrDefault = Self::Data;
     type Cursor = Cursor<'this, S, I, F>;
 }
 
@@ -35,6 +38,8 @@ where
     >,
 {
     const EXACT_HIERARCHY: bool = S::EXACT_HIERARCHY;
+    type DefaultData = ConstFalse;
+    
     type LevelCount = S::LevelCount;
     type LevelMask = S::LevelMask;
 
@@ -74,7 +79,9 @@ where
     S: MultiHibitTree,
     I: NullaryFunction,
 { 
-    type Data = I::Output; 
+    type Data = I::Output;
+    type DataUnchecked = I::Output;
+    type DataOrDefault = I::Output;
 }
 impl<'src, S, I, F> HibitTreeCursor<'src> for Cursor<'src, S, I, F>
 where
@@ -125,7 +132,7 @@ where
 
     #[inline]
     unsafe fn data_unchecked<'a>(&'a self, src: &'src Self::Tree, level_index: usize) 
-        -> <Self as HibitTreeCursorTypes<'a>>::Data 
+        -> <Self as HibitTreeCursorTypes<'a>>::DataUnchecked
     {
         let init = src.init.exec();
         let data_iter = self.0.data_unchecked(&src.s, level_index);

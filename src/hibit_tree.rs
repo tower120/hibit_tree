@@ -1,14 +1,14 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::ops::RangeTo;
-use crate::{multi_map_fold, BitBlock, HierarchyIndex};
-use crate::const_utils::{ConstArray, ConstInteger};
+use crate::{/*multi_map_fold, */BitBlock, HierarchyIndex};
+use crate::const_utils::{ConstArray, ConstBool, ConstInteger, ConstTrue, IsConstTrue};
 use crate::iter::Iter;
-use crate::ops::{Map, MapFunction, MultiMapFold};
-use crate::utils::{BinaryFunction, Borrowable, NullaryFunction};
+use crate::ops::{Map/*, MultiMapFold*/};
+// use crate::ops::iterate_with_default::{iterate_with_default, IterateWithDefault};
+use crate::utils::{BinaryFunction, Borrowable, NullaryFunction, UnaryFunction};
 
-// Should be just <const WIDTH: usize, const DEPTH: usize>, but RUST not yet
-// support that for our case.
+// TODO: move out from this .rs
 /// Range checked index. 
 /// 
 /// Known to be within `HibitTree<LevelMaskType, LevelCount>::index_range()`.
@@ -93,6 +93,7 @@ for
 pub trait HibitTreeTypes<'this, ImplicitBounds = &'this Self>{
     type Data;
     type DataUnchecked;
+    type DataOrDefault;
     type Cursor: HibitTreeCursor<'this, Tree=Self>;
 }
 
@@ -146,6 +147,11 @@ where
     /// false-positive bits in bitmasks.
     const EXACT_HIERARCHY: bool;
     
+    /// Tree capability of returning Default value for absent elements FAST.
+    /// 
+    /// Makes [data_or_default](Self::data_or_default) available.
+    type DefaultData: ConstBool;
+    
     /// Hierarchy levels count (without a data level).
     type LevelCount: ConstInteger;
     
@@ -181,6 +187,15 @@ where
     unsafe fn data_unchecked(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
         -> <Self as HibitTreeTypes<'_>>::DataUnchecked;
     
+    // Should be safe + "where Self::DefaultData: IsConstTrue". Or just be in
+    // separate super trait HibitTreeWithDefault. But it's just way too tedious 
+    // to work with that in RUST.
+    /// # Safety
+    /// 
+    /// Unsafe to call if DefaultData is not true.
+    unsafe fn data_or_default(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
+        -> <Self as HibitTreeTypes<'_>>::DataOrDefault;
+    
     #[inline]
     fn iter(&self) -> Iter<Self>{
         Iter::new(self)
@@ -206,6 +221,16 @@ where
         self.data_unchecked(&index)
     }
     
+    #[inline]
+    fn get_or_default(&self, index: impl Into<Index<<Self as HibitTree>::LevelMask, Self::LevelCount>>)
+        -> <Self as HibitTreeTypes<'_>>::DataOrDefault
+    where 
+        Self::DefaultData: IsConstTrue
+    {
+        let index = HierarchyIndex::from(index.into());
+        unsafe{ self.data_or_default(&index) }
+    }
+
     /// Index range this SparseHierarchy can handle - `0..width^depth`.
     /// 
     /// Indices outside of this range considered to be invalid.
@@ -224,10 +249,47 @@ where
 /// 
 /// Most results of operations are.
 pub trait LazyHibitTree: HibitTree {
+/*    // TODO: move to HibitTree?
+    /// Iterator will use `data_or_default` methods to get concrete values.
+    /// 
+    /// This should speed up some operations, like union, by making them branchless.
+    /// But default values MAY appear in your iterator output.
+    /// 
+    /// # Usage
+    /// 
+    /// Call this BEFORE iterating a tree.
+    ///
+    /// TODO: example.
+    /// 
+    /// # Implementation details
+    /// 
+    /// Exploit cursor's [data_or_default] method, by
+    /// routing [data()] and [data_unchecked()] to it.
+    /// 
+    /// Since [data_or_default] provides branchless access to absent elements, 
+    /// this should have better performance for cases where `data.unwrap_or(..)` 
+    /// is used (like [union]). 
+    /// 
+    /// Iterator may return default values spuriously. If none of [Cursor]'s 
+    /// nested [data_unchecked()] calls use [data()] - this has no effect and
+    /// [IterateWithDefault] will act exactly as `Self`. An example of this are - 
+    /// container, intersection of containers. But union of containers, or
+    /// union of intersections of containers will benefit from using this.
+    /// 
+    /// Zero overhead.
+    #[inline]
+    fn iterate_with_default(self) -> IterateWithDefault<Self>
+    where
+        Self::DefaultData: IsConstTrue
+    {
+        iterate_with_default(self)
+    } */
+    
     /// Make a concrete collection from a lazy/virtual one.
     #[inline]
     fn materialize<T>(self) -> T
     where
+        Self: RegularHibitTree,
         T: FromHibitTree<Self>
     {
         T::from_sparse_hierarchy(self)
@@ -235,15 +297,15 @@ pub trait LazyHibitTree: HibitTree {
 }
 
 /// Construct a [HibitTree] collection from any [HibitTree].
-pub trait FromHibitTree<From: HibitTree> {
+pub trait FromHibitTree<From: RegularHibitTree> {
     fn from_sparse_hierarchy(from: From) -> Self;
 }
 
 /// [HibitTreeCursor] lifetime-dependent types.
 pub trait HibitTreeCursorTypes<'this, ImplicitBounds = &'this Self>{
     type Data;
-    // Looks like we don't need DataUnchecked in State yet.
-    // (unchecked versions return Data)
+    type DataUnchecked;
+    type DataOrDefault;
 }
 
 /// Stateful [HibitTree] traverse interface.
@@ -300,7 +362,11 @@ where
         level_index: usize,
     ) -> <Self::Tree as HibitTree>::LevelMask;
     
-    /// Pointed node must exists
+    /// # Safety
+    /// 
+    /// * Pointed node must exist.
+    /// * `level_n` must be valid.
+    /// * Do not mix with `select_level_node`. 
     unsafe fn select_level_node_unchecked<N: ConstInteger>(
         &mut self,
         tree: &'tree Self::Tree,
@@ -308,19 +374,39 @@ where
         level_index: usize
     ) -> <Self::Tree as HibitTree>::LevelMask;
     
-    /// Item at index may not exist.
+    // We need this for union operations.
+    /// Item at `index` may not exist.
+    /// 
+    /// # Safety
+    /// 
+    /// * `index` must be within block range. 
+    /// * Use only with [select_level_node].
     unsafe fn data<'a>(
         &'a self,
         tree: &'tree Self::Tree,
         level_index: usize
     ) -> Option<<Self as HibitTreeCursorTypes<'a>>::Data>;      
  
-    /// Pointed data must exists
+    /// # Safety
+    /// 
+    /// Pointed data must exist.
     unsafe fn data_unchecked<'a>(
         &'a self,
         tree: &'tree Self::Tree,
         level_index: usize
-    ) -> <Self as HibitTreeCursorTypes<'a>>::Data;        
+    ) -> <Self as HibitTreeCursorTypes<'a>>::DataUnchecked;
+    
+    /// Return Default, if item at index does not exist.
+    /// 
+    /// # Safety
+    /// 
+    /// - Should be used with [select_level_node]. 
+    /// - Unsafe to call if Self::Tree::DataValue is not true.
+    unsafe fn data_or_default<'a>(
+        &'a self,
+        tree: &'tree Self::Tree,
+        level_index: usize
+    ) -> <Self as HibitTreeCursorTypes<'a>>::DataOrDefault;
 }
 
 /// [HibitTree]::Data
@@ -334,9 +420,12 @@ pub type MultiHibitTreeIterItem<'a, T> = <T as MultiHibitTreeTypes<'a>>::IterIte
 /// Data types are the same.  
 pub trait RegularHibitTreeTypes<'this, ImplicitBounds = &'this Self>
     : HibitTreeTypes<'this, ImplicitBounds,
-        DataUnchecked = <Self as HibitTreeTypes<'this, ImplicitBounds>>::Data, 
+        DataUnchecked = <Self as HibitTreeTypes<'this, ImplicitBounds>>::Data,
+        DataOrDefault = <Self as HibitTreeTypes<'this, ImplicitBounds>>::Data,
         Cursor: for<'a> HibitTreeCursorTypes<'a, 
-            Data = Self::Data
+            Data = Self::Data,
+            DataUnchecked = Self::Data,
+            DataOrDefault = Self::Data,
         >,
     >
 {}
@@ -359,27 +448,50 @@ where
     #[inline]
     fn map<F>(self, f: F) -> Map<Self, F>
     where
-        F: for<'a> MapFunction<'a, <Self as HibitTreeTypes<'a>>::Data>
+        F: for<'a> UnaryFunction<<Self as HibitTreeTypes<'a>>::Data>
     {
         crate::map(self, f)
     }
     
+    /// See [crate::map_w_default]
+    #[inline]
+    fn map_w_default<F>(self, f: F) -> Map<Self, F, ConstTrue>
+    where
+        Self::DefaultData: IsConstTrue,
+        F: for<'a> UnaryFunction<<Self as HibitTreeTypes<'a>>::Data>
+    {
+        crate::map_w_default(self, f)
+    }
+
     /// See [crate::map]
     #[inline]
-    fn map_ref<F>(&self, f: F) -> Map<&Self, F>
+    fn ref_map<F>(&self, f: F) -> Map<&Self, F>
     where
-        F: for<'a> MapFunction<'a, <Self as HibitTreeTypes<'a>>::Data>
+        F: for<'a> UnaryFunction<<Self as HibitTreeTypes<'a>>::Data>
     {
         crate::map(self, f)
     }
+    
+    /// See [crate::map_w_default]
+    #[inline]
+    fn ref_map_w_default<F>(&self, f: F) -> Map<&Self, F, ConstTrue>
+    where
+        Self::DefaultData: IsConstTrue,
+        F: for<'a> UnaryFunction<<Self as HibitTreeTypes<'a>>::Data>
+    {
+        crate::map_w_default(self, f)
+    }    
 }
 
 impl<'this, T> RegularHibitTreeTypes<'this> for T
 where
     T: HibitTreeTypes<'this,
         DataUnchecked = <Self as HibitTreeTypes<'this>>::Data,
+        DataOrDefault = <Self as HibitTreeTypes<'this>>::Data,
         Cursor: for<'a> HibitTreeCursorTypes<'a, 
-            Data = Self::Data
+            Data = Self::Data,
+            DataUnchecked = Self::Data,
+            DataOrDefault = Self::Data,
         >,
     >
 {} 
@@ -394,13 +506,16 @@ where
 /// [MultiHibitTree] lifetime-dependent types. 
 /// 
 /// This is actually requirement/bound for [HibitTreeTypes], that all
-/// Data types implement .
+/// Data types `impl Iterator<IterItem>`.
 pub trait MultiHibitTreeTypes<'this, ImplicitBounds = &'this Self>
     : HibitTreeTypes<'this, ImplicitBounds, 
         Data: Iterator<Item=Self::IterItem>,
         DataUnchecked: Iterator<Item=Self::IterItem>,
+        DataOrDefault: Iterator<Item=Self::IterItem>,
         Cursor: for<'a> HibitTreeCursorTypes<'a, 
-            Data: Iterator<Item=Self::IterItem>
+            Data: Iterator<Item=Self::IterItem>,
+            DataUnchecked: Iterator<Item=Self::IterItem>,
+            DataOrDefault: Iterator<Item=Self::IterItem>,
         >,
     >
 {
@@ -417,7 +532,7 @@ pub trait MultiHibitTree: HibitTree
 where
     Self: for<'this> MultiHibitTreeTypes<'this>
 {
-    /// See [crate::multi_map_fold].
+    /*/// See [crate::multi_map_fold].
     #[inline]
     fn map_fold<I, F>(self, init: I, f: F) -> MultiMapFold<Self, I, F>
     where 
@@ -429,5 +544,5 @@ where
         >,    
     {
         multi_map_fold(self, init, f)
-    }
+    }*/
 }

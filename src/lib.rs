@@ -5,6 +5,7 @@
 
 //! # Hibit tree[^hibit]
 //!
+//! TODO: better description in this section.
 //! The core of the lib is [SparseTree] and [DenseTree] containers with [HibitTree] 
 //! interface. These are fixed-depth, K-ary[^k_ary] trees[^trie] with integer keys,
 //! that form bitmap hierarchy[^bitmap_hierarchy].
@@ -12,7 +13,6 @@
 //! * Branchless O(1) access.
 //! * No tree balancing.
 //! * Ordered.
-//! * Unordered contiguous storage.
 //! * Tree act as a bitset/bitmap hierarchy. Bitmap hierarchy is a natural
 //!   acceleration structure for intersection. Allows super-fast set-like operations: 
 //!   intersection, merge, etc.   
@@ -150,7 +150,7 @@ pub mod bit_queue;
 pub mod const_utils;
 pub mod utils;
 pub mod config;
-pub mod tree;
+//pub mod tree;
 pub mod tree2;
 
 //pub use ref_or_val::*;
@@ -160,8 +160,8 @@ pub use sparse_tree::SparseTree;
 pub use dense_tree::DenseTree;
 pub use hibit_tree::*;
 pub use iter::*;
-pub use ops::map::map;
-pub use ops::multi_map_fold::multi_map_fold;
+pub use ops::map2_1::{map, map_w_default};
+// pub use ops::multi_map_fold::multi_map_fold;
 pub use ops::intersection::intersection;
 pub use ops::union::union;
 pub use ops::_multi_intersection::multi_intersection;

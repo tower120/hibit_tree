@@ -41,9 +41,11 @@ where
 
 pub type ArrayOf<T, C: ConstInteger> = C::ArrayOf<T>;
 
+// TODO: remove, use ArrayOf 
 /// [ConstArray] with size `C` and type `T` items.
 pub type ConstArrayType<T, C: ConstInteger> = C::ArrayOf<T>;
 
+// TODO: remove, use ArrayOf
 /// Copyable [ConstArray] with size `C` and type `T` items.
 pub type ConstCopyArrayType<T: Copy, C: ConstInteger> = C::CopyArrayOf<T>;
 

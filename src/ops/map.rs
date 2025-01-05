@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use crate::{LazyHibitTree, RegularHibitTree, HibitTree, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex};
-use crate::const_utils::ConstInteger;
+use crate::const_utils::{ConstFalse, ConstInteger};
 use crate::utils::{Borrowable, UnaryFunction};
 
 mod private {
@@ -48,7 +48,8 @@ where
     F: for<'a> MapFunction<'a, <S::Borrowed as HibitTreeTypes<'a>>::Data>
 {
     const EXACT_HIERARCHY: bool = <S::Borrowed as HibitTree>::EXACT_HIERARCHY;
-    
+    type DefaultData = ConstFalse;
+
     type LevelCount = <S::Borrowed as HibitTree>::LevelCount;
     type LevelMask  = <S::Borrowed as HibitTree>::LevelMask;
 
@@ -90,7 +91,7 @@ pub struct Cursor<'src, S, F>(
 where 
     S: Borrowable<Borrowed: HibitTree>;
 
-impl<'src, S, F> HibitTreeCursor<'src> for Cursor<'src, S, F>
+impl<'tree, S, F> HibitTreeCursor<'tree> for Cursor<'tree, S, F>
 where 
     S: Borrowable<Borrowed: RegularHibitTree>,
     F: for<'a> MapFunction<'a, <S::Borrowed as HibitTreeTypes<'a>>::Data>
@@ -98,7 +99,7 @@ where
     type Tree = Map<S, F>;
     
     #[inline]
-    fn new(this: &'src Self::Tree) -> Self {
+    fn new(this: &'tree Self::Tree) -> Self {
         Self(
             HibitTreeCursor::new(this.s.borrow()),
             PhantomData
@@ -107,20 +108,20 @@ where
 
     #[inline]
     unsafe fn select_level_node<N: ConstInteger>(
-        &mut self, src: &'src Self::Tree, level_n: N, level_index: usize
+        &mut self, src: &'tree Self::Tree, level_n: N, level_index: usize
     ) -> <Self::Tree as HibitTree>::LevelMask {
         self.0.select_level_node(src.s.borrow(), level_n, level_index)
     }
 
     #[inline]
     unsafe fn select_level_node_unchecked<N: ConstInteger>(
-        &mut self, src: &'src Self::Tree, level_n: N, level_index: usize
+        &mut self, src: &'tree Self::Tree, level_n: N, level_index: usize
     ) -> <Self::Tree as HibitTree>::LevelMask {
         self.0.select_level_node_unchecked(src.s.borrow(), level_n, level_index)
     }
 
     #[inline]
-    unsafe fn data<'a>(&'a self, this: &'src Self::Tree, level_index: usize) 
+    unsafe fn data<'a>(&'a self, this: &'tree Self::Tree, level_index: usize) 
         -> Option<<Self as HibitTreeCursorTypes<'a>>::Data> 
     {
         let data = self.0.data(this.s.borrow(), level_index);
@@ -132,11 +133,19 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked<'a>(&'a self, this: &'src Self::Tree, level_index: usize) 
+    unsafe fn data_unchecked<'a>(&'a self, this: &'tree Self::Tree, level_index: usize) 
         -> <Self as HibitTreeCursorTypes<'a>>::Data
     {
         let data = self.0.data_unchecked(this.s.borrow(), level_index);
         this.f.exec(data)
+    }
+    
+    #[inline]
+    unsafe fn data_or_default<'a>(&'a self, tree: &'tree Self::Tree, level_index: usize) 
+        -> <Self as HibitTreeCursorTypes<'a>>::Data
+    {
+        let data = self.0.data_or_default(tree.s.borrow(), level_index);
+        tree.f.exec(data)
     }
 }
 

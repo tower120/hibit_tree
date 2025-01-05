@@ -348,6 +348,7 @@ where
 {
     type Data = &'a T;
     type DataUnchecked = &'a T;
+    type DataOrDefault = &'a T;
     type Cursor = Cursor<'a, T, DEPTH>;    
 }
 
@@ -356,7 +357,8 @@ where
     ConstUsize<DEPTH>: ConstInteger
 {
     const EXACT_HIERARCHY: bool = true;
-    
+    type DefaultData = ConstFalse;
+
     type LevelCount = ConstUsize<DEPTH>;
 
     type LevelMask = Mask;
@@ -385,6 +387,10 @@ where
     {
         self.data(index).unwrap_unchecked()
     }
+
+    unsafe fn data_or_default(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>) -> <Self as HibitTreeTypes<'_>>::DataOrDefault {
+        unimplemented!()
+    }
 }
 
 pub struct Cursor<'src, T, const DEPTH: usize>
@@ -406,6 +412,8 @@ where
     ConstUsize<DEPTH>: ConstInteger
 {
     type Data = &'src T;
+    type DataUnchecked = &'src T;
+    type DataOrDefault = &'src T;
 }
 
 impl<'src, T, const DEPTH: usize> HibitTreeCursor<'src> for Cursor<'src, T, DEPTH>
@@ -519,6 +527,10 @@ where
             
         let data_index = node.get_child::<DataIndex>(level_index).as_usize();
         this.data.get_unchecked(data_index)
+    }
+
+    unsafe fn data_or_default<'a>(&'a self, tree: &'src Self::Tree, level_index: usize) -> <Self as HibitTreeCursorTypes<'a>>::DataOrDefault {
+        unimplemented!()
     }
 }
 

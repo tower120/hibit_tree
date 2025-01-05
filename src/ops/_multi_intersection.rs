@@ -1,17 +1,18 @@
 use std::marker::PhantomData;
 use std::borrow::Borrow;
-use std::mem::MaybeUninit;
-use std::ptr::NonNull;
 use std::slice;
 use arrayvec::ArrayVec;
 use crate::{BitBlock, LazyHibitTree, RegularHibitTree, MultiHibitTree, MultiHibitTreeTypes, HibitTreeData, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex};
-use crate::const_utils::{ConstArray, ConstArrayType, ConstInteger};
+use crate::const_utils::{ConstArray, ConstBool, ConstFalse, ConstInteger, ConstTrue, IsConstTrue};
 use crate::hibit_tree::{HibitTree, HibitTreeCursor};
 use crate::utils::{Array, Borrowable, Ref};
 
 /// Intersection between all iterator items.
 ///
 /// All data iterators are [ExactSizeIterator]. 
+/// 
+/// [data_or_default] will return `data_or_default`s for all iterated trees.  
+/// [Cursor::data_or_default] will return empty iterator if no intersection happens.
 pub struct MultiIntersection<Iter> {
     iter: Iter,
 }
@@ -26,6 +27,7 @@ where
 {
     type Data  = Data<'item, Iter>;
     type DataUnchecked = DataUnchecked<Iter>;
+    type DataOrDefault = DataOrDefault<Iter>;
     type Cursor = Cursor<'this, 'item, Iter>;
 }
 
@@ -35,6 +37,7 @@ where
     T: HibitTree + 'i
 {
     const EXACT_HIERARCHY: bool = false;
+    type DefaultData = T::DefaultData;
     
     type LevelCount = T::LevelCount;
     type LevelMask  = T::LevelMask;
@@ -134,11 +137,24 @@ where
         DataUnchecked {
             hi_index: index.clone(), 
             iter: self.iter.clone(),
+            phantom: Default::default(),
+        }
+    }
+    
+    #[inline]
+    unsafe fn data_or_default(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
+        -> <Self as HibitTreeTypes<'_>>::DataOrDefault
+    {
+        DataUnchecked {
+            hi_index: index.clone(), 
+            iter: self.iter.clone(),
+            phantom: Default::default(),
         }
     }
 }
 
 pub type Data<'item, Iter> = arrayvec::IntoIter<<IterItem<Iter> as HibitTreeTypes<'item>>::Data, N>; 
+pub type DataOrDefault<Iter> = DataUnchecked<Iter, ConstTrue>;
 
 /*use data_resolve_v2::ResolveIter;
 
@@ -251,7 +267,7 @@ mod data_resolve_v2 {
 }
 */
 
-pub struct DataUnchecked<Iter> 
+pub struct DataUnchecked<Iter, D=ConstFalse> 
 where
     Iter: Iterator<Item: Ref<Type: HibitTree>>,
 {
@@ -260,20 +276,28 @@ where
         <IterItem<Iter> as HibitTree>::LevelCount,
     >,
     iter: Iter,
+    phantom: PhantomData<D>,
 }
-impl<'item, Iter, T> Iterator for DataUnchecked<Iter>
+impl<'item, Iter, T, D> Iterator for DataUnchecked<Iter, D>
 where
     Iter: Iterator<Item = &'item T> + Clone,
     T: HibitTree + 'item,
+    D: ConstBool
 {
-    type Item = </*IterItem<Iter>*/T as HibitTreeTypes<'item>>::DataUnchecked;
+    type Item = D::Conditional<
+        <T as HibitTreeTypes<'item>>::DataOrDefault,
+        <T as HibitTreeTypes<'item>>::DataUnchecked    
+    >;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
             .next()
             .map(|array| unsafe {
-                array.data_unchecked(&self.hi_index)
+                D::conditional_exec(
+                    || array.data_or_default(&self.hi_index),
+                    || array.data_unchecked(&self.hi_index)
+                )
             })
     }
 
@@ -284,7 +308,10 @@ where
         F: FnMut(B, Self::Item) -> B,
     {
         self.iter.fold(init, |init, array| unsafe {
-            let data = array.data_unchecked(&self.hi_index);
+            let data = D::conditional_exec(
+                || array.data_or_default(&self.hi_index),
+                || array.data_unchecked(&self.hi_index)
+            );
             f(init, data)
         })
     }
@@ -295,10 +322,11 @@ where
     }
 }
 
-impl<'item, Iter, T> ExactSizeIterator for DataUnchecked<Iter>
+impl<'item, Iter, T, D> ExactSizeIterator for DataUnchecked<Iter, D>
 where
     Iter: Iterator<Item = &'item T> + Clone,
     T: HibitTree + 'item,
+    D: ConstBool
 {}
 
 const N: usize = 32;
@@ -319,6 +347,8 @@ where
     Iter: Iterator<Item: Ref<Type: HibitTree>>
 {
     type Data = CursorData<'this, 'item, Iter>;
+    type DataUnchecked = Self::Data;
+    type DataOrDefault = Self::Data;
 }
 
 impl<'src, 'item, Iter, T> HibitTreeCursor<'src> for Cursor<'src, 'item, Iter>
@@ -379,7 +409,7 @@ where
             usize::MAX
         };
         
-        /*const*/ if N::VALUE == <Self::Tree as HibitTree>::LevelCount::VALUE - 1 {
+        /*const*/ if N::VALUE == <<Self::Tree as HibitTree>::LevelCount as ConstInteger>::VALUE - 1 {
             self.terminal_node_mask = acc_mask.clone(); 
         }
         
@@ -408,7 +438,7 @@ where
                 array, level_n, level_index
             );
             acc_mask &= mask;
-        }            
+        }     
         
         acc_mask
     }
@@ -434,6 +464,29 @@ where
             cursors_iter: self.cursors.iter(),
         }
     }
+    
+    #[inline]
+    unsafe fn data_or_default<'a>(
+        &'a self, src: &'src Self::Tree, level_index: usize
+    ) -> <Self as HibitTreeCursorTypes<'a>>::DataOrDefault {
+        // Mimic default value with an empty slice. Basically same as data().
+        // This is not a branch!
+        let cursors_slice_len = if !self.terminal_node_mask.get_bit_unchecked(level_index){
+            0
+        } else {
+            self.cursors.len()
+        };
+        let cursors_iter = slice::from_raw_parts(
+            self.cursors.as_ptr(),
+            cursors_slice_len
+        ).iter();
+        
+        CursorData { 
+            level_index,
+            array_iter: src.iter.clone(),
+            cursors_iter,
+        }
+    }    
 }
 
 #[derive(Clone)]
@@ -459,9 +512,9 @@ where
 impl<'cursor, 'item, I, T> Iterator for CursorData<'cursor, 'item, I>
 where
     I: Iterator<Item = &'item T> + Clone,
-    T: HibitTree + 'item
+    T: RegularHibitTree + 'item
 {
-    type Item = <IterItemCursor<'item, I> as HibitTreeCursorTypes<'cursor>>::Data;
+    type Item = <IterItemCursor<'item, I> as HibitTreeCursorTypes<'cursor>>::DataUnchecked;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -499,10 +552,11 @@ where
     }
 }
 
+// 0 or array_iter.len()
 impl<'cursor, 'item, I, T> ExactSizeIterator for CursorData<'cursor, 'item, I>
 where
     I: Iterator<Item = &'item T> + Clone,
-    T: HibitTree + 'item
+    T: RegularHibitTree + 'item
 {}
 
 impl<'item, 'this, Iter, T> MultiHibitTreeTypes<'this> for MultiIntersection<Iter>
@@ -526,7 +580,7 @@ where
 
 impl<Iter> Borrowable for MultiIntersection<Iter>{ type Borrowed = Self; }
 
-/// Intersection between multiple &[HibitTree]s.
+/// Intersection between multiple &[RegularHibitTree]s.
 /// 
 /// `iter` will be cloned and iterated multiple times.
 /// Pass something like [slice::Iter].
@@ -534,7 +588,7 @@ impl<Iter> Borrowable for MultiIntersection<Iter>{ type Borrowed = Self; }
 pub fn multi_intersection<Iter>(iter: Iter) 
     -> MultiIntersection<Iter>
 where
-    Iter: Iterator<Item: Ref<Type: HibitTree>> + Clone,
+    Iter: Iterator<Item: Ref<Type: RegularHibitTree>> + Clone,
 {
     MultiIntersection{ iter }
 }
@@ -542,28 +596,29 @@ where
 #[cfg(test)]
 mod tests{
     use itertools::assert_equal;
-    use crate::dense_tree::DenseTree;
     use crate::hibit_tree::HibitTree;
+    use crate::ReqDefault;
+    use crate::tree2::Config64bit;
     use crate::utils::LendingIterator;
     use super::multi_intersection;
 
     #[test]
     fn smoke_test(){
-        type Array = DenseTree<usize, 3>;
-        let mut a1 = Array::default();
-        let mut a2 = Array::default();
-        let mut a3 = Array::default();
+        type Tree = crate::tree2::Tree<usize, Config64bit<3>, ReqDefault>;
+        let mut a1 = Tree::default();
+        let mut a2 = Tree::default();
+        let mut a3 = Tree::default();
         
-        *a1.get_or_insert(10) = 10;
-        *a1.get_or_insert(15) = 15;
-        *a1.get_or_insert(200) = 200;
+        a1.insert(10, 10);
+        a1.insert(15, 15);
+        a1.insert(200, 200);
         
-        *a2.get_or_insert(100) = 100;
-        *a2.get_or_insert(15)  = 15;
-        *a2.get_or_insert(200) = 200;
+        a2.insert(100, 100);
+        a2.insert(15, 15);
+        a2.insert(200, 200);
         
-        *a3.get_or_insert(300) = 300;
-        *a3.get_or_insert(15)  = 15;
+        a3.insert(300, 300);
+        a3.insert(15, 15);
         
         let arrays = [a1, a2, a3];
         
@@ -576,11 +631,14 @@ mod tests{
         }
         
         assert_equal( 
+            intersection.get_or_default(10),
+            &vec![10, 0, 0]
+        );        
+        assert_equal( 
             intersection.get(15).unwrap(),
             vec![arrays[0].get(15).unwrap(), arrays[1].get(15).unwrap(), arrays[2].get(15).unwrap()]
         );
         assert!( intersection.get(200).is_none() );
         assert_equal(unsafe{ intersection.get_unchecked(15) }, intersection.get(15).unwrap());
     }
-
 }

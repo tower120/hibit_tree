@@ -44,7 +44,7 @@ use crate::hibit_tree::{HibitTree, HibitTreeCursor};
 ///
 /// [get_or_default]: SparseTree::get_or_default 
 /// [get_unchecked]: SparseTree::get_unchecked
-pub struct SparseTree<Levels, Data, R = ReqDefault<false>>
+pub struct SparseTree<Levels, Data, R = ReqDefault<ConstFalse>>
 where
     Levels: SparseTreeLevels,
     R: DefaultRequirement
@@ -521,7 +521,7 @@ where
     #[inline]
     unsafe fn drop_impl(&mut self){
         // Manually drop values, skipping first non-existent element, if necessary.
-        let skip_first = !R::REQUIRED; 
+        let skip_first = !R::Required::VALUE; 
         let slice = ptr::slice_from_raw_parts_mut(
             self.values.as_mut_ptr().add(skip_first as usize), 
             self.values.len() - skip_first as usize
@@ -590,6 +590,7 @@ where
 {
     type Data = &'this Data;
     type DataUnchecked = &'this Data;
+    type DataOrDefault = &'this Data;
     type Cursor = Cursor<'this, Levels, Data, R>;
 }
 
@@ -599,7 +600,8 @@ where
     R: DefaultRequirement
 {
     const EXACT_HIERARCHY: bool = true;
-    
+    type DefaultData = ConstFalse;
+
     type LevelCount = Levels::LevelCount;
     type LevelMask  = Levels::Mask;
     
@@ -630,6 +632,10 @@ where
         /*let data_block_index = self.fetch_block_index(level_indices);
         self.values.get_unchecked(data_block_index)*/
     }
+
+    unsafe fn data_or_default(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>) -> <Self as HibitTreeTypes<'_>>::DataOrDefault {
+        unimplemented!()
+    }
 }
 
 pub struct Cursor<'src, Levels, Data, R>
@@ -653,6 +659,8 @@ where
     R: DefaultRequirement,
 {
     type Data = &'src Data;
+    type DataUnchecked = &'src Data;
+    type DataOrDefault = &'src Data;
 }
 
 impl<'src, Levels, Data, R> HibitTreeCursor<'src> for Cursor<'src, Levels, Data, R>
@@ -739,5 +747,9 @@ where
         } else {
             Some(src.values.get_unchecked(data_block_index))
         }
-    }    
+    }
+
+    unsafe fn data_or_default<'a>(&'a self, tree: &'src Self::Tree, level_index: usize) -> <Self as HibitTreeCursorTypes<'a>>::DataOrDefault {
+        unimplemented!()
+    }
 }

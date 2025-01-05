@@ -1,18 +1,19 @@
 use std::marker::PhantomData;
+use crate::const_utils::{ConstBool, ConstFalse, ConstTrue};
 
 /// Marker for container's item [Default] requirement.
 #[derive(Default, Copy, Clone)] 
-pub struct ReqDefault<const B: bool = true>;
+pub struct ReqDefault<B: ConstBool = ConstTrue>(B);
 
 pub trait DefaultRequirement: Default {
-    const REQUIRED: bool;
+    type Required: ConstBool;
 }
-impl<const B: bool> DefaultRequirement for ReqDefault<B>{
-    const REQUIRED: bool = B;
+impl<B: ConstBool> DefaultRequirement for ReqDefault<B>{
+    type Required = B;
 } 
 
 pub trait IsReqDefault{}
-impl IsReqDefault for ReqDefault<true>{}
+impl IsReqDefault for ReqDefault<ConstTrue>{}
 
 
 #[deprecated = "use MakeDefault instead"]
@@ -26,7 +27,7 @@ impl<T: Default> DefaultInit for DefaultInitFor<T, ReqDefault> {
         value.cast::<T>().write(T::default())
     }
 }
-impl<T> DefaultInit for DefaultInitFor<T, ReqDefault<false>> {
+impl<T> DefaultInit for DefaultInitFor<T, ReqDefault<ConstFalse>> {
     #[inline]
     unsafe fn init_default(_: *mut u8) {
         // nothing
@@ -45,7 +46,7 @@ impl<T: Default> MakeDefault<T> for MakeDefaultFor<T, ReqDefault> {
         T::default()
     }
 }
-impl<T> MakeDefault<T> for MakeDefaultFor<T, ReqDefault<false>> {
+impl<T> MakeDefault<T> for MakeDefaultFor<T, ReqDefault<ConstFalse>> {
     #[inline]
     fn make_default() -> T {
         unreachable!("T does not implement Default.")

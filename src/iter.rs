@@ -7,7 +7,6 @@ use crate::const_utils::ConstArrayType;
 use crate::utils::LendingIterator;
 use crate::utils::Array;
 
-// TODO: could be u8's
 /// [usize; T::LevelCount::N - 1]
 type LevelIndices<T: HibitTree> =
     ConstArrayType<
@@ -15,7 +14,7 @@ type LevelIndices<T: HibitTree> =
         <T::LevelCount as ConstInteger>::Dec   
     >;
 
-/// Each hierarchy level has its own iterator.
+/// Each hierarchy level has its own bitblock iterator.
 /// 
 /// [T::LevelMaskType::BitsIter; T::LevelCount]
 type LevelIterators<T: HibitTree> =
@@ -79,7 +78,7 @@ where
 {
     type Item<'this>= (
         usize/*index*/, 
-        <<T as HibitTreeTypes<'a>>::Cursor as HibitTreeCursorTypes<'this>>::Data
+        <<T as HibitTreeTypes<'a>>::Cursor as HibitTreeCursorTypes<'this>>::DataUnchecked
     ) where Self:'this;
 
     #[inline]
@@ -90,6 +89,7 @@ where
             if let Some(index) = last_level_iter.next() {
                 break index;
             } else {
+                // TODO: const_loop! here?
                 let ctrl = const_for_rev(ConstUsize::<0>, T::LevelCount::DEFAULT.dec(), V(self)); 
                 struct V<'b,'a,T: HibitTree>(&'b mut Iter<'a, T>); 
                 impl<'b,'a,T: HibitTree> ConstIntVisitor for V<'b,'a,T> {

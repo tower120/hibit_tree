@@ -1,4 +1,6 @@
 /// Implementable nullary [Fn].
+/// 
+/// Closures and nullary `fn`s implement it.
 pub trait NullaryFunction {
     type Output;
     fn exec(&self) -> Self::Output;
@@ -17,6 +19,8 @@ where
 }
 
 /// Implementable unary [Fn].
+/// 
+/// Closures and unary `fn`s implement it.
 pub trait UnaryFunction<Arg> {
     type Output;
     fn exec(&self, arg: Arg) -> Self::Output;
@@ -35,6 +39,8 @@ where
 }
 
 /// Implementable binary [Fn].
+/// 
+/// Closures and binary `fn`s implement it.
 pub trait BinaryFunction<Arg0, Arg1> {
     type Output;
     fn exec(&self, arg0: Arg0, arg1: Arg1) -> Self::Output;
