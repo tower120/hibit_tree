@@ -1,93 +1,10 @@
 use std::borrow::Borrow;
-use std::marker::PhantomData;
 use std::ops::RangeTo;
-use crate::{/*multi_map_fold, */BitBlock, HierarchyIndex};
+use crate::{BitBlock, HierarchyIndex};
 use crate::const_utils::{ConstArray, ConstBool, ConstInteger, ConstTrue, IsConstTrue};
 use crate::iter::Iter;
-use crate::ops::{Map/*, MultiMapFold*/};
-// use crate::ops::iterate_with_default::{iterate_with_default, IterateWithDefault};
+use crate::ops::Map;
 use crate::utils::{BinaryFunction, Borrowable, NullaryFunction, UnaryFunction};
-
-// TODO: move out from this .rs
-/// Range checked index. 
-/// 
-/// Known to be within `HibitTree<LevelMaskType, LevelCount>::index_range()`.
-/// 
-/// Whenever you see `impl Into<Index<_, _>>` - you can just use your `usize` index
-/// as usual.
-///  
-/// Index range check is very cheap, and is just one assert_eq with constant value.
-/// But in tight loops you may want to get rid of that check - and that's the sole
-/// purpose of `Index`.  
-///
-/// ```
-/// # use hibit_tree::{HibitTree, Index};
-/// # fn example<T: HibitTree>(array: &T, array2: &T){ 
-/// // use it just as usize
-/// array.get(12);
-///
-/// // zero-cost unsafe construction
-/// array.get(unsafe{ Index::new_unchecked(12) });
-///
-/// // safe construct once, then reuse
-/// {
-///     let i = Index::from(12);
-///     array.get(i);
-///     array2.get(i);
-/// }
-/// # }
-/// ``` 
-pub struct Index<LevelMask: BitBlock, LevelCount: ConstInteger>(
-    usize, PhantomData<(LevelMask, LevelCount)>
-);
-
-impl<LevelMask: BitBlock, LevelCount: ConstInteger> Clone for Index<LevelMask, LevelCount>{
-    #[inline]
-    fn clone(&self) -> Self {
-        Self(self.0, PhantomData)
-    }
-}
-impl<LevelMask: BitBlock, LevelCount: ConstInteger> Copy for Index<LevelMask, LevelCount>{}
-
-impl<LevelMaskType: BitBlock, LevelCount: ConstInteger> 
-    Index<LevelMaskType, LevelCount>
-{
-    /// # Safety
-    ///
-    /// You must guarantee that index is in SparseHierarchy<LevelMaskType, LevelCount> range.
-    #[inline]
-    pub unsafe fn new_unchecked(index: usize) -> Self {
-        Self(index, Default::default())
-    }
-}
-
-/// usize -> SparseHierarchyIndex
-impl<LevelMaskType: BitBlock, LevelCount: ConstInteger> From<usize>
-for
-    Index<LevelMaskType, LevelCount>
-{
-    /// # Panic
-    ///
-    /// Panics if index is not in SparseHierarchy<LevelMaskType, LevelCount> range.
-    #[inline]
-    fn from(index: usize) -> Self {
-        let range_end = LevelMaskType::Size::VALUE.saturating_pow(LevelCount::VALUE as _);
-        assert!(index < range_end, "Index {index} is out of SparseHierarchy range.");
-        unsafe{ Self::new_unchecked(index) }
-    }
-}
-
-/// Index -> usize 
-impl<LevelMaskType: BitBlock, LevelCount: ConstInteger> 
-    From<Index<LevelMaskType, LevelCount>>
-for 
-    usize
-{
-    #[inline]
-    fn from(value: Index<LevelMaskType, LevelCount>) -> Self {
-        value.0
-    }
-}
 
 /// [HibitTree] lifetime-dependent types.
 pub trait HibitTreeTypes<'this, ImplicitBounds = &'this Self>{
@@ -196,40 +113,48 @@ where
     unsafe fn data_or_default(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
         -> <Self as HibitTreeTypes<'_>>::DataOrDefault;
     
-    #[inline]
-    fn iter(&self) -> Iter<Self>{
-        Iter::new(self)
-    }
-
     /// You can use `usize` or [Index] for `index`.
+    /// 
+    /// # Panic
+    /// 
+    /// Will panic if `index.try_into() -> Err`.
     #[inline]
-    fn get(&self, index: impl Into<Index<<Self as HibitTree>::LevelMask, Self::LevelCount>>) 
+    fn get(&self, index: impl TryInto<HierarchyIndex<<Self as HibitTree>::LevelMask, Self::LevelCount>>) 
         -> Option<<Self as HibitTreeTypes<'_>>::Data> 
     {
-        let index = HierarchyIndex::from(index.into());
+        let index = index.try_into().unwrap_or_else(|_| panic!());
         self.data(&index)
     }
 
     /// # Safety
     ///
-    /// Item at `index` must exist.
+    /// * `index` must be valid.
+    /// * Item at `index` must exist.
     #[inline]
-    unsafe fn get_unchecked(&self, index: usize) 
+    unsafe fn get_unchecked(&self, index: impl TryInto<HierarchyIndex<<Self as HibitTree>::LevelMask, Self::LevelCount>>) 
         -> <Self as HibitTreeTypes<'_>>::DataUnchecked 
     {
-        let index = HierarchyIndex::from(Index::new_unchecked(index));
+        let index = index.try_into().unwrap_unchecked();
         self.data_unchecked(&index)
     }
-    
+
+    /// # Panic
+    /// 
+    /// Will panic if `index.try_into() -> Err`.
     #[inline]
-    fn get_or_default(&self, index: impl Into<Index<<Self as HibitTree>::LevelMask, Self::LevelCount>>)
+    fn get_or_default(&self, index: impl TryInto<HierarchyIndex<<Self as HibitTree>::LevelMask, Self::LevelCount>>)
         -> <Self as HibitTreeTypes<'_>>::DataOrDefault
     where 
         Self::DefaultData: IsConstTrue
     {
-        let index = HierarchyIndex::from(index.into());
+        let index = index.try_into().unwrap_or_else(|_| panic!());
         unsafe{ self.data_or_default(&index) }
     }
+    
+    #[inline]
+    fn iter(&self) -> Iter<Self>{
+        Iter::new(self)
+    }    
 
     /// Index range this SparseHierarchy can handle - `0..width^depth`.
     /// 
@@ -249,42 +174,6 @@ where
 /// 
 /// Most results of operations are.
 pub trait LazyHibitTree: HibitTree {
-/*    // TODO: move to HibitTree?
-    /// Iterator will use `data_or_default` methods to get concrete values.
-    /// 
-    /// This should speed up some operations, like union, by making them branchless.
-    /// But default values MAY appear in your iterator output.
-    /// 
-    /// # Usage
-    /// 
-    /// Call this BEFORE iterating a tree.
-    ///
-    /// TODO: example.
-    /// 
-    /// # Implementation details
-    /// 
-    /// Exploit cursor's [data_or_default] method, by
-    /// routing [data()] and [data_unchecked()] to it.
-    /// 
-    /// Since [data_or_default] provides branchless access to absent elements, 
-    /// this should have better performance for cases where `data.unwrap_or(..)` 
-    /// is used (like [union]). 
-    /// 
-    /// Iterator may return default values spuriously. If none of [Cursor]'s 
-    /// nested [data_unchecked()] calls use [data()] - this has no effect and
-    /// [IterateWithDefault] will act exactly as `Self`. An example of this are - 
-    /// container, intersection of containers. But union of containers, or
-    /// union of intersections of containers will benefit from using this.
-    /// 
-    /// Zero overhead.
-    #[inline]
-    fn iterate_with_default(self) -> IterateWithDefault<Self>
-    where
-        Self::DefaultData: IsConstTrue
-    {
-        iterate_with_default(self)
-    } */
-    
     /// Make a concrete collection from a lazy/virtual one.
     #[inline]
     fn materialize<T>(self) -> T

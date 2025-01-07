@@ -4,14 +4,14 @@ use std::collections::BTreeMap;
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
 use rand::{Rng, SeedableRng};
 use rand::seq::SliceRandom;
-use hibit_tree::{config, SparseTree, Index, ReqDefault, tree};
+use hibit_tree::{Index, ReqDefault, tree};
 use hibit_tree::DenseTree;
 //use hi_sparse_array::level_block::{Block, ClusterBlock, SmallBlock};
 //use hi_sparse_array::Iter;
 //use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
 use hibit_tree::HibitTree;
 use hibit_tree::ops::multi_intersection::Data;
-use hibit_tree::tree::{Config128bit, Config256bit, Config64bit, Tree};
+use hibit_tree::tree::{Config128bit, Config64bit, Tree};
 
 const RANGE: usize = 260_000;
 const COUNT: usize = 4000;
@@ -35,7 +35,7 @@ type BTree = BTreeMap<u32, DataBlock>;
 type CompactArray = DenseTree<DataBlock, 3>;
 
 //type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>, IntrusiveListLevel<Lvl2Block>), DataBlock>;
-type BlockArray = SparseTree<config::width_64::depth_3, DataBlock>;
+// type BlockArray = SparseTree<config::width_64::depth_3, DataBlock>;
 type BlockArrayNew = Tree<DataBlock, Config64bit<3>, ReqDefault>;
 type BlockArrayNew2 = tree::Tree<DataBlock, tree::Config64bit<3>, ReqDefault>;
 
@@ -69,7 +69,7 @@ fn compact_array_get(array: &CompactArray, indices: &[usize]) -> u64 {
     s
 }*/
 
-fn array_get(array: &BlockArray, indices: &[usize]) -> u64 {
+/*fn array_get(array: &BlockArray, indices: &[usize]) -> u64 {
     let mut s = 0;
     for &i in indices{
         unsafe{
@@ -79,7 +79,7 @@ fn array_get(array: &BlockArray, indices: &[usize]) -> u64 {
         }
     }
     s
-}
+}*/
 
 fn array_new_get(array: &BlockArrayNew, indices: &[usize]) -> u64 {
     let mut s = 0;
@@ -125,7 +125,7 @@ fn btree_get(array: &BTree, indices: &[usize]) -> u64 {
 pub fn bench_iter(c: &mut Criterion) {
     let mut new_array = BlockArrayNew::new();
     let mut new_array2 = BlockArrayNew2::new();
-    let mut block_array = BlockArray::default();
+    // let mut block_array = BlockArray::default();
     //let mut small_block_array = SmallBlockArray::default();
     let mut compact_array = CompactArray::default();
     /*let mut cluster_block_array = ClusterBlockArray::default();*/
@@ -139,7 +139,7 @@ pub fn bench_iter(c: &mut Criterion) {
         let v = rng.gen_range(0..RANGE);
         random_indices.push(v);
         
-        block_array.insert(v, DataBlock(v as _));
+        // block_array.insert(v, DataBlock(v as _));
         new_array.insert(v, DataBlock(v as _));
         new_array2.insert(v, DataBlock(v as _));
         //*small_block_array.get_mut(v) = DataBlock(v as u64);
@@ -158,7 +158,7 @@ pub fn bench_iter(c: &mut Criterion) {
 
     c.bench_function("new array2", |b| b.iter(|| array_new_get2(black_box(&new_array2), black_box(&random_indices))));
     c.bench_function("new array", |b| b.iter(|| array_new_get(black_box(&new_array), black_box(&random_indices))));
-    c.bench_function("level_block array", |b| b.iter(|| array_get(black_box(&block_array), black_box(&random_indices))));
+    // c.bench_function("level_block array", |b| b.iter(|| array_get(black_box(&block_array), black_box(&random_indices))));
     c.bench_function("compact array", |b| b.iter(|| compact_array_get(black_box(&compact_array), black_box(&random_indices))));
     //c.bench_function("small level_block array", |b| b.iter(|| small_array_get(black_box(&small_block_array), black_box(&random_indices))));
     /*c.bench_function("cluster level_block array", |b| b.iter(|| cluster_array_get(black_box(&cluster_block_array))));*/

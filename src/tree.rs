@@ -499,10 +499,10 @@ where
     
     pub fn insert(
         &mut self,
-        index: impl Into<HierarchyIndex<Conf::Mask, Conf::LevelCount>>,
+        index: impl TryInto<HierarchyIndex<Conf::Mask, Conf::LevelCount>>,
         value: T
     ) {
-        let index = index.into();
+        let index = index.try_into().unwrap_or_else(|_| panic!());
         let mut block = &mut self.root;
         const_loop!(I in 0..{Conf::LevelCount::VALUE-1} => {
             let child_index = index.level_indices.as_ref()[I];
@@ -560,9 +560,9 @@ where
     
     pub fn remove(
         &mut self,
-        index: impl Into<HierarchyIndex<Conf::Mask, Conf::LevelCount>>,
+        index: impl TryInto<HierarchyIndex<Conf::Mask, Conf::LevelCount>>,
     ){
-        let index = index.into();
+        let index = index.try_into().unwrap_or_else(|_| panic!());
         let mut branch = self.get_branch(&index);
         unsafe{
             let terminal_node = branch.as_mut().last_mut().unwrap_unchecked();
@@ -600,37 +600,10 @@ where
     }
     
     #[inline]
-    pub fn get_mut(&mut self, index: impl Into<HierarchyIndex<Conf::Mask, Conf::LevelCount>>) -> Option<&mut T> {
-        self.get_impl(&index.into()).map(|v| unsafe{ &mut *v })
+    pub fn get_mut(&mut self, index: impl TryInto<HierarchyIndex<Conf::Mask, Conf::LevelCount>>) -> Option<&mut T> {
+        let index = index.try_into().unwrap_or_else(|_| panic!());
+        self.get_impl(&index).map(|v| unsafe{ &mut *v })
     }
-    
-/*    #[inline]
-    pub fn get(&self, index: impl Into<HierarchyIndex<Conf::Mask, Conf::LevelCount>>) -> Option<&T> {
-        self.get_impl(&index.into()).map(|v| unsafe{ &*v })
-    }    
-    
-    #[inline]
-    pub fn get_or_default(
-        &self, 
-        index: impl Into<HierarchyIndex<Conf::Mask, Conf::LevelCount>>
-    ) -> &T
-    where
-        R: IsReqDefault
-    {
-        
-        let index = index.into();
-        let mut block = self.root;
-        const_loop!(I in 0..{Conf::LevelCount::VALUE-1} => {
-            let child_index = index.level_indices.as_ref()[I];
-            block = unsafe{ *block.get_unchecked_ptr(child_index) };
-        });
-        
-        let child_index = index.level_indices.as_ref()[Conf::LevelCount::VALUE-1];
-        unsafe{ &*block.get_unchecked_ptr(child_index) }
-        
-        //unsafe{ self.get(index).unwrap_unchecked() }
-    } */   
-    
 }
 impl<T, Conf: Config, R: DefaultRequirement> Drop for Tree<T, Conf, R> {
     fn drop(&mut self) {

@@ -12,10 +12,9 @@ mod node;
 
 use std::{mem, ptr};
 use std::marker::PhantomData;
-use crate::{BitBlock, Index, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex};
+use crate::{BitBlock, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex};
 use crate::bit_queue::BitQueue;
 use crate::const_utils::{const_loop, ConstArray, ConstArrayType, ConstBool, ConstFalse, ConstInteger, ConstTrue, ConstUsize};
-use crate::level_indices;
 use crate::hibit_tree::{HibitTree, HibitTreeCursor};
 use crate::utils::{Array, Borrowable, Primitive};
 
@@ -118,16 +117,17 @@ where
     #[inline]
     fn get_or_insert_impl(
         &mut self, 
-        index: usize,
+        index: impl TryInto<HierarchyIndex<Mask, ConstUsize<DEPTH>>>,
         insert: impl ConstBool,
         value_fn: impl FnOnce() -> T
     ) -> &mut T {
-        let indices = level_indices::<Mask, ConstUsize<DEPTH>>(index);
+        let HierarchyIndex{index, level_indices, ..} = index.try_into()
+            .unwrap_or_else(|_| panic!());
         
         // get terminal node pointing to data
         let mut node = &mut self.root;
         const_loop!(N in 0..{DEPTH-1} => {
-            let inner_index = indices.as_ref()[N];
+            let inner_index = level_indices.as_ref()[N];
             unsafe{
                 let mut node_ptr = *node;
                 /*child*/ node = if node_ptr.header().contains(inner_index) {
@@ -155,7 +155,7 @@ where
         // now fetch data
         unsafe{
             let node_ptr = *node;
-            let inner_index = *indices.as_ref().last().unwrap_unchecked();
+            let inner_index = *level_indices.as_ref().last().unwrap_unchecked();
             
             let data_index = if node_ptr.header().contains(inner_index) {
                 let data_index = node_ptr.get_child::<DataIndex>(inner_index).as_usize();
@@ -175,16 +175,14 @@ where
         }
     }    
     
-    pub fn get_or_insert(&mut self, index: impl Into<Index<Mask, ConstUsize<DEPTH>>>) -> &mut T
+    pub fn get_or_insert(&mut self, index: impl TryInto<HierarchyIndex<Mask, ConstUsize<DEPTH>>>) -> &mut T
     where
         T: Default
     {
-        let index: usize = index.into().into();
         self.get_or_insert_impl(index, ConstFalse, || T::default())
     }
     
-    pub fn insert(&mut self, index: impl Into<Index<Mask, ConstUsize<DEPTH>>>, value: T) {
-        let index: usize = index.into().into();
+    pub fn insert(&mut self, index: impl TryInto<HierarchyIndex<Mask, ConstUsize<DEPTH>>>, value: T) {
         self.get_or_insert_impl(index, ConstTrue, ||value);
     }
     
@@ -225,15 +223,15 @@ where
     }      
     
     #[inline]
-    pub fn remove(&mut self, index: impl Into<Index<Mask, ConstUsize<DEPTH>>>) -> Option<T>{
-        let index: usize = index.into().into();
+    pub fn remove(&mut self, index: impl TryInto<HierarchyIndex<Mask, ConstUsize<DEPTH>>>,) -> Option<T>{
+        let HierarchyIndex{index, level_indices, ..} = index.try_into()
+            .unwrap_or_else(|_| panic!());
         
         unsafe{
-            let indices = level_indices::<Mask, ConstUsize<DEPTH>>(index);
-            let branch = self.get_branch(&indices);
+            let branch = self.get_branch(&level_indices);
 
             let terminal_node = branch.as_ref().last().unwrap_unchecked();
-            let terminal_inner_index = *indices.as_ref().last().unwrap_unchecked();
+            let terminal_inner_index = *level_indices.as_ref().last().unwrap_unchecked();
 
             let data_index = terminal_node.get_child::<DataIndex>(terminal_inner_index).as_usize();
             
@@ -252,7 +250,7 @@ where
                             branch.as_ref()[N-1]
                         };
                         
-                        node.remove::<NodePtr>(indices.as_ref()[N]);
+                        node.remove::<NodePtr>(level_indices.as_ref()[N]);
                         if node.header().len() != 1 {
                             break 'out;
                         } 
@@ -269,8 +267,8 @@ where
                     if last_key != index {
                         *self.keys.get_unchecked_mut(data_index) = last_key;
 
-                        let indices = level_indices::<Mask, ConstUsize<DEPTH>>(last_key);
-                        let (node, inner_index) = self.get_terminal_node(indices.as_ref());                    
+                        let HierarchyIndex::<Mask, ConstUsize<DEPTH>>{level_indices, ..} = last_key.try_into().unwrap_unchecked();
+                        let (node, inner_index) = self.get_terminal_node(level_indices.as_ref());                    
                         *node.get_child_mut::<DataIndex>(inner_index) = data_index as DataIndex; 
                     }    
                 }
