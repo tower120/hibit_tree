@@ -1,3 +1,5 @@
+mod from;
+
 use std::alloc::{alloc, dealloc, realloc, Layout};
 use std::marker::PhantomData;
 use std::{cmp, mem, ptr};
@@ -134,7 +136,12 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
     }
     
     #[inline]
-    pub unsafe fn write_child_at<Child>(&mut self, value: Child, child_index: usize) -> *mut Child {
+    pub unsafe fn child_indices_mut(&mut self) -> &mut [u8] {
+        self.0.as_mut().child_indices.as_mut()
+    }
+    
+    #[inline]
+    pub unsafe fn write_child_at<Child>(&mut self, child_index: usize, value: Child) -> *mut Child {
         let ptr = self.children_ptr(align_of::<Child>()).cast::<Child>()
                  .add(child_index);
         ptr.write(value);
@@ -208,6 +215,11 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
     }
     
     #[inline]
+    pub unsafe fn mask_mut(&mut self) -> &mut Conf::Mask {
+        unsafe{ &mut self.0.as_mut().mask }
+    }
+    
+    #[inline]
     pub fn is_empty(&self) -> bool {
         unsafe{ self.0.as_ref().mask.is_zero() }
     }
@@ -248,7 +260,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
             block.len += 1;
             child_index as usize
         };
-        let child = self.write_child_at(child(), child_index);
+        let child = self.write_child_at(child_index, child());
         
         let block = self.0.as_mut();
         *block.child_indices.as_mut().get_unchecked_mut(index) = child_index as u8; 
@@ -392,7 +404,6 @@ type EmptyBranchBlocks<T, Conf: Config> = ArrayOf<BlockPtr<T, Conf>, /*<*/Conf::
 pub struct Tree<T, Conf:Config, R: DefaultRequirement = ReqDefault<ConstFalse>>{
     root: BlockPtr<T, Conf>,
     
-    // TODO: root level empty block never used - remove?
     /// Sequence of empty blocks with child at pos 0.
     /// This lets us have branchless get().
     empty_branch_blocks: EmptyBranchBlocks<T, Conf>,
@@ -438,53 +449,58 @@ impl<T, Conf:Config, R: DefaultRequirement> Tree<T, Conf, R>
     }       
 }
 
+#[inline]
+fn make_empty_branch_blocks<T, Conf, R>() -> EmptyBranchBlocks<T, Conf>
+where
+    Conf:Config, 
+    R: DefaultRequirement,
+    MakeDefaultFor<T, R>: MakeDefault<T>
+{
+    let mut empty_branch_blocks = EmptyBranchBlocks::<T, Conf>::uninit_array();
+    // in reverse order - from terminal node to the root.
+    let mut block = BlockPtr::new::<T>(1);
+    if R::Required::VALUE {
+        unsafe {
+            block.write_child_at(
+                0,
+                <MakeDefaultFor<T, R> as MakeDefault<T>>::make_default()
+            );
+            block.set_len(1);
+        }
+    }
+    empty_branch_blocks.as_mut()[Conf::LevelCount::VALUE-1].write(block);
+    for I in (0..Conf::LevelCount::VALUE-1).rev() {
+        let mut new_block = BlockPtr::new::<BlockPtr<T, Conf>>(1);
+        unsafe{
+            new_block.write_child_at(0, block);
+            new_block.set_len(1);
+        }
+        block = new_block;
+        empty_branch_blocks.as_mut()[I].write(block);
+    }
+    unsafe{ Array::assume_init_array(empty_branch_blocks) }
+}
 
 impl<T, Conf:Config, R: DefaultRequirement> Tree<T, Conf, R>
 where
     MakeDefaultFor<T, R>: MakeDefault<T>
 {
     pub fn new() -> Self{
-        // construct empty branch
-        let empty_branch_blocks: EmptyBranchBlocks<T, Conf> = {
-            let mut empty_branch_blocks = EmptyBranchBlocks::<T, Conf>::uninit_array();
-            // in reverse order - from terminal node to the root.
-            let mut block = BlockPtr::new::<T>(1);
-            if R::Required::VALUE {
-                unsafe {
-                    block.write_child_at(
-                        <MakeDefaultFor<T, R> as MakeDefault<T>>::make_default(),
-                        0
-                    );
-                    block.set_len(1);
-                }
-            }
-            empty_branch_blocks.as_mut()[Conf::LevelCount::VALUE-1].write(block);
-            for I in (0..Conf::LevelCount::VALUE-1).rev() {
-                let mut new_block = BlockPtr::new::<BlockPtr<T, Conf>>(1);
-                unsafe{
-                    new_block.write_child_at(block, 0);
-                    new_block.set_len(1);
-                }
-                block = new_block;
-                empty_branch_blocks.as_mut()[I].write(block);
-            }
-            unsafe{ Array::assume_init_array(empty_branch_blocks) }
-        };
-        
+        let empty_branch_blocks = make_empty_branch_blocks::<T, Conf, R>();
         let mut root = BlockPtr::new::<BlockPtr<T, Conf>>(2);
         unsafe{
             if <Conf::LevelCount as ConstInteger>::VALUE == 1 {
                 if const{R::Required::VALUE} {
                     root.write_child_at(
-                        <MakeDefaultFor<T, R> as MakeDefault<T>>::make_default(),
-                        0
+                        0,
+                        <MakeDefaultFor<T, R> as MakeDefault<T>>::make_default()
                     );
                     root.set_len(1);
                 }                
             } else {            
                 root.write_child_at(
-                    empty_branch_blocks.as_ref()[1], 
-                    0
+                    0,
+                    empty_branch_blocks.as_ref()[1],
                 );
                 root.set_len(1);
             }
@@ -514,8 +530,8 @@ where
                             if const {R::Required::VALUE} {
                                 let mut block = BlockPtr::new::<T>(2);
                                 block.write_child_at(
+                                    0,
                                     <MakeDefaultFor<T, R> as MakeDefault<T>>::make_default(),
-                                    0
                                 );
                                 block.set_len(1);
                                 block
@@ -525,9 +541,9 @@ where
                         } else {
                             let mut block = BlockPtr::new::<BlockPtr<T, Conf>>(2);
                             block.write_child_at(
+                                0,
                                 // I+2, because we point from child, and to it's child
                                 self.empty_branch_blocks.as_ref()[I+2],
-                                0
                             );
                             block.set_len(1);
                             block

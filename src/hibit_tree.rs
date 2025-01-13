@@ -1,4 +1,5 @@
 use std::borrow::Borrow;
+use std::marker::PhantomData;
 use std::ops::RangeTo;
 use crate::{BitBlock, HierarchyIndex};
 use crate::const_utils::{ConstArray, ConstBool, ConstInteger, ConstTrue, IsConstTrue};
@@ -154,7 +155,73 @@ where
     #[inline]
     fn iter(&self) -> Iter<Self>{
         Iter::new(self)
-    }    
+    }
+    
+    /// See [crate::map]
+    #[inline]
+    fn map<F>(self, f: F) -> Map<Self, F>
+    where
+        for<'a, 'b> F: 
+            UnaryFunction<<Self as HibitTreeTypes<'a>>::Data> +
+            UnaryFunction<<Self as HibitTreeTypes<'a>>::DataUnchecked> +
+            UnaryFunction<<Self as HibitTreeTypes<'a>>::DataOrDefault> +
+    
+            UnaryFunction<<<Self as HibitTreeTypes<'a>>::Cursor as HibitTreeCursorTypes<'b>>::Data > +
+            UnaryFunction<<<Self as HibitTreeTypes<'a>>::Cursor as HibitTreeCursorTypes<'b>>::DataUnchecked > + 
+            UnaryFunction<<<Self as HibitTreeTypes<'a>>::Cursor as HibitTreeCursorTypes<'b>>::DataOrDefault >,    
+    {
+        crate::map(self, f)
+    }
+    
+    /// See [crate::map_w_default]
+    #[inline]
+    fn map_w_default<F>(self, f: F) -> Map<Self, F, ConstTrue>
+    where
+        Self::DefaultData: IsConstTrue,
+        for<'a, 'b> F: 
+            UnaryFunction<<Self as HibitTreeTypes<'a>>::Data> +
+            UnaryFunction<<Self as HibitTreeTypes<'a>>::DataUnchecked> +
+            UnaryFunction<<Self as HibitTreeTypes<'a>>::DataOrDefault> +
+    
+            UnaryFunction<<<Self as HibitTreeTypes<'a>>::Cursor as HibitTreeCursorTypes<'b>>::Data > +
+            UnaryFunction<<<Self as HibitTreeTypes<'a>>::Cursor as HibitTreeCursorTypes<'b>>::DataUnchecked > + 
+            UnaryFunction<<<Self as HibitTreeTypes<'a>>::Cursor as HibitTreeCursorTypes<'b>>::DataOrDefault >,    
+    {
+        crate::map_w_default(self, f)
+    }
+
+    /// See [crate::map]
+    #[inline]
+    fn ref_map<F>(&self, f: F) -> Map<&Self, F>
+    where
+        for<'a, 'b> F: 
+            UnaryFunction<<Self as HibitTreeTypes<'a>>::Data> +
+            UnaryFunction<<Self as HibitTreeTypes<'a>>::DataUnchecked> +
+            UnaryFunction<<Self as HibitTreeTypes<'a>>::DataOrDefault> +
+    
+            UnaryFunction<<<Self as HibitTreeTypes<'a>>::Cursor as HibitTreeCursorTypes<'b>>::Data > +
+            UnaryFunction<<<Self as HibitTreeTypes<'a>>::Cursor as HibitTreeCursorTypes<'b>>::DataUnchecked > + 
+            UnaryFunction<<<Self as HibitTreeTypes<'a>>::Cursor as HibitTreeCursorTypes<'b>>::DataOrDefault >,    
+    {
+        crate::map(self, f)
+    }
+    
+    /// See [crate::map_w_default]
+    #[inline]
+    fn ref_map_w_default<F>(&self, f: F) -> Map<&Self, F, ConstTrue>
+    where
+        Self::DefaultData: IsConstTrue,
+        for<'a, 'b> F: 
+            UnaryFunction<<Self as HibitTreeTypes<'a>>::Data> +
+            UnaryFunction<<Self as HibitTreeTypes<'a>>::DataUnchecked> +
+            UnaryFunction<<Self as HibitTreeTypes<'a>>::DataOrDefault> +
+    
+            UnaryFunction<<<Self as HibitTreeTypes<'a>>::Cursor as HibitTreeCursorTypes<'b>>::Data > +
+            UnaryFunction<<<Self as HibitTreeTypes<'a>>::Cursor as HibitTreeCursorTypes<'b>>::DataUnchecked > + 
+            UnaryFunction<<<Self as HibitTreeTypes<'a>>::Cursor as HibitTreeCursorTypes<'b>>::DataOrDefault >,
+    {
+        crate::map_w_default(self, f)
+    }       
 
     /// Index range this SparseHierarchy can handle - `0..width^depth`.
     /// 
@@ -179,15 +246,46 @@ pub trait LazyHibitTree: HibitTree {
     fn materialize<T>(self) -> T
     where
         Self: RegularHibitTree,
-        T: FromHibitTree<Self>
+        T: FromHibitTree<
+            Self,
+            LevelMask  = Self::LevelMask,
+            LevelCount = Self::LevelCount,
+        >
     {
-        T::from_sparse_hierarchy(self)
+        T::from_tree(self)
     }
+    
+    #[inline]
+    fn materialize_filtered<T, F>(self, f: F) -> T
+    where
+        Self: RegularHibitTree,
+        T: FromHibitTree<
+            Self,
+            LevelMask  = Self::LevelMask,
+            LevelCount = Self::LevelCount,
+        >,
+        for<'a> F: UnaryFunction<&'a HibitTreeData<'a, Self>, Output=bool>
+    {
+        T::from_filtered_tree(self, f)
+    }    
 }
 
 /// Construct a [HibitTree] collection from any [HibitTree].
-pub trait FromHibitTree<From: RegularHibitTree> {
-    fn from_sparse_hierarchy(from: From) -> Self;
+pub trait FromHibitTree<From: RegularHibitTree>: HibitTree
+where
+    From: RegularHibitTree<
+        LevelMask  = Self::LevelMask,
+        LevelCount = Self::LevelCount,
+    >
+{
+    fn from_tree(from: From) -> Self;
+    
+    fn from_filtered_tree<F>(from: From, f: F) -> Self
+    where
+        for<'a> F: UnaryFunction<&'a HibitTreeData<'a, From>, Output=bool>
+    {
+        unimplemented!()
+    }
 }
 
 /// [HibitTreeCursor] lifetime-dependent types.
@@ -332,45 +430,7 @@ pub trait RegularHibitTreeTypes<'this, ImplicitBounds = &'this Self>
 pub trait RegularHibitTree: HibitTree
 where
     Self: for<'this> RegularHibitTreeTypes<'this>
-{
-    /// See [crate::map]
-    #[inline]
-    fn map<F>(self, f: F) -> Map<Self, F>
-    where
-        F: for<'a> UnaryFunction<<Self as HibitTreeTypes<'a>>::Data>
-    {
-        crate::map(self, f)
-    }
-    
-    /// See [crate::map_w_default]
-    #[inline]
-    fn map_w_default<F>(self, f: F) -> Map<Self, F, ConstTrue>
-    where
-        Self::DefaultData: IsConstTrue,
-        F: for<'a> UnaryFunction<<Self as HibitTreeTypes<'a>>::Data>
-    {
-        crate::map_w_default(self, f)
-    }
-
-    /// See [crate::map]
-    #[inline]
-    fn ref_map<F>(&self, f: F) -> Map<&Self, F>
-    where
-        F: for<'a> UnaryFunction<<Self as HibitTreeTypes<'a>>::Data>
-    {
-        crate::map(self, f)
-    }
-    
-    /// See [crate::map_w_default]
-    #[inline]
-    fn ref_map_w_default<F>(&self, f: F) -> Map<&Self, F, ConstTrue>
-    where
-        Self::DefaultData: IsConstTrue,
-        F: for<'a> UnaryFunction<<Self as HibitTreeTypes<'a>>::Data>
-    {
-        crate::map_w_default(self, f)
-    }    
-}
+{}
 
 impl<'this, T> RegularHibitTreeTypes<'this> for T
 where

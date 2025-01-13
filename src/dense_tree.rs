@@ -487,8 +487,6 @@ where
         *node.header().mask()
     }
     
-    // TODO: data_or_default possible too.
-    
     #[inline]
     unsafe fn data<'a>(&'a self, this: &'src Self::Tree, level_index: usize) 
         -> Option<<Self as HibitTreeCursorTypes<'a>>::Data> 
@@ -500,6 +498,7 @@ where
             self.level_nodes.as_ref().last().unwrap_unchecked().unwrap_unchecked()
         };
         
+        // TODO: try again with prefetching?
         /*// default
         let data_index = node.get_child::<DataIndex>(level_index).as_usize() * node.contains(level_index) as usize;
         Some(this.data.get_unchecked(data_index))*/
@@ -527,7 +526,9 @@ where
         this.data.get_unchecked(data_index)
     }
 
-    unsafe fn data_or_default<'a>(&'a self, tree: &'src Self::Tree, level_index: usize) -> <Self as HibitTreeCursorTypes<'a>>::DataOrDefault {
+    unsafe fn data_or_default<'a>(&'a self, tree: &'src Self::Tree, level_index: usize) 
+        -> <Self as HibitTreeCursorTypes<'a>>::DataOrDefault 
+    {
         unimplemented!()
     }
 }

@@ -147,7 +147,7 @@ where
         >,*/
     >,    
 {
-    fn from_sparse_hierarchy(other: From) -> Self {
+    fn from_tree(other: From) -> Self {
         let mut other_cursor = <From as HibitTreeTypes>::Cursor::new(&other);        
         let mut data: Vec<T> = Vec::with_capacity(1);
         unsafe{ data.set_len(1); }

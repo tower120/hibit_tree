@@ -5,7 +5,7 @@ use crate::const_utils::{ConstBool, ConstFalse, ConstTrue};
 #[derive(Default, Copy, Clone)] 
 pub struct ReqDefault<B: ConstBool = ConstTrue>(B);
 
-pub trait DefaultRequirement: Default {
+pub trait DefaultRequirement: Default + Copy + Clone {
     type Required: ConstBool;
 }
 impl<B: ConstBool> DefaultRequirement for ReqDefault<B>{
