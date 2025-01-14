@@ -58,7 +58,7 @@ where
         let childs = ManuallyDrop::new(childs);
         ptr::copy_nonoverlapping(
             childs.as_ptr(),
-            block.children_ptr(align_of::<T>()).cast::<Other::Data>().add(index_offset as usize),
+            block.children_ptr::<Other::Data>().add(index_offset as usize),
             childs.len()
         );
     }
@@ -186,7 +186,7 @@ where
         let childs = ManuallyDrop::new(childs);
         ptr::copy_nonoverlapping(
             childs.as_ptr(), 
-            block.children_ptr(align_of::<BlockPtr<T, Conf>>()).cast::<BlockPtr<T, Conf>>().add(start_index),
+            block.children_ptr::<BlockPtr<T, Conf>>().add(start_index),
             childs.len()
         );
     }    

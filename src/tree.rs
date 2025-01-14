@@ -115,12 +115,13 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         }
     }
     
-    // TODO: take <Child>, return *mut Child
     #[inline]
-    const fn children_ptr(&self, child_align: usize) -> *mut u8 {
+    const fn children_ptr<Child>(&self) -> *mut Child {
         let ptr = self.0.as_ptr() as *mut u8;
         unsafe{
-            ptr.add(BlockHeader::<T, Conf>::children_addr_offset(child_align))
+            ptr
+            .add(BlockHeader::<T, Conf>::children_addr_offset(align_of::<Child>()))
+            .cast()
         }
     }    
     
@@ -132,7 +133,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         block.mask.clone().into_bits_iter()
             .map(move |i| unsafe {
                 let i = *block.child_indices.as_ref().get_unchecked(i) as usize;
-                &mut *self.children_ptr(align_of::<Child>()).cast::<Child>().add(i)
+                &mut *self.children_ptr::<Child>().add(i)
             })
     }
     
@@ -143,8 +144,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
     
     #[inline]
     pub unsafe fn write_child_at<Child>(&mut self, child_index: usize, value: Child) -> *mut Child {
-        let ptr = self.children_ptr(align_of::<Child>()).cast::<Child>()
-                 .add(child_index);
+        let ptr = self.children_ptr::<Child>().add(child_index);
         ptr.write(value);
         ptr
     }
@@ -169,7 +169,8 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         block.free_child_index = child_index as u8;
         
         let free_child_ptr =  
-            self.children_ptr(align_of::<Child>()).cast::<Child>().add(child_index)
+            self.children_ptr::<Child>()
+            .add(child_index)
             .cast::<u8>();
         
         *free_child_ptr = prev_root_index;
@@ -187,7 +188,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         }
         
         let next_free_child_ptr =  
-            self.children_ptr(align_of::<Child>()).cast::<Child>().add(index)
+            self.children_ptr::<Child>().add(index)
             .cast::<u8>();
         
         block.free_child_index = *next_free_child_ptr;
@@ -203,7 +204,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         ) as usize;         
 
         // 1. destruct child
-        let child = &mut *self.children_ptr(align_of::<Child>()).cast::<Child>().add(child_element_index);
+        let child = &mut *self.children_ptr::<Child>().add(child_element_index);
         ptr::drop_in_place(child);
         
         // 2. mark child's slot as free 
@@ -305,7 +306,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
     ) -> *mut Child {
         let block = self.0.as_ref();
         let i = *block.child_indices.as_ref().get_unchecked(index);
-        self.children_ptr(align_of::<Child>()).cast::<Child>().add(i as usize)
+        self.children_ptr::<Child>().add(i as usize)
     }
 
     #[inline]
@@ -324,12 +325,12 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         if Height::VALUE == 0 {
             // terminal node
             if R::Required::VALUE {
-                let child = &mut *self.children_ptr(align_of::<T>()).cast::<T>();
+                let child = &mut *self.children_ptr::<T>();
                 ptr::drop_in_place(child);
             }
             self.destruct_empty::<T>();
         } else {
-            let mut child = &mut *self.children_ptr(align_of::<BlockPtr<T, Conf>>()).cast::<BlockPtr<T, Conf>>();
+            let mut child = &mut *self.children_ptr::<BlockPtr<T, Conf>>();
             child.destruct_empty_branch(height.dec(), req);
             ptr::drop_in_place(child);
             self.destruct_empty::<BlockPtr<T, Conf>>();
