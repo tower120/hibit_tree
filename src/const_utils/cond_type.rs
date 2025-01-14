@@ -62,8 +62,8 @@ where
 impl<B: ConstBool, T, F> CondType<B, T, F>{
     #[inline(always)]
     pub fn new(
-        mut true_fn : impl FnMut() -> T,
-        mut false_fn: impl FnMut() -> F,
+        true_fn : impl FnOnce() -> T,
+        false_fn: impl FnOnce() -> F,
     ) -> Self {
         let mut this = MaybeUninit::uninit();
         

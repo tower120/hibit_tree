@@ -264,7 +264,7 @@ pub trait LazyHibitTree: HibitTree {
             LevelMask  = Self::LevelMask,
             LevelCount = Self::LevelCount,
         >,
-        for<'a> F: UnaryFunction<&'a HibitTreeData<'a, Self>, Output=bool>
+        for<'a, 'b> F: UnaryFunction<&'a HibitTreeData<'b, Self>, Output=bool>
     {
         T::from_filtered_tree(self, f)
     }    
@@ -282,7 +282,7 @@ where
     
     fn from_filtered_tree<F>(from: From, f: F) -> Self
     where
-        for<'a> F: UnaryFunction<&'a HibitTreeData<'a, From>, Output=bool>
+        for<'a, 'b> F: UnaryFunction<&'a HibitTreeData<'b, From>, Output=bool>
     {
         unimplemented!()
     }

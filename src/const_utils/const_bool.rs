@@ -1,5 +1,4 @@
 use std::ops::{Deref, DerefMut};
-use crate::BitBlock;
 use crate::const_utils::const_int::ConstInteger;
 use crate::utils::NullaryFunction;
 

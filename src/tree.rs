@@ -115,6 +115,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         }
     }
     
+    // TODO: take <Child>, return *mut Child
     #[inline]
     const fn children_ptr(&self, child_align: usize) -> *mut u8 {
         let ptr = self.0.as_ptr() as *mut u8;
@@ -148,6 +149,9 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         ptr
     }
     
+    /// Maybe one element more than `mask.count_ones()`,
+    /// if 0th element used as an empty node pointer -  
+    /// all non-existent `child_indices` will point to it.  
     #[inline]
     pub unsafe fn set_len(&mut self, len: u8) {
         let mut block = self.0.as_mut();
@@ -481,31 +485,66 @@ where
     unsafe{ Array::assume_init_array(empty_branch_blocks) }
 }
 
+#[inline]
+fn make_empty_root<T, Conf, R>(empty_branch_blocks: &EmptyBranchBlocks<T, Conf>) 
+    -> BlockPtr<T, Conf>
+where
+    Conf:Config, 
+    R: DefaultRequirement,
+    MakeDefaultFor<T, R>: MakeDefault<T>
+{
+    let mut root = BlockPtr::new::<BlockPtr<T, Conf>>(2);
+    unsafe{
+        if <Conf::LevelCount as ConstInteger>::VALUE == 1 {
+            if const{R::Required::VALUE} {
+                root.write_child_at(
+                    0,
+                    <MakeDefaultFor<T, R> as MakeDefault<T>>::make_default()
+                );
+                root.set_len(1);
+            }                
+        } else {            
+            root.write_child_at(
+                0,
+                empty_branch_blocks.as_ref()[1],
+            );
+            root.set_len(1);
+        }
+    }
+    root
+}
+
+#[inline]
+fn make_empty_terminal<R, T, Conf>(cap: u8, _:R) -> BlockPtr<T, Conf>
+where
+    Conf: Config,
+    R: DefaultRequirement,
+    MakeDefaultFor<T, R>: MakeDefault<T>
+{
+    // TODO: align capacity to pot?
+    if const {R::Required::VALUE} {
+        let cap = cap+1;
+        let mut block = BlockPtr::new::<T>(cap);
+        unsafe{
+            block.write_child_at(
+                0,
+                <MakeDefaultFor<T, R> as MakeDefault<T>>::make_default(),
+            );
+            block.set_len(1);
+        }
+        block
+    } else {
+        BlockPtr::new::<T>(cap)    
+    }
+}
+
 impl<T, Conf:Config, R: DefaultRequirement> Tree<T, Conf, R>
 where
     MakeDefaultFor<T, R>: MakeDefault<T>
 {
     pub fn new() -> Self{
         let empty_branch_blocks = make_empty_branch_blocks::<T, Conf, R>();
-        let mut root = BlockPtr::new::<BlockPtr<T, Conf>>(2);
-        unsafe{
-            if <Conf::LevelCount as ConstInteger>::VALUE == 1 {
-                if const{R::Required::VALUE} {
-                    root.write_child_at(
-                        0,
-                        <MakeDefaultFor<T, R> as MakeDefault<T>>::make_default()
-                    );
-                    root.set_len(1);
-                }                
-            } else {            
-                root.write_child_at(
-                    0,
-                    empty_branch_blocks.as_ref()[1],
-                );
-                root.set_len(1);
-            }
-        }
-        
+        let root = make_empty_root::<T, Conf, R>(&empty_branch_blocks);
         Self{
             root,
             empty_branch_blocks,
@@ -527,17 +566,7 @@ where
                     child_index, 
                     ||{
                         if I == Conf::LevelCount::VALUE-2 {
-                            if const {R::Required::VALUE} {
-                                let mut block = BlockPtr::new::<T>(2);
-                                block.write_child_at(
-                                    0,
-                                    <MakeDefaultFor<T, R> as MakeDefault<T>>::make_default(),
-                                );
-                                block.set_len(1);
-                                block
-                            } else {
-                                BlockPtr::new::<T>(1)    
-                            }
+                            make_empty_terminal(1, R::default())
                         } else {
                             let mut block = BlockPtr::new::<BlockPtr<T, Conf>>(2);
                             block.write_child_at(
