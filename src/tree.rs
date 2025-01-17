@@ -785,6 +785,7 @@ impl<'tree, T, Conf: Config, R: DefaultRequirement> HibitTreeCursor<'tree> for T
 #[cfg(test)]
 mod test{
     use std::collections::HashMap;
+    use cfg_if::cfg_if;
     use itertools::assert_equal;
     use rand::{Rng, SeedableRng};
     use super::*;
@@ -842,10 +843,10 @@ mod test{
     
     #[test]
     fn fuzzy_read_test(){
-        const REPEATS: usize = 100;
-        const RANGE  : usize = 10000;
-        const MAX_INSERTS: usize = 10000;
-        const MAX_READS  : usize = 10000;
+        const REPEATS    : usize = if cfg!(miri) { 3     } else { 100    };
+        const RANGE      : usize = if cfg!(miri) { 6000  } else { 260000 }; 
+        const MAX_INSERTS: usize = if cfg!(miri) { 2000  } else { 100000 }; 
+        const MAX_READS  : usize = if cfg!(miri) { 2000  } else { 100000 };
         
         let mut rng = rand::rngs::StdRng::seed_from_u64(0xe15bb9db3dee3a0f);
         

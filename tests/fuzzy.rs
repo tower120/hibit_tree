@@ -15,8 +15,9 @@ type Map = HashMap<usize, Data>;
 
 #[test]
 fn fuzzy_test(){
-    const RANGE: usize = common::RANGE;
-    const COUNT: usize = 4000;
+    const RANGE  : usize = common::RANGE;
+    const COUNT  : usize = if cfg!(miri) { 400 } else { 10000 };
+    const REPEATS: usize = if cfg!(miri) { 3   } else { 100   };
     
     let mut rng = rand::rngs::StdRng::seed_from_u64(0xe15bb9db3dee3a0f);    
 
@@ -56,7 +57,7 @@ fn fuzzy_test(){
         }          
     }
  
-    for _ in 0..10 {
+    for _ in 0..REPEATS {
         // insert
         for _ in 0..rng.gen_range(0..COUNT) {
             let v = rng.gen_range(0..RANGE);
