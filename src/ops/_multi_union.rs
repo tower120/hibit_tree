@@ -272,11 +272,9 @@ where
             return acc_mask;
         }
         
-        // drop lifetime checks for `get_many`-like access. 
-        let mut lvls_non_empty_states = NonNull::from(self.lvls_non_empty_states.as_mut());
-        
-        let lvl_non_empty_states = 
-            lvls_non_empty_states.as_mut().get_unchecked_mut(level_n.value()-1);
+        // Work with pointers for `get_many`-like access. 
+        let lvls_non_empty_states = self.lvls_non_empty_states.as_mut().as_mut_ptr();
+        let lvl_non_empty_states  = &mut*lvls_non_empty_states.add(level_n.value()-1);
         lvl_non_empty_states.clear();
         
         let len = self.cursors.len() as u8;
@@ -295,8 +293,7 @@ where
             // just iterate all states.
             for i in 0..len { foreach(i) }    
         } else {
-            let prev_lvl_non_empty_states =
-                lvls_non_empty_states.as_ref().get_unchecked(level_n.value()-2);
+            let prev_lvl_non_empty_states = &*lvls_non_empty_states.add(level_n.value()-2);
             for i in prev_lvl_non_empty_states { foreach(*i) }
         }
         

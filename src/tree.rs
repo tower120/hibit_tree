@@ -3,6 +3,7 @@ mod from;
 use std::alloc::{alloc, dealloc, realloc, Layout};
 use std::marker::PhantomData;
 use std::{cmp, mem, ptr};
+use std::mem::MaybeUninit;
 use std::ptr::{addr_of_mut, null, NonNull};
 use wide::u64x2;
 use crate::{BitBlock, HibitTree, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex, ReqDefault};
