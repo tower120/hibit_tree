@@ -598,13 +598,13 @@ mod tests{
     use itertools::assert_equal;
     use crate::hibit_tree::HibitTree;
     use crate::ReqDefault;
-    use crate::tree::Config64bit;
+    use crate::config::_64bit;
     use crate::utils::LendingIterator;
     use super::multi_intersection;
 
     #[test]
     fn smoke_test(){
-        type Tree = crate::tree::Tree<usize, Config64bit<3>, ReqDefault>;
+        type Tree = crate::tree::Tree<usize, _64bit<3>, ReqDefault>;
         let mut a1 = Tree::default();
         let mut a2 = Tree::default();
         let mut a3 = Tree::default();

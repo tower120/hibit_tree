@@ -2,40 +2,13 @@ mod from;
 
 use std::alloc::{alloc, dealloc, realloc, Layout};
 use std::marker::PhantomData;
-use std::{cmp, mem, ptr};
-use std::mem::MaybeUninit;
-use std::ptr::{addr_of_mut, null, NonNull};
-use wide::u64x2;
+use std::{mem, ptr};
+use std::ptr::{addr_of_mut, NonNull};
 use crate::{BitBlock, HibitTree, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex, ReqDefault};
+use crate::config::{Config, _64bit};
 use crate::const_utils::{const_loop, max, ArrayOf, ConstBool, ConstFalse, ConstInteger, ConstUsize};
-use crate::req_default::{MakeDefault, MakeDefaultFor, DefaultRequirement, IsReqDefault};
+use crate::req_default::{DefaultRequirement, IsReqDefault, MakeDefault, MakeDefaultFor};
 use crate::utils::{Array, Borrowable};
-
-pub trait Config {
-    type Mask: BitBlock;
-    type LevelCount: ConstInteger;
-}
-
-pub struct Config64bit<const LEVELS: usize>;
-impl<const LEVELS: usize> Config for Config64bit<LEVELS>
-where
-    ConstUsize<LEVELS>: ConstInteger,
-{
-    type Mask = u64;
-    type LevelCount = ConstUsize<LEVELS>;
-}
-
-pub struct Config128bit<const LEVELS: usize>;
-impl<const LEVELS: usize> Config for Config128bit<LEVELS>
-where
-    ConstUsize<LEVELS>: ConstInteger,
-{
-    type Mask = u64x2;
-    type LevelCount = ConstUsize<LEVELS>;
-}
-
-// We do not implement Config256bit, since we use one index as sentinel.
-// That would not fit u8 range (256+1 > u8::MAX).
 
 const FREE_CHILD_INDEX_SENTINEL: u8 = u8::MAX;
 
@@ -372,7 +345,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
 
 #[test]
 fn block_free_inidces_test(){
-    let mut block: BlockPtr<usize, Config64bit<2>> = BlockPtr::new::<usize>(16);
+    let mut block: BlockPtr<usize, _64bit<2>> = BlockPtr::new::<usize>(16);
     unsafe{
         block.push_free_child_index::<usize>(2);
         block.push_free_child_index::<usize>(4);
@@ -389,7 +362,7 @@ fn block_free_inidces_test(){
 
 #[test]
 fn block_free_inidces_test2(){
-    let mut block: BlockPtr<usize, Config64bit<2>> = BlockPtr::new::<usize>(16);
+    let mut block: BlockPtr<usize, _64bit<2>> = BlockPtr::new::<usize>(16);
     unsafe{
         block.push_free_child_index::<usize>(2);
         block.push_free_child_index::<usize>(4);
@@ -589,6 +562,7 @@ where
     }
     
     // TODO: Do not track root block - it is always only one.
+    #[inline]
     fn get_branch(&self, index: &HierarchyIndex<Conf::Mask, Conf::LevelCount>) 
         -> ArrayOf< BlockPtr<T, Conf>, Conf::LevelCount >  
     {
@@ -792,7 +766,7 @@ mod test{
     
     #[test]
     fn smoke_test(){
-        let mut tree: Tree<usize, Config64bit<2>> = Tree::new();
+        let mut tree: Tree<usize, _64bit<2>> = Tree::new();
         tree.insert(0, 0);
         tree.insert(0, 0);
         assert_eq!(tree.get_mut(0), Some(&mut 0));
@@ -801,14 +775,14 @@ mod test{
     
     #[test]
     fn get_default_test(){
-        let mut tree: Tree<usize, Config64bit<2>, ReqDefault> = Tree::new();
+        let mut tree: Tree<usize, _64bit<2>, ReqDefault> = Tree::new();
         tree.insert(200, 200);
         assert_eq!(tree.get_or_default(10), &0);
     }
     
     #[test]
     fn remove_test(){
-        let mut tree: Tree<usize, Config64bit<3>> = Tree::new();
+        let mut tree: Tree<usize, _64bit<3>> = Tree::new();
         tree.insert(0, 0);
         tree.insert(4000, 4000);
         assert_eq!(tree.get_mut(0), Some(&mut 0));
@@ -825,7 +799,7 @@ mod test{
     
     #[test]
     fn iter_test(){
-        let mut tree: Tree<usize, Config64bit<3>> = Tree::new();
+        let mut tree: Tree<usize, _64bit<3>> = Tree::new();
         assert!(tree.iter().next().is_none());
         
         tree.insert(0, 0);
@@ -851,7 +825,7 @@ mod test{
         let mut rng = rand::rngs::StdRng::seed_from_u64(0xe15bb9db3dee3a0f);
         
         for _ in 0..REPEATS {
-            let mut array: Tree<usize, Config64bit<3>> = Tree::new();
+            let mut array: Tree<usize, _64bit<3>> = Tree::new();
             let mut set  : HashMap<usize, usize> = Default::default();
             for _ in 0..rng.gen_range(0..MAX_INSERTS){
                 let v = rng.gen_range(0..RANGE);

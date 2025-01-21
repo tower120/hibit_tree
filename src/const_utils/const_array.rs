@@ -1,6 +1,6 @@
 use std::mem::ManuallyDrop;
 use std::ptr;
-use crate::{Array, Primitive};
+use crate::utils::Array;
 use crate::const_utils::{ConstUsize, ConstInteger};
 
 // TODO: All Arrays can be ConstArrays.

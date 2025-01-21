@@ -252,11 +252,11 @@ mod tests{
     use crate::{map, map_w_default, ReqDefault};
     use crate::ops::union::{union, union_w_default};
     use crate::hibit_tree::HibitTree;
-    use crate::tree::Config64bit;
+    use crate::config::_64bit;
 
     #[test]
     fn smoke_test(){
-        type Array = crate::tree::Tree<usize, Config64bit<3>, ReqDefault>;
+        type Array = crate::tree::Tree<usize, _64bit<3>, ReqDefault>;
         let mut a1 = Array::default();
         let mut a2 = Array::default();
         

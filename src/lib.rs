@@ -133,39 +133,41 @@
 //! Requires nightly. Allow to store references in containers.
 //! See [rustonomicon](https://doc.rust-lang.org/nomicon/dropck.html#an-escape-hatch).
 
-mod dense_tree;
 mod bit_utils;
+
+mod dense_tree;
+pub use dense_tree::DenseTree;
+
 mod bit_block;
+pub use bit_block::BitBlock;
+
 mod index;
+pub use index::*;
+
 mod hibit_tree;
+pub use hibit_tree::*;
+
 mod iter;
+pub use iter::*;
+
 mod req_default;
+pub use req_default::ReqDefault;
 
 pub mod ops;
-pub mod bit_queue;
-//mod ref_or_val;
-pub mod const_utils;
-pub mod utils;
-pub mod tree;
-
-//pub use ref_or_val::*;
-pub use bit_block::BitBlock;
-pub use req_default::ReqDefault;
-pub use dense_tree::DenseTree;
-pub use index::*;
-pub use hibit_tree::*;
-pub use iter::*;
 pub use ops::map::{map, map_w_default};
 pub use ops::intersection::intersection;
 pub use ops::union::union;
 pub use ops::_multi_intersection::multi_intersection;
 pub use ops::_multi_union::multi_union;
 
-use std::borrow::Borrow;
-use std::marker::PhantomData;
-use std::ops::BitAnd;
-use const_utils::{ConstInteger, ConstIntVisitor};
-use utils::Primitive;
-use utils::Array;
-use utils::Borrowable;
-use crate::const_utils::{ConstCopyArrayType, ConstUsize};
+pub mod bit_queue;
+pub mod const_utils;
+pub mod utils;
+pub mod config;
+
+mod tree;
+pub use tree::Tree;
+
+// Just for macros examples
+//mod ref_or_val;
+//pub use ref_or_val::*;

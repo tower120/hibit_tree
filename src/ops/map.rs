@@ -224,9 +224,10 @@ impl<S, F, D> Borrowable for Map<S, F, D> { type Borrowed = Self; }
 /// You can make [RegularHibitTree] from [MultiHibitTree] with `map` and [fun!]:
 /// ```
 ///  # use hibit_tree::{fun, map, multi_intersection, MultiHibitTree, RegularHibitTree};
-///  # use hibit_tree::tree::*;
+///  # use hibit_tree::config::*;
+///  # use hibit_tree::Tree;
 ///  #
-///  type Array = Tree<usize, Config64bit<3>>;
+///  type Array = Tree<usize, _64bit<3>>;
 ///  let mut a1: Array = Default::default();
 ///  let mut a2: Array = Default::default();
 ///  let mut a3: Array = Default::default();
@@ -293,11 +294,11 @@ mod tests {
     use itertools::assert_equal;
     use super::*;    
     use crate::{fun, multi_intersection, tree, ReqDefault};
-    use crate::tree::Config64bit;
+    use crate::config::_64bit;
     use crate::utils::Primitive;
 
     fn smoke_test(){
-        type Tree = tree::Tree<usize, Config64bit<3>, ReqDefault>;
+        type Tree = tree::Tree<usize, _64bit<3>, ReqDefault>;
         let mut t1 = Tree::new();
         let mut t2 = Tree::new();
         
@@ -321,7 +322,7 @@ mod tests {
     
     #[test]
     fn multi_map_test() {
-        type Tree = tree::Tree<usize, Config64bit<3>, ReqDefault>;
+        type Tree = tree::Tree<usize, _64bit<3>, ReqDefault>;
         let mut a1: Tree = Default::default();
         let mut a2: Tree = Default::default();
         let mut a3: Tree = Default::default();

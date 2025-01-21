@@ -270,7 +270,7 @@ mod test{
     
     #[test]
     fn from_test(){
-        type Map = Tree<usize, Config64bit<3>, ReqDefault>; 
+        type Map = Tree<usize, _64bit<3>, ReqDefault>; 
         let mut tree = Map::new();
         
         for i in 0..1000 {
@@ -288,7 +288,7 @@ mod test{
     
     #[test]
     fn from_filtered_test(){
-        type Map = Tree<usize, Config64bit<3>, ReqDefault>; 
+        type Map = Tree<usize, _64bit<3>, ReqDefault>; 
         let mut tree = Map::new();
         
         for i in 0..1000 {

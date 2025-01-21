@@ -3,7 +3,7 @@ use std::mem::{ManuallyDrop, size_of};
 use std::ops::ControlFlow;
 
 use crate::bit_utils::{one_bits_iter, OneBitsIter, self};
-use crate::Primitive;
+use crate::utils::Primitive;
 
 /// Return 0 if n > BITS
 #[inline]

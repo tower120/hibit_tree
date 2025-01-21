@@ -1,17 +1,17 @@
 //! get 50% existent, ~50% non-existent
 
 use std::collections::BTreeMap;
-use criterion::{black_box, Criterion, criterion_group, criterion_main};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::{Rng, SeedableRng};
 use rand::seq::SliceRandom;
-use hibit_tree::{Index, ReqDefault, tree};
+use hibit_tree::{config, tree, Index, ReqDefault};
+use hibit_tree::config::_64bit;
 use hibit_tree::DenseTree;
 //use hi_sparse_array::level_block::{Block, ClusterBlock, SmallBlock};
 //use hi_sparse_array::Iter;
 //use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
 use hibit_tree::HibitTree;
-use hibit_tree::ops::multi_intersection::Data;
-use hibit_tree::tree::{Config128bit, Config64bit, Tree};
+use hibit_tree::tree::Tree;
 
 const RANGE: usize = 260_000;
 const COUNT: usize = 4000;
@@ -36,8 +36,8 @@ type CompactArray = DenseTree<DataBlock, 3>;
 
 //type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>, IntrusiveListLevel<Lvl2Block>), DataBlock>;
 // type BlockArray = SparseTree<config::width_64::depth_3, DataBlock>;
-type BlockArrayNew = Tree<DataBlock, Config64bit<3>, ReqDefault>;
-type BlockArrayNew2 = tree::Tree<DataBlock, tree::Config64bit<3>, ReqDefault>;
+type BlockArrayNew = Tree<DataBlock, _64bit<3>, ReqDefault>;
+type BlockArrayNew2 = Tree<DataBlock, _64bit<3>, ReqDefault>;
 
 //type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<CompactLvl1Block>, IntrusiveListLevel<CompactLvl2Block>), DataBlock>;
 //type SmallBlockArray = SparseArray<config::sbo::width_64::depth_6, DataBlock>;
