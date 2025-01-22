@@ -44,7 +44,7 @@ pub trait HibitTreeTypes<'this, ImplicitBounds = &'this Self>{
 /// [MultiHibitTreeIterItem] helpers. Or get them from [HibitTreeTypes],
 /// as if it were super-trait:
 /// ```
-/// # use hibit_tree::{DenseTree, HibitTree, HibitTreeData, HibitTreeTypes};
+/// # use hibit_tree::{HibitTree, HibitTreeData, HibitTreeTypes};
 /// # fn myfn<MyTree: HibitTree>(my_sparse_container: MyTree){
 /// let i: HibitTreeData<MyTree> = my_sparse_container.get(1).unwrap();
 /// let i: <MyTree as HibitTreeTypes>::Data = my_sparse_container.get(1).unwrap();
@@ -314,10 +314,11 @@ pub trait HibitTreeCursorTypes<'this, ImplicitBounds = &'this Self>{
 /// 
 /// For 2-level 64bit hierarchy:
 ///```
-/// use hibit_tree::{HibitTreeTypes, HibitTreeCursor, DenseTree};
+/// use hibit_tree::{HibitTreeTypes, HibitTreeCursor, Tree};
+/// use hibit_tree::config::_64bit;
 /// use hibit_tree::const_utils::ConstUsize;
 /// 
-/// type Array = DenseTree<usize, 2>; 
+/// type Array = Tree<usize, _64bit<2>>; 
 /// let mut array = Array::default();
 /// array.insert(201, 500);
 /// 

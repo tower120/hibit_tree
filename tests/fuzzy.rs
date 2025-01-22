@@ -25,18 +25,14 @@ fn fuzzy_test(){
     let mut h = Map::default();
     
     fn check(rng: &mut impl Rng, a: &Array, h: &Map) {
-        // iter + unordered_iter
+        // iter
         {
             let a_items: Vec<_> = a.iter().map(|(_,d)|d).collect();
-            
-            let mut a_unordered_items: Vec<_> = a.key_values().1.iter().collect();
-            a_unordered_items.sort();
             
             let mut h_items: Vec<_> = h.iter().map(|(_,d)|d).collect();
             h_items.sort();
             
-            assert_equal(&a_items, &a_unordered_items);
-            assert_equal(&a_unordered_items, &h_items);
+            assert_equal(&a_items, &h_items);
         }
         
         // get
@@ -61,7 +57,7 @@ fn fuzzy_test(){
         // insert
         for _ in 0..rng.gen_range(0..COUNT) {
             let v = rng.gen_range(0..RANGE);
-            *a.get_or_insert(v) = Data(v);
+            a.insert(v, Data(v));
             h.insert(v, Data(v));
         }
         check(&mut rng, &a, &h);   

@@ -14,10 +14,10 @@ type CompactLvls = (
     IntrusiveListLevel<CompactLvl1Block>, 
     IntrusiveListLevel<CompactLvl2Block>
 );*/
-
-use hibit_tree::{DenseTree};
+use hibit_tree::config::_64bit;
+use hibit_tree::Tree;
 
 // TODO: switch to Compact on flag for CI. 
 //pub type Array<Data> = SparseTree<config::width_64::depth_3, Data>;
-pub type Array<Data> = DenseTree<Data, 3>;
+pub type Array<Data> = Tree<Data, _64bit<3>>;
 pub const RANGE: usize = 260_000;

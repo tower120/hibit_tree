@@ -1,10 +1,11 @@
 use std::iter;
-use hibit_tree::{DenseTree, HibitTree, multi_intersection};
+use hibit_tree::{Tree, HibitTree, multi_intersection};
+use hibit_tree::config::_64bit;
 use hibit_tree::utils::LendingIterator;
 
 fn main(){
     /// [store_id; good_amount]
-    type Goods = DenseTree<usize, 4>;
+    type Goods = Tree<usize, _64bit<4>>;
     
     let mut apples : Goods = Default::default();
     apples.insert(0, 12);
@@ -23,7 +24,11 @@ fn main(){
     let goods            = [&apples, &oranges, &carrots];
     let min_goods_amount = [5      , 20      , 7       ];
     
+    // Found stores that have apples AND oranges AND carrots, as intersection.
+    // This narrows down search area significantly at very low cost.
     let intersection = multi_intersection(goods.iter().copied());
+    
+    // Now iterate that found stores and find one with enough goods.
     let mut iter = intersection.iter();
     while let Some((store_id, goods_amount /*: impl Iterator<usize> */)) = 
         LendingIterator::next(&mut iter)

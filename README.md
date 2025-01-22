@@ -4,10 +4,9 @@
 [![license](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue?style=flat-square)](#license)
 [![Docs](https://docs.rs/hibit_tree/badge.svg)](https://docs.rs/hibit_tree)
 
-Hierarchical bitmap tree is an integer-key fixed-depth prefix-tree 
-with no memory overhead[^mem_overhead].
+Hierarchical bitmap tree is an integer-key fixed-depth prefix-tree.
 That have unique[^unique_ops], blazingly fast inter-container intersection[^unparalleled_intersection] and union.
-That outperforms `HashMap<u32, T>`[^hashmap_conf] most of the time.
+That outperforms `HashMap<u32, T>`[^hashmap_conf] always.
 
 Think of it as a map that can do set things. And MUCH more efficiently[^intersection_efficiency]
 then traditional set operations combined with map lookups.
@@ -23,9 +22,6 @@ then traditional set operations combined with map lookups.
 [^intersection_efficiency]: Intersection operation directly over data container is much faster, than intersecting 
 set + getting items from tree/map. Since with intersection directly over tree - we
 are skipping additional tree traverse phase for actually getting data.
-
-[^mem_overhead]: Tree nodes store child-pointers in a dense format - null-pointers are not stored.
-While still have O(1) child access, like in traditional sparse format.
 
 [^hashmap_conf]: HashMap<u32, T> with nohash-hasher and uniform key distribution -
 ideal condition for HashMap.
@@ -46,9 +42,9 @@ it naturally acts as intersection acceleration structure.
 [examples/readme_sparse_vec_dot.rs](./examples/readme_sparse_vec_dot.rs)
 
 ```rust
-type SparseVec = DenseTree<f32, 4>;
+type SparseVec = Tree<f32, _64bit<4>>;
 
-let mut v1: SparseVec = Default::default();
+let mut v1: SparseVec  = Default::default();
 v1.insert(10, 1.0);
 v1.insert(20, 10.0);
 v1.insert(30, 100.0);
@@ -59,6 +55,9 @@ v2.insert(30, 0.5);
 
 let mul = intersection(&v1, &v2)            // lazy element-wise mul
     .map(|(e1, e2): (&f32, &f32)| e1 * e2);
+
+// Only 2 element pairs are actually multiplied, 
+// everything else never touched.
 let dot: f32 = mul.iter().map(|(_index, element)| element).sum();
 
 assert_eq!(dot, 51.0);
@@ -70,13 +69,13 @@ assert_eq!(dot, 51.0);
 
 ```rust
 // index as user-id.
-type Tree<T> = DenseTree<T, 4>;
-let mut ages : Tree<usize>  = Default::default();
+type IntMap<T> = Tree<T, _64bit<4>>;
+let mut ages : IntMap<usize>  = Default::default();
 ages.insert(100, 20);
 ages.insert(200, 30);
 ages.insert(300, 40);
 
-let mut names: Tree<String> = Default::default();
+let mut names: IntMap<String> = Default::default();
 names.insert(200, "John".into());
 names.insert(234, "Zak".into());
 names.insert(300, "Ernie".into());
@@ -96,7 +95,7 @@ assert_equal(users.iter(), [
 
 ```rust
 /// [store_id; good_amount]
-type Goods = DenseTree<usize, 4>;
+type Goods = Tree<usize, _64bit<4>>;
 
 let mut apples : Goods = Default::default();
 apples.insert(0, 12);
@@ -115,7 +114,11 @@ carrots.insert(3, 100);
 let goods            = [&apples, &oranges, &carrots];
 let min_goods_amount = [5      , 20      , 7       ];
 
+// Found stores that have apples AND oranges AND carrots, as intersection.
+// This narrows down search area significantly at very low cost.
 let intersection = multi_intersection(goods.iter().copied());
+
+// Now iterate that found stores and find one with enough goods.
 let mut iter = intersection.iter();
 while let Some((store_id, goods_amount /*: impl Iterator<usize> */)) = 
     LendingIterator::next(&mut iter)
@@ -165,12 +168,12 @@ Hierarchical bitmap tree is a form of a prefix tree. Each node have fixed number
 Level count is fixed. This allows to fast calculate in-node indices for by-index access,
 without touching nodes, spending ~1 cycle per level.
 
-Thou we have fixed number of children in node - we store only non-null children, using ["bit-block map" technique](#bit-block-map-technique) for access.
 ```
                 Node     
           ┌─────────────┐
-          │ 64bit mask  │  <- Mask of existent children. Act as sparse index array.
-Level0    │ cap         │
+          │ 64bit mask  │  <- Mask of existent children.
+Level0    │ [u8; 64]    │  <- Data indices (sparse array).
+          │ cap         │    
           │ [*Node;cap] │  <- Dense array as FAM.
           └─────────────┘
                 ...      
@@ -178,13 +181,10 @@ Level0    │ cap         │
                Node      
           ┌─────────────┐
           │ 64bit mask  │
-LevelN    │ cap         │
-          │ [usize;cap] │  <- Data indices.
+LevelN    │ [u8; 64]    │    
+          │ cap         │
+          │ [T;cap]     │  <- Actual data.
           └─────────────┘
-                         
-                ┌   ┐    
-Data        Vec │ T │    
-                └   ┘    
 ```
 
 Node is like a C99 object with [flexible array member (FAM)](https://en.wikipedia.org/wiki/Flexible_array_member).
@@ -192,54 +192,6 @@ Which means, that memory allocated only for existent children pointers.
 
 Node bitmask have raised bits at children indices. Children are always stored ordered by 
 their indices.
-
-### "bit-block map" technique
-
-Maps sparse index in bit-block to some data in dense array.
-
-
-```
-                  0 1       2 3          ◁═ popcnt before bit (dense_array index)
-                                                                 
- bit_block      0 1 1 0 0 0 1 1 0 0 ...                          
-              └───┬─┬───────┬─┬─────────┘                        
-                  1 2       6 7          ◁═ bit index (sparse index)
-               ┌──┘┌┘ ┌─────┘ │                                  
-               │   │  │  ┌────┘                                  
-               ▼   ▼  ▼  ▼                                       
-dense_array    1, 32, 4, 5               len = bit_block popcnt  
-
-1 => 1  (dense_array[0])
-2 => 32 (dense_array[1])
-6 => 4  (dense_array[2])
-7 => 5  (dense_array[3])
-```
-
-Dense array elements must always have the same order as sparse array indices.
-
-On x86 getting dense index costs 3-4 tacts with `bmi1`:
-```rust
-(bit_block & !(u64::MAX << index)).count_ones()
-```
-and just 2 with `bmi2`:
-```rust
-_bzhi_u64(bit_block, index).count_ones()
-```
-
-### Switching to uncompressed node
-
-[Unimplemented]
-
-Since children must always remain sorted, insert and remove technically O(N).
-That's not a problem for most nodes, since they will have just a few children.
-But for dense nodes - it is reasonably to switch to "uncompressed" data storage - 
-where insert and remove O(1). 
-
-To do this without introducing branching, we add another bitmask.
-If children count less then some threshold (32) it is equal to the original one.
-Otherwise - filled with ones. We will use it for [bit-block mapping](#bit-block-map-technique): 
-below threshold it will work as usual, above - it's dense-index will equal sparse-index
-(because bits before requested sparse index are all ones).
 
 ## Hierarchical bitmap
 
@@ -267,9 +219,9 @@ TODO: EXAMPLE
 
 ## Design choices
 
-Tree have compile-time defined depth and width. This performs **significantly**
+Tree have compile-time defined depth and node-width. This performs **significantly**
 better, then traditional *dynamic* structure. And since we have integer as key,
-we need only 8-11 levels depth max - any mem-overhead is neglectable due to tiny node sizes. 
+we need only 8-11 levels depth max. 
 But we assume, that most of the time user will work near u32 index space (4-6 levels).
 
 ### Dynamic tree
@@ -279,16 +231,9 @@ But on shallow trees (~4 levels/32bit range) - fixed-depth tree outperforms sign
 And we expect these shallow 32bit range trees to be used the most.
 
 Plus, for dynamic tree to be beneficial, tree must be very sparsely populated across index range. 
-Since as soon as there will be no single-childed nodes - dynamic tree
+And as soon as there will be no single-childed nodes - dynamic tree
 will have the same amount of nodes in depth as a fixed one.
 
-## Uncompressed tree
+## SIMD
 
-Lib also provide version of tree with uncompressed nodes (with fixed sized array of children). It have higher memory overhead, but a little
-bit faster since it don't need to do [bit-block mapping](#bit-block-map-technique). It still
-have much lower memory footprint, then using plain Vec for sparse data, while being faster then HashMap.
-
-You may need it, if your target platform have slow bit manipulation operations. Or memory overhead is 
-not an issue - and you want inter-tree intersection as fast as possible.
-
-It also can use SIMD-sized (and accelerated) bitblocks in nodes.
+It is possible to use SIMD-sized (and accelerated) bitblocks in nodes.

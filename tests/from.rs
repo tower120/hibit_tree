@@ -2,7 +2,8 @@
 
 use itertools::assert_equal;
 use rand::{Rng, SeedableRng};
-use hibit_tree::{DenseTree, FromHibitTree, intersection, LazyHibitTree, map, union};
+use hibit_tree::{FromHibitTree, intersection, LazyHibitTree, map, union, Tree};
+use hibit_tree::config::_64bit;
 use hibit_tree::HibitTree;
 use hibit_tree::RegularHibitTree;
 use hibit_tree::utils::{Borrowable, UnaryFunction};
@@ -13,7 +14,7 @@ mod common;
 struct Data(usize);
 
 // TODO: common::Array<Data>
-type Array = DenseTree<Data, 4>;
+type Array = Tree<Data, _64bit<4>>;
 
 #[test]
 fn materialize_test(){
@@ -31,7 +32,7 @@ fn materialize_test(){
     }
 
     {
-        let mut a1: DenseTree<_, 4> = Default::default();
+        let mut a1: Tree<usize, _64bit<4>> = Default::default();
         let i0 = 0;
         a1.insert(0, i0);
         

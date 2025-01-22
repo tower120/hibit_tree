@@ -49,7 +49,7 @@ pub(crate) fn data_block_index<LevelCount: ConstInteger, LevelMaskType: BitBlock
 /// }
 /// # }
 /// ``` 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct HierarchyIndex<LevelMask: BitBlock, LevelsCount: ConstInteger> {
     pub(crate) index: usize,
     // We could use smaller index size, like u8. 
@@ -57,6 +57,10 @@ pub struct HierarchyIndex<LevelMask: BitBlock, LevelsCount: ConstInteger> {
     pub(crate) level_indices: ConstCopyArrayType<usize, LevelsCount>,
     pub(crate) phantom_data : PhantomData<(LevelMask, LevelsCount)>
 }
+
+impl<LevelMask: BitBlock, LevelsCount: ConstInteger> Copy  
+    for HierarchyIndex<LevelMask, LevelsCount>
+{}
 
 impl<LevelMask: BitBlock, LevelsCount: ConstInteger> 
     HierarchyIndex<LevelMask, LevelsCount>

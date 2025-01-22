@@ -230,24 +230,25 @@ where
 #[cfg(test)]
 mod tests{
     use itertools::assert_equal;
-    use crate::dense_tree::DenseTree;
+    use crate::config::_64bit;
+    use crate::Tree;
     use crate::ops::intersection::intersection;
     use crate::hibit_tree::HibitTree;
     use crate::map;
 
     #[test]
     fn smoke_test(){
-        type Array = DenseTree<usize, 3>;
+        type Array = Tree<usize, _64bit<3>>;
         let mut a1= Array::default();
         let mut a2= Array::default();
         
-        *a1.get_or_insert(10) = 10;
-        *a1.get_or_insert(15) = 15;
-        *a1.get_or_insert(200) = 200;
+        a1.insert(10, 10);
+        a1.insert(15, 15);
+        a1.insert(200, 200);
         
-        *a2.get_or_insert(100) = 100;
-        *a2.get_or_insert(15)  = 15;
-        *a2.get_or_insert(200) = 200;
+        a2.insert(100, 100);
+        a2.insert(15, 15);
+        a2.insert(200, 200);
         
         let intersect = intersection(&a1, &a2);
 

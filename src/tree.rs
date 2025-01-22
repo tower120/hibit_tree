@@ -12,9 +12,6 @@ use crate::utils::{Array, Borrowable};
 
 const FREE_CHILD_INDEX_SENTINEL: u8 = u8::MAX;
 
-#[derive(Debug, Copy, Clone)]
-pub enum ChildsType{Blocks, DataBlocks}
-
 struct BlockHeader<T, Conf:Config> {
     mask: Conf::Mask,
     child_indices: ArrayOf<

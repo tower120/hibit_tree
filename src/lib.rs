@@ -1,12 +1,12 @@
 #![feature(maybe_uninit_array_assume_init)]
-#![feature(const_alloc_layout)]
+
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 
 //! # Hibit tree[^hibit]
 //!
 //! TODO: better description in this section.
-//! The core of the lib is [SparseTree] and [DenseTree] containers with [HibitTree] 
+//! The core of the lib is [SparseTree] container with [HibitTree] 
 //! interface. These are fixed-depth, K-ary[^k_ary] trees[^trie] with integer keys,
 //! that form bitmap hierarchy[^bitmap_hierarchy].
 //! 
@@ -41,17 +41,13 @@
 //! operation, which basically is just BMI's pop_cnt/trail_cnt. There is no "scan"
 //! across node child items, for finding non-empty child/sub-tree.
 //! 
-//! Unordered iteration is as fast as a plain Vec iteration.
-//! 
 //! Iteration of intersection between N trees in worst case scenario,
 //! where trees have keys located nearby (fit same terminal blocks), 
-//! take N/block_width[^block_width] times of usual ordered iteration. In the best
+//! take N/block_width times of usual ordered iteration. In the best
 //! case scenario where nothing intersects, and this happens at the first levels - 
 //! basically free. 
 //! Hierarchical bitmap acts as acceleration structure for intersection.
 //! Branches/sub-trees that have no keys in common index-range discarded early.
-//! 
-//! [^block_width]: 64 for [DenseTree]. Can be up to 256 for [SparseTree]. 
 //! 
 //! ### Benchmarks data
 //! 
@@ -59,9 +55,8 @@
 //! 
 //! #### Against HashMap
 //! 
-//! Comparing random access against `no_hash` HashMap with usize uniformly distributed keys 
+//! Comparing random access against `no_hash` HashMap with uniformly distributed keys 
 //! (ideal HashMap scenario):
-//! * 64x5  [DenseTree]  (~u32 range) 5% slower.
 //! * 256x4 [SparseTree] (u32 range)  60% faster. 
 //! * 256x8 [SparseTree] (u64 range)  25% slower.
 //! 
@@ -130,13 +125,10 @@
 //! 
 //! ### may_dangle
 //! 
-//! Requires nightly. Allow to store references in containers.
+//! Requires nightly. Allow to store references in containers (TODO: not implemented).
 //! See [rustonomicon](https://doc.rust-lang.org/nomicon/dropck.html#an-escape-hatch).
 
 mod bit_utils;
-
-mod dense_tree;
-pub use dense_tree::DenseTree;
 
 mod bit_block;
 pub use bit_block::BitBlock;
@@ -156,9 +148,9 @@ pub use req_default::ReqDefault;
 pub mod ops;
 pub use ops::map::{map, map_w_default};
 pub use ops::intersection::intersection;
-pub use ops::union::union;
+pub use ops::union::{union, union_w_default};
 pub use ops::_multi_intersection::multi_intersection;
-pub use ops::_multi_union::multi_union;
+pub use ops::_multi_union::{multi_union, multi_union_w_default};
 
 pub mod bit_queue;
 pub mod const_utils;

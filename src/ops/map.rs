@@ -187,10 +187,11 @@ impl<S, F, D> Borrowable for Map<S, F, D> { type Borrowed = Self; }
 /// or implement [UnaryFunction] manually or with [fun!].
 ///
 /// ```
-/// # use hibit_tree::{map, DenseTree};
+/// # use hibit_tree::{map, Tree};
+/// # use hibit_tree::config::_64bit;
 /// # use hibit_tree::utils::UnaryFunction;
 /// # use hibit_tree::fun;
-/// let a: DenseTree<usize, 4> = Default::default();
+/// let a: Tree<usize, _64bit<4>> = Default::default();
 ///
 /// // This will fail to compile:
 /// // let m = map(&a, |d| { d.clone() } );
@@ -212,7 +213,7 @@ impl<S, F, D> Borrowable for Map<S, F, D> { type Borrowed = Self; }
 ///     }
 /// }
 /// let m = map(&a, Cloned );
-/// 
+///
 /// // You can use fun! macro to generate stateless UnaryFunction as well.
 /// let m = map(&a, fun!( 
 ///     [T: Clone] |d: T| -> T { d.clone() } 

@@ -4,14 +4,13 @@ use std::collections::BTreeMap;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::{Rng, SeedableRng};
 use rand::seq::SliceRandom;
-use hibit_tree::{config, tree, Index, ReqDefault};
+use hibit_tree::{HierarchyIndex, ReqDefault};
 use hibit_tree::config::_64bit;
-use hibit_tree::DenseTree;
 //use hi_sparse_array::level_block::{Block, ClusterBlock, SmallBlock};
 //use hi_sparse_array::Iter;
 //use hi_sparse_array::level::{IntrusiveListLevel, SingleBlockLevel};
 use hibit_tree::HibitTree;
-use hibit_tree::tree::Tree;
+use hibit_tree::Tree;
 
 const RANGE: usize = 260_000;
 const COUNT: usize = 4000;
@@ -32,12 +31,9 @@ type Map = nohash_hasher::IntMap<u32, DataBlock>;
 //type Map = ahash::AHashMap<u32, DataBlock>;
 type BTree = BTreeMap<u32, DataBlock>;
 
-type CompactArray = DenseTree<DataBlock, 3>;
-
 //type BlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<Lvl1Block>, IntrusiveListLevel<Lvl2Block>), DataBlock>;
 // type BlockArray = SparseTree<config::width_64::depth_3, DataBlock>;
-type BlockArrayNew = Tree<DataBlock, _64bit<3>, ReqDefault>;
-type BlockArrayNew2 = Tree<DataBlock, _64bit<3>, ReqDefault>;
+type BlockArrayNew = Tree<DataBlock, _64bit<4>, ReqDefault>;
 
 //type SmallBlockArray = SparseArray<(SingleBlockLevel<Lvl0Block>, IntrusiveListLevel<CompactLvl1Block>, IntrusiveListLevel<CompactLvl2Block>), DataBlock>;
 //type SmallBlockArray = SparseArray<config::sbo::width_64::depth_6, DataBlock>;
@@ -50,16 +46,6 @@ type BlockArrayNew2 = Tree<DataBlock, _64bit<3>, ReqDefault>;
     }
     s
 }*/
-
-fn compact_array_get(array: &CompactArray, indices: &[usize]) -> u64 {
-    let mut s = 0;
-    for &i in indices{
-        //s += unsafe{ array.get_unchecked(i) }.0;
-        s += unsafe{ array.get(Index::new_unchecked(i)) }.unwrap_or(&DataBlock(0)).0;
-        //s += array.get_or_default(i).0;
-    }
-    s
-}
 
 /*fn small_array_get(array: &SmallBlockArray, indices: &[usize]) -> u64 {
     let mut s = 0;
@@ -85,7 +71,7 @@ fn array_new_get(array: &BlockArrayNew, indices: &[usize]) -> u64 {
     let mut s = 0;
     for &i in indices{
         unsafe{
-        s += array.get(Index::new_unchecked(i))
+        s += array.get(HierarchyIndex::new_unchecked(i))
             .unwrap_or(&DataBlock(0)).0;
          //s += array.get_or_default(Index::new_unchecked(i)).0;            
         }
@@ -93,13 +79,13 @@ fn array_new_get(array: &BlockArrayNew, indices: &[usize]) -> u64 {
     s
 }
 
-fn array_new_get2(array: &BlockArrayNew2, indices: &[usize]) -> u64 {
+fn array_new_get_or_default(array: &BlockArrayNew, indices: &[usize]) -> u64 {
     let mut s = 0;
     for &i in indices{
         unsafe{
-        s += array.get(Index::new_unchecked(i))
-            .unwrap_or(&mut DataBlock(0)).0;
-        //s += array.get_or_default(Index::new_unchecked(i)).0;            
+        /*s += array.get(HierarchyIndex::new_unchecked(i))
+            .unwrap_or(&DataBlock(0)).0;*/
+        s += array.get_or_default(HierarchyIndex::new_unchecked(i)).0;            
         }
     }
     s
@@ -124,10 +110,9 @@ fn btree_get(array: &BTree, indices: &[usize]) -> u64 {
 
 pub fn bench_iter(c: &mut Criterion) {
     let mut new_array = BlockArrayNew::new();
-    let mut new_array2 = BlockArrayNew2::new();
+    let mut new_array2 = BlockArrayNew::new();
     // let mut block_array = BlockArray::default();
     //let mut small_block_array = SmallBlockArray::default();
-    let mut compact_array = CompactArray::default();
     /*let mut cluster_block_array = ClusterBlockArray::default();*/
     let mut hashmap = Map::default();
     let mut btree = BTree::default();
@@ -143,7 +128,6 @@ pub fn bench_iter(c: &mut Criterion) {
         new_array.insert(v, DataBlock(v as _));
         new_array2.insert(v, DataBlock(v as _));
         //*small_block_array.get_mut(v) = DataBlock(v as u64);
-        *compact_array.get_or_insert(v)= DataBlock(v as u64);
         /* *cluster_block_array.get_or_insert(v) = DataBlock(v as u64);*/
         hashmap.insert(v as _, DataBlock(v as u64));
         btree.insert(v as _, DataBlock(v as u64));
@@ -156,10 +140,9 @@ pub fn bench_iter(c: &mut Criterion) {
     }*/
     random_indices.shuffle(&mut rng);
 
-    c.bench_function("new array2", |b| b.iter(|| array_new_get2(black_box(&new_array2), black_box(&random_indices))));
+    c.bench_function("new array2", |b| b.iter(|| array_new_get_or_default(black_box(&new_array2), black_box(&random_indices))));
     c.bench_function("new array", |b| b.iter(|| array_new_get(black_box(&new_array), black_box(&random_indices))));
     // c.bench_function("level_block array", |b| b.iter(|| array_get(black_box(&block_array), black_box(&random_indices))));
-    c.bench_function("compact array", |b| b.iter(|| compact_array_get(black_box(&compact_array), black_box(&random_indices))));
     //c.bench_function("small level_block array", |b| b.iter(|| small_array_get(black_box(&small_block_array), black_box(&random_indices))));
     /*c.bench_function("cluster level_block array", |b| b.iter(|| cluster_array_get(black_box(&cluster_block_array))));*/
     c.bench_function("hashmap", |b| b.iter(|| hashmap_get(black_box(&hashmap), black_box(&random_indices))));
