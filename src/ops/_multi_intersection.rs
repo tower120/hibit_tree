@@ -11,7 +11,7 @@ use crate::utils::{Array, Borrowable, Ref};
 ///
 /// All data iterators are [ExactSizeIterator]. 
 /// 
-/// [data_or_default] will return `data_or_default`s for all iterated trees.  
+/// [Self::data_or_default] will return `data_or_default`s for all iterated trees.  
 /// [Cursor::data_or_default] will return empty iterator if no intersection happens.
 pub struct MultiIntersection<Iter> {
     iter: Iter,

@@ -1,11 +1,11 @@
 use std::borrow::Borrow;
-use std::marker::PhantomData;
 use std::ops::RangeTo;
 use crate::{BitBlock, HierarchyIndex};
-use crate::const_utils::{ConstArray, ConstBool, ConstInteger, ConstTrue, IsConstTrue};
+use crate::const_utils::{ConstBool, ConstInteger, ConstTrue, IsConstTrue};
 use crate::iter::Iter;
 use crate::ops::Map;
-use crate::utils::{BinaryFunction, Borrowable, NullaryFunction, UnaryFunction};
+use crate::utils::Borrowable;
+use crate::utils::function::*;
 
 /// [HibitTree] lifetime-dependent types.
 pub trait HibitTreeTypes<'this, ImplicitBounds = &'this Self>{

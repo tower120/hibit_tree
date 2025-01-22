@@ -1,8 +1,9 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use crate::{LazyHibitTree, RegularHibitTree, HibitTree, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex};
-use crate::const_utils::{ConstAnd, ConstBool, ConstFalse, ConstInteger, ConstTrue, IsConstTrue};
-use crate::utils::{Borrowable, UnaryFunction};
+use crate::const_utils::{ConstBool, ConstFalse, ConstInteger, ConstTrue, IsConstTrue};
+use crate::utils::Borrowable;
+use crate::utils::function::UnaryFunction;
 
 pub struct Map<S, F, D=ConstFalse>{
     s: S,
@@ -189,7 +190,7 @@ impl<S, F, D> Borrowable for Map<S, F, D> { type Borrowed = Self; }
 /// ```
 /// # use hibit_tree::{map, Tree};
 /// # use hibit_tree::config::_64bit;
-/// # use hibit_tree::utils::UnaryFunction;
+/// # use hibit_tree::utils::function::UnaryFunction;
 /// # use hibit_tree::fun;
 /// let a: Tree<usize, _64bit<4>> = Default::default();
 ///
@@ -267,7 +268,7 @@ where
     Map{ s, f, phantom: PhantomData }
 } 
 
-/// Same as [map], but allows access to `data_or_default` methods and [iterate_w_default].
+/// Same as [map], but allows access to `data_or_default` methods.
 ///
 /// # Map function 
 /// 
@@ -307,9 +308,7 @@ mod tests {
         t2.insert(200, 200);
         
         fn bypass(d: &usize) -> &usize { d }
-        map(
-            &t1, bypass 
-        );
+        map(&t1, bypass);
         
         struct Bypass;
         impl<'a, T> UnaryFunction<&'a T> for Bypass {

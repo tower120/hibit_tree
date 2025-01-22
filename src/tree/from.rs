@@ -2,7 +2,7 @@ use std::mem::ManuallyDrop;
 use std::ops::ControlFlow::Continue;
 use arrayvec::ArrayVec;
 use crate::{FromHibitTree, HibitTreeData, RegularHibitTree};
-use crate::utils::UnaryFunction;
+use crate::utils::function::UnaryFunction;
 use super::*;
 
 #[inline]

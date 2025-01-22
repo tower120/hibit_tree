@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 use crate::const_utils::const_int::ConstInteger;
-use crate::utils::NullaryFunction;
+use crate::utils::function::NullaryFunction;
 
 pub trait ConstBool: Default + Copy {
     const VALUE: bool;

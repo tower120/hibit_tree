@@ -1,15 +1,18 @@
 mod primitive;
-mod array;
-mod take;
-mod borrowable;
-mod function;
-mod lending_iterator;
-
 pub use primitive::*;
+
+mod array;
 pub use array::*;
+
+mod take;
 pub use take::*;
+
+mod borrowable;
 pub use borrowable::*;
-pub use function::*;
+
+pub mod function;
+
+mod lending_iterator;
 pub use lending_iterator::*;
 
 /// Trait for &.
