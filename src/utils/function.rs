@@ -97,7 +97,7 @@ macro_rules! fun {
     ([$($generics:tt)*] |$arg:ident: $arg_type:ty| -> $output:ty where [$($bounds:tt)*] $body:block) => {
         {
             struct F;
-            impl<$($generics)*> $crate::utils::UnaryFunction<$arg_type> for F
+            impl<$($generics)*> $crate::utils::function::UnaryFunction<$arg_type> for F
             where
                 $($bounds)*
             {

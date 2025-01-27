@@ -6,7 +6,7 @@ use hibit_tree::{FromHibitTree, intersection, LazyHibitTree, map, union, Tree};
 use hibit_tree::config::_64bit;
 use hibit_tree::HibitTree;
 use hibit_tree::RegularHibitTree;
-use hibit_tree::utils::{Borrowable, UnaryFunction};
+use hibit_tree::utils::Borrowable;
 
 mod common;
 
