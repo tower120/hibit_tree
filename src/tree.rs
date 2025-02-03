@@ -206,7 +206,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         &mut self, 
         index: usize, 
         child: ChildCtr
-    ) -> Result<&mut Child, ChildCtr> {
+    ) -> Result<NonNull<Child>, ChildCtr> {
         let block = self.0.as_mut();
         // TODO: try read first
         let have_child = unsafe {
@@ -241,7 +241,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         let block = self.0.as_mut();
         *block.child_indices.as_mut().get_unchecked_mut(index) = child_index as u8; 
         
-        Ok(&mut*child)
+        Ok(NonNull::new_unchecked(child))
     }    
     
     #[inline]
@@ -249,13 +249,13 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         &mut self, 
         index: usize, 
         child: ChildCtr
-    ) -> &mut Child {
+    ) -> NonNull<Child> {
         // Drop lifetime to fight RUST's not working an early-return lifetime drop.
         let mut this = NonNull::from(self);
         if let Ok(child) = this.as_mut().insert_impl(index, child){
             return child;
         }
-        &mut*this.as_mut().get_unchecked_ptr::<Child>(index)
+        NonNull::new_unchecked(this.as_mut().get_unchecked_ptr::<Child>(index))
     }
     
     #[inline]
@@ -524,11 +524,11 @@ where
         }
     }
     
-    pub fn insert(
+    #[inline]
+    fn get_or_insert_terminal_block(
         &mut self,
         index: impl TryInto<HierarchyIndex<Conf::Mask, Conf::LevelCount>>,
-        value: T
-    ) {
+    ) -> (&mut BlockPtr<T, Conf>, usize) {
         let index = index.try_into().unwrap_or_else(|_| panic!());
         let mut block = &mut self.root;
         const_loop!(I in 0..{Conf::LevelCount::VALUE-1} => {
@@ -550,12 +550,33 @@ where
                             block
                         }
                     }
-                )
+                ).as_mut()
             };
         });   
         
-        let child_index = index.level_indices.as_ref()[Conf::LevelCount::VALUE-1]; 
-        unsafe{ block.insert_unchecked(child_index, value); }
+        let child_index = index.level_indices.as_ref()[Conf::LevelCount::VALUE-1];
+        (block, child_index)
+    }
+    
+    pub fn insert(
+        &mut self,
+        index: impl TryInto<HierarchyIndex<Conf::Mask, Conf::LevelCount>>,
+        value: T
+    ) {
+        let (mut terminal_block, child_index) = self.get_or_insert_terminal_block(index);
+        unsafe{ terminal_block.insert_unchecked(child_index, value); }
+    }
+    
+    pub fn get_or_insert(&mut self, index: impl TryInto<HierarchyIndex<Conf::Mask, Conf::LevelCount>>) 
+        -> &mut T
+    where
+        T: Default
+    {
+        let (mut terminal_block, child_index) = self.get_or_insert_terminal_block(index);
+        unsafe{
+            let mut item = terminal_block.get_or_insert_unchecked(child_index, ||Default::default());
+            item.as_mut()
+        }
     }
     
     // TODO: Do not track root block - it is always only one.
