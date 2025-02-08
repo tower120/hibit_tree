@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 use crate::BitBlock;
-use crate::const_utils::{ConstCopyArrayType, ConstInteger, ConstUsize};
+use crate::const_utils::{ConstCopyArrayType, ConstInteger};
 use crate::utils::Array;
 
 // TODO: try replace with accumulated key on the fly calculation.
@@ -31,6 +31,8 @@ pub(crate) fn data_block_index<LevelCount: ConstInteger, LevelMaskType: BitBlock
 /// - that represents tree path. 
 /// You can reuse `HierarchyIndex` - this will save a few precious CPU ticks,
 /// when you access the same index in different trees.
+/// 
+/// [new_unchecked()]: Self::new_unchecked
 ///
 /// ```
 /// # use hibit_tree::{HibitTree, HierarchyIndex};
@@ -127,6 +129,7 @@ where
 
 #[cfg(test)]
 mod test{
+    use crate::const_utils::ConstUsize;
     use super::*;
     
     #[test]

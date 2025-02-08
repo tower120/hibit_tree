@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::ops::RangeTo;
 use crate::{BitBlock, HierarchyIndex};
 use crate::const_utils::{ConstBool, ConstInteger, ConstTrue, IsConstTrue};
@@ -31,9 +30,10 @@ pub trait HibitTreeTypes<'this, ImplicitBounds = &'this Self>{
 /// during access call - but this way you would not have a meaningful way of processing
 /// individual items. So we split process - multi_* returns [MultiHibitTree], which
 /// you can iterate with [LendingIterator], or you can aggregate it to [RegularHibitTree]
-/// with [multi_map_fold]. 
+/// with [map()]. 
 /// 
 /// [LendingIterator]: crate::utils::LendingIterator
+/// [map()]: HibitTree::map()
 ///
 /// # HibitTreeTypes
 /// 
@@ -114,7 +114,7 @@ where
     unsafe fn data_or_default(&self, index: &HierarchyIndex<Self::LevelMask, Self::LevelCount>)
         -> <Self as HibitTreeTypes<'_>>::DataOrDefault;
     
-    /// You can use `usize` or [Index] for `index`.
+    /// You can use `usize` or [HierarchyIndex] for `index`.
     /// 
     /// # Panic
     /// 
@@ -282,10 +282,7 @@ where
     
     fn from_filtered_tree<F>(from: From, f: F) -> Self
     where
-        for<'a, 'b> F: UnaryFunction<&'a HibitTreeData<'b, From>, Output=bool>
-    {
-        unimplemented!()
-    }
+        for<'a, 'b> F: UnaryFunction<&'a HibitTreeData<'b, From>, Output=bool>;
 }
 
 /// [HibitTreeCursor] lifetime-dependent types.
@@ -369,6 +366,8 @@ where
     /// 
     /// * `index` must be within block range. 
     /// * Use only with [select_level_node].
+    /// 
+    /// [select_level_node]: Self::select_level_node
     unsafe fn data<'a>(
         &'a self,
         tree: &'tree Self::Tree,
@@ -390,6 +389,8 @@ where
     /// 
     /// - Should be used with [select_level_node]. 
     /// - Unsafe to call if Self::Tree::DataValue is not true.
+    /// 
+    /// [select_level_node]: Self::select_level_node
     unsafe fn data_or_default<'a>(
         &'a self,
         tree: &'tree Self::Tree,
@@ -469,7 +470,13 @@ pub trait MultiHibitTreeTypes<'this, ImplicitBounds = &'this Self>
         >,
     >
 {
-    /// [Iterator::Item] of all Data types: [Data], [DataUnchecked], [Cursor::Data]. 
+    /// [Iterator::Item] of all Data types: [Data], [DataUnchecked], 
+    /// [HibitTreeCursor::Data], [HibitTreeCursor::DataUnchecked].
+    /// 
+    /// [Data]: HibitTreeTypes::Data
+    /// [DataUnchecked]: HibitTreeTypes::DataUnchecked
+    /// [HibitTreeCursor::Data]: HibitTreeCursorTypes::Data
+    /// [HibitTreeCursor::DataUnchecked]: HibitTreeCursorTypes::DataUnchecked 
     type IterItem;
 }
 
@@ -477,7 +484,9 @@ pub trait MultiHibitTreeTypes<'this, ImplicitBounds = &'this Self>
 /// 
 /// `multi_*` operations return [MultiHibitTree]'ies.
 /// 
-/// You can convert `MultiHibitTree` to [RegularHibitTree] with [multi_map_fold()]. 
+/// You can convert `MultiHibitTree` to [RegularHibitTree] with [map()].
+///
+/// [map()]: HibitTree::map()
 pub trait MultiHibitTree: HibitTree
 where
     Self: for<'this> MultiHibitTreeTypes<'this>

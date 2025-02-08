@@ -1,4 +1,4 @@
-use std::{array, mem};
+use std::array;
 use std::mem::MaybeUninit;
 
 /// [Item; CAP]

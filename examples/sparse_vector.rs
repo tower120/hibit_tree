@@ -1,13 +1,11 @@
 use std::borrow::Borrow;
 use wide::f32x4;
-use hibit_tree::{config, intersection, BitBlock, ReqDefault};
+use hibit_tree::{config, intersection, ReqDefault};
+use hibit_tree::HibitTree;
 use hibit_tree::RegularHibitTree;
 use hibit_tree::Iter;
 
-#[derive(Clone, Default)]
-struct DataBlock(f32x4);
-
-type SparseArray = hibit_tree::SparseTree<config::width_64::depth_2, DataBlock, ReqDefault>;
+type SparseArray = hibit_tree::Tree<f32x4, config::_64bit<2>, ReqDefault>;
 
 #[derive(Default)]
 struct SparseVector {
@@ -22,17 +20,17 @@ impl SparseVector{
         
         let block = self.sparse_array.get_or_insert(block_index);
         unsafe{
-            *block.0.as_array_mut().get_unchecked_mut(in_block_index) = value;
+            *block.as_array_mut().get_unchecked_mut(in_block_index) = value;
         }
     }
 }
 
 /// Per-element multiplication
 pub fn mul<'a>(v1: &'a SparseVector, v2: &'a SparseVector) 
-    -> impl RegularHibitTree<Data=DataBlock> + 'a
+    -> impl RegularHibitTree<Data=f32x4> + 'a
 {
     intersection(&v1.sparse_array, &v2.sparse_array)
-        .map(|(l, r): (&DataBlock, &DataBlock)| DataBlock(l.0 * r.0) )
+        .map(|(l, r): (&f32x4, &f32x4)| *l * *r )
 }
 
 pub fn dot(v1: &SparseVector, v2: &SparseVector) -> f32 {
@@ -40,7 +38,7 @@ pub fn dot(v1: &SparseVector, v2: &SparseVector) -> f32 {
     let iter = Iter::new(&m);
     let mut sum = f32x4::ZERO;
     iter.for_each(|(index, block)|{
-        sum += block.borrow().0;
+        sum += block;
     });
     sum.reduce_add()
 }

@@ -1,4 +1,3 @@
-use std::ops::{Deref, DerefMut};
 use crate::const_utils::const_int::ConstInteger;
 use crate::utils::function::NullaryFunction;
 
@@ -81,7 +80,7 @@ mod test{
         v: B::Conditional<usize, f32>
     }
     
-    fn test<B: ConstBool>(mut s: S<B>)
+    fn test<B: ConstBool>(s: S<B>)
     where
         B::Conditional<usize, f32>: Clone
     {
@@ -94,7 +93,7 @@ mod test{
         type T1 = ConstTrue;
         type A = ConstAnd<T0, T1>;
         assert_eq!(A::VALUE, true);
-        fn test<B: IsConstTrue>(){};
+        fn test<B: IsConstTrue>(){}
         test::<A>();
     }
 }

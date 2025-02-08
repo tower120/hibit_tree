@@ -7,19 +7,19 @@ use crate::utils::LendingIterator;
 use crate::utils::Array;
 
 /// [usize; T::LevelCount::N - 1]
-type LevelIndices<T: HibitTree> =
+type LevelIndices<T> =
     ConstArrayType<
         usize,
-        <T::LevelCount as ConstInteger>::Dec   
+        <<T as HibitTree>::LevelCount as ConstInteger>::Dec   
     >;
 
 /// Each hierarchy level has its own bitblock iterator.
 /// 
 /// [T::LevelMaskType::BitsIter; T::LevelCount]
-type LevelIterators<T: HibitTree> =
+type LevelIterators<T> =
     ConstArrayType<
         <<T as HibitTree>::LevelMask as BitBlock>::BitsIter,
-        T::LevelCount
+        <T as HibitTree>::LevelCount
     >;
 
 /// [HibitTree] iterator.

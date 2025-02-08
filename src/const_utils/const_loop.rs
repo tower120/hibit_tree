@@ -29,7 +29,10 @@ macro_rules! const_loop {
     };    
     
     ($n:ident in $start:tt..$end:tt => $body:block) => {
-        const_loop!($n in $start..$end => 'out: $body);
+        #[allow(unused_labels)]
+        {
+            const_loop!($n in $start..$end => 'out: $body);
+        }
     };
 
     ($n:ident in $start:tt..$end:tt => $break_label:lifetime : $body:block) => {
@@ -43,7 +46,10 @@ macro_rules! const_loop {
     };
 
     ($n:ident in $start:tt..$end:tt rev => $body:block) => {
-        const_loop!($n in $start..$end rev => 'out: $body);
+        #[allow(unused_labels)]
+        {
+            const_loop!($n in $start..$end rev => 'out: $body);
+        }
     };
 
     ($n:ident in $start:tt..$end:tt rev => $break_label:lifetime : $body:block) => {

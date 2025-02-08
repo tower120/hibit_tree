@@ -1,6 +1,6 @@
 use std::mem;
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, ControlFlow};
-use crate::bit_queue::{ArrayBitQueue, BitQueue, EmptyBitQueue, PrimitiveBitQueue};
+use crate::bit_queue::{ArrayBitQueue, BitQueue, PrimitiveBitQueue};
 use crate::bit_utils;
 use crate::const_utils::{ConstInteger, ConstUsize};
 use crate::utils::Array;

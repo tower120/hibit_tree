@@ -11,7 +11,7 @@ mod cond_type;
 pub use cond_type::*;
 
 mod const_loop;
-pub use const_loop::*;
+pub(crate) use const_loop::*;
 
 /// const-friendly max.
 macro_rules! max {

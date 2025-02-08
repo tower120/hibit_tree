@@ -1,8 +1,7 @@
 use std::marker::PhantomData;
-use std::ptr::NonNull;
 use std::slice;
 use arrayvec::ArrayVec;
-use crate::{BitBlock, LazyHibitTree, RegularHibitTree, MultiHibitTree, MultiHibitTreeTypes, HibitTree, HibitTreeData, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex, union};
+use crate::{BitBlock, LazyHibitTree, RegularHibitTree, MultiHibitTree, MultiHibitTreeTypes, HibitTree, HibitTreeData, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex};
 use crate::const_utils::{ConstArrayType, ConstBool, ConstFalse, ConstInteger, ConstTrue, IsConstTrue};
 use crate::utils::{Array, Borrowable, Ref};
 
@@ -46,7 +45,7 @@ where
         // Gather items - then return as iter.
         let mut datas: ArrayVec<_, N> = Default::default();
         for array in self.iter.clone(){
-            let data = unsafe{ array.borrow().data(index) };
+            let data = array.borrow().data(index);
             if let Some(data) = data {
                 datas.push(data);
             }
@@ -100,9 +99,7 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.find_map(|array| unsafe{
-            array.data(&self.hi_index)
-        })
+        self.iter.find_map(|array| array.data(&self.hi_index))
     }
 
     #[inline]
@@ -112,7 +109,7 @@ where
         F: FnMut(B, Self::Item) -> B,
     {
         for array in self.iter {
-            if let Some(item) = unsafe{array.data(&self.hi_index)} {
+            if let Some(item) = array.data(&self.hi_index) {
                 init = f(init, item)    
             }
         }
@@ -259,7 +256,7 @@ where
     }
 
     #[inline]
-    unsafe fn select_level_node<N: ConstInteger>(&mut self, src: &'src Self::Tree, level_n: N, level_index: usize) 
+    unsafe fn select_level_node<N: ConstInteger>(&mut self, _: &'src Self::Tree, level_n: N, level_index: usize) 
         -> <Self::Tree as HibitTree>::LevelMask 
     {
         let mut acc_mask = BitBlock::zero();
@@ -309,7 +306,7 @@ where
     }
 
     #[inline]
-    unsafe fn data<'a>(&'a self, src: &'src Self::Tree, level_index: usize) 
+    unsafe fn data<'a>(&'a self, _: &'src Self::Tree, level_index: usize) 
         -> Option<<Self as HibitTreeCursorTypes<'a>>::Data> 
     {
         if <<Self::Tree as HibitTree>::LevelCount as ConstInteger>::VALUE == 1 {
@@ -331,22 +328,22 @@ where
     }
 
     #[inline]
-    unsafe fn data_unchecked<'a>(&'a self, src: &'src Self::Tree, level_index: usize) 
+    unsafe fn data_unchecked<'a>(&'a self, _: &'src Self::Tree, level_index: usize) 
         -> <Self as HibitTreeCursorTypes<'a>>::DataUnchecked
     {
         self.make_cursor_data(level_index)
     }
     
     #[inline]
-    unsafe fn data_or_default<'a>(&'a self, src: &'src Self::Tree, level_index: usize) 
+    unsafe fn data_or_default<'a>(&'a self, _: &'src Self::Tree, level_index: usize) 
         -> <Self as HibitTreeCursorTypes<'a>>::DataOrDefault 
     {
         self.make_cursor_data(level_index)
     }    
 }
 
-/// `D=true` will use [data_or_default] to return values. 
-/// Otherwise, [data] will be used.
+// `D=true` will use [data_or_default] to return values. 
+// Otherwise, [data] will be used.
 pub struct CursorData<'cursor, 'item, I, D>
 where
     I: Iterator<Item: Ref<Type: HibitTree>>
@@ -468,6 +465,8 @@ where
 /// skip values during iteration.
 /// 
 /// Default values MAY appear in iterator output.
+/// 
+/// [data_or_default]: crate::HibitTree::data_or_default
 #[inline]
 pub fn multi_union_w_default<Iter>(iter: Iter) 
     -> MultiUnion<Iter, ConstTrue>

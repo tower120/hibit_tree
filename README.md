@@ -6,7 +6,7 @@
 
 Hierarchical bitmap tree is an integer-key fixed-depth prefix-tree.
 That have unique[^unique_ops], blazingly fast inter-container intersection[^unparalleled_intersection] and union.
-That outperforms `HashMap<u32, T>`[^hashmap_conf] always.
+That outperforms `HashMap<u32, T>`[^hashmap_conf].
 
 Think of it as a map that can do set things. And MUCH more efficiently[^intersection_efficiency]
 then traditional set operations combined with map lookups.
@@ -15,7 +15,7 @@ then traditional set operations combined with map lookups.
 
 * Predictable insert/remove performance - no tree-balancing, or any hidden performance impact.
 
-* Ordered by key[^sorting]. Have unordered contiguous iteration[^unordered_iter] as well.
+* Ordered by key[^sorting].
 
 * Fast inter-container equality and ordering [Not yet implemented].
 

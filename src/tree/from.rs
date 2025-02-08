@@ -265,6 +265,7 @@ where
 #[cfg(test)]
 mod test{
     use itertools::assert_equal;
+    use crate::config::_64bit;
     use super::*;
     use crate::hibit_tree::LazyHibitTree;
     

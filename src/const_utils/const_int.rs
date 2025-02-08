@@ -1,7 +1,6 @@
 use std::fmt;
-use std::fmt::{Debug, Display};
+use std::fmt::{Debug};
 use crate::const_utils::const_array::ConstArray;
-use crate::utils::Array;
 
 /// Ala C++ integral_constant.
 /// 

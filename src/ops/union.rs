@@ -1,11 +1,9 @@
 use std::marker::PhantomData;
 use std::borrow::Borrow;
-use std::ops::{BitAnd, BitOr};
 use crate::const_utils::{ConstAnd, ConstBool, ConstFalse, ConstInteger, ConstTrue, IsConstTrue};
 use crate::hibit_tree::{HibitTree, HibitTreeCursor};
-use crate::{BitBlock, LazyHibitTree, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex};
-use crate::bit_queue::BitQueue;
-use crate::utils::{Array, Borrowable};
+use crate::{LazyHibitTree, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex};
+use crate::utils::{Borrowable};
 
 pub struct Union<S0, S1, D=ConstFalse>{
     s0: S0,
@@ -231,6 +229,8 @@ where
 /// Same as [union] but iterator will use [data_or_default].
 /// 
 /// This can lead to a faster code, since you don't need to unwrap values.
+/// 
+/// [data_or_default]: crate::HibitTree::data_or_default
 #[inline]
 pub fn union_w_default<S0, S1>(s0: S0, s1: S1) -> Union<S0, S1, ConstTrue>
 where

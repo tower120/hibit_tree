@@ -5,9 +5,9 @@ use std::marker::PhantomData;
 use std::{mem, ptr};
 use std::ptr::{addr_of_mut, NonNull};
 use crate::{BitBlock, HibitTree, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex, ReqDefault};
-use crate::config::{Config, _64bit};
+use crate::config::{Config};
 use crate::const_utils::{const_loop, max, ArrayOf, ConstBool, ConstFalse, ConstInteger, ConstUsize};
-use crate::req_default::{DefaultRequirement, IsReqDefault, MakeDefault, MakeDefaultFor};
+use crate::req_default::{DefaultRequirement, MakeDefault, MakeDefaultFor};
 use crate::utils::{Array, Borrowable};
 
 const FREE_CHILD_INDEX_SENTINEL: u8 = u8::MAX;
@@ -125,7 +125,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
     /// all non-existent `child_indices` will point to it.  
     #[inline]
     pub unsafe fn set_len(&mut self, len: u8) {
-        let mut block = self.0.as_mut();
+        let block = self.0.as_mut();
         block.len = len;
     }
 
@@ -181,7 +181,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         // 2. mark child's slot as free 
         self.push_free_child_index::<Child>(child_element_index);
         
-        let mut block = self.0.as_mut();
+        let block = self.0.as_mut();
         block.mask.set_bit_unchecked::<false>(index);
     }
     
@@ -301,7 +301,7 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
             }
             self.destruct_empty::<T>();
         } else {
-            let mut child = &mut *self.children_ptr::<BlockPtr<T, Conf>>();
+            let child = &mut *self.children_ptr::<BlockPtr<T, Conf>>();
             child.destruct_empty_branch(height.dec(), req);
             ptr::drop_in_place(child);
             self.destruct_empty::<BlockPtr<T, Conf>>();
@@ -315,13 +315,13 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
     pub unsafe fn destruct<Height: ConstInteger>(&mut self, height: Height){
         if Height::VALUE == 0 {
             // terminal level
-            let mut iter = self.children_iter_mut::<T>();
+            let iter = self.children_iter_mut::<T>();
             for child in iter {
                 ptr::drop_in_place(child);
             }
             self.destruct_empty::<T>();
         } else {
-            let mut iter = self.children_iter_mut::<BlockPtr<T, Conf>>();
+            let iter = self.children_iter_mut::<BlockPtr<T, Conf>>();
             for child in iter {
                 child.destruct(height.dec());
                 ptr::drop_in_place(child);
@@ -340,42 +340,48 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
     }
 }
 
-#[test]
-fn block_free_inidces_test(){
-    let mut block: BlockPtr<usize, _64bit<2>> = BlockPtr::new::<usize>(16);
-    unsafe{
-        block.push_free_child_index::<usize>(2);
-        block.push_free_child_index::<usize>(4);
-        block.push_free_child_index::<usize>(8);
-        
-        assert_eq!(block.pop_free_child_index::<usize>(), Some(8));
-        assert_eq!(block.pop_free_child_index::<usize>(), Some(4));
-        assert_eq!(block.pop_free_child_index::<usize>(), Some(2));
-        assert_eq!(block.pop_free_child_index::<usize>(), None);
-        
-        block.destruct(ConstUsize::<0>); 
+#[cfg(test)]
+mod block_test{
+    use crate::config::_64bit;
+    use super::*;
+    
+    #[test]
+    fn block_free_inidces_test(){
+        let mut block: BlockPtr<usize, _64bit<2>> = BlockPtr::new::<usize>(16);
+        unsafe{
+            block.push_free_child_index::<usize>(2);
+            block.push_free_child_index::<usize>(4);
+            block.push_free_child_index::<usize>(8);
+            
+            assert_eq!(block.pop_free_child_index::<usize>(), Some(8));
+            assert_eq!(block.pop_free_child_index::<usize>(), Some(4));
+            assert_eq!(block.pop_free_child_index::<usize>(), Some(2));
+            assert_eq!(block.pop_free_child_index::<usize>(), None);
+            
+            block.destruct(ConstUsize::<0>); 
+        }
+    }
+    
+    #[test]
+    fn block_free_inidces_test2(){
+        let mut block: BlockPtr<usize, _64bit<2>> = BlockPtr::new::<usize>(16);
+        unsafe{
+            block.push_free_child_index::<usize>(2);
+            block.push_free_child_index::<usize>(4);
+            assert_eq!(block.pop_free_child_index::<usize>(), Some(4));
+            
+            block.push_free_child_index::<usize>(8);
+            assert_eq!(block.pop_free_child_index::<usize>(), Some(8));
+            assert_eq!(block.pop_free_child_index::<usize>(), Some(2));
+            assert_eq!(block.pop_free_child_index::<usize>(), None);
+            
+            block.destruct(ConstUsize::<0>); 
+        }
     }
 }
 
-#[test]
-fn block_free_inidces_test2(){
-    let mut block: BlockPtr<usize, _64bit<2>> = BlockPtr::new::<usize>(16);
-    unsafe{
-        block.push_free_child_index::<usize>(2);
-        block.push_free_child_index::<usize>(4);
-        assert_eq!(block.pop_free_child_index::<usize>(), Some(4));
-        
-        block.push_free_child_index::<usize>(8);
-        assert_eq!(block.pop_free_child_index::<usize>(), Some(8));
-        assert_eq!(block.pop_free_child_index::<usize>(), Some(2));
-        assert_eq!(block.pop_free_child_index::<usize>(), None);
-        
-        block.destruct(ConstUsize::<0>); 
-    }
-}
 
-
-type EmptyBranchBlocks<T, Conf: Config> = ArrayOf<BlockPtr<T, Conf>, /*<*/Conf::LevelCount/* as ConstInteger>::Inc*/>;
+type EmptyBranchBlocks<T, Conf> = ArrayOf<BlockPtr<T, Conf>, /*<*/<Conf as Config>::LevelCount/* as ConstInteger>::Inc*/>;
 
 pub struct Tree<T, Conf:Config, R: DefaultRequirement = ReqDefault<ConstFalse>>{
     root: BlockPtr<T, Conf>,
@@ -445,14 +451,14 @@ where
         }
     }
     empty_branch_blocks.as_mut()[Conf::LevelCount::VALUE-1].write(block);
-    for I in (0..Conf::LevelCount::VALUE-1).rev() {
+    for i in (0..Conf::LevelCount::VALUE-1).rev() {
         let mut new_block = BlockPtr::new::<BlockPtr<T, Conf>>(1);
         unsafe{
             new_block.write_child_at(0, block);
             new_block.set_len(1);
         }
         block = new_block;
-        empty_branch_blocks.as_mut()[I].write(block);
+        empty_branch_blocks.as_mut()[i].write(block);
     }
     unsafe{ Array::assume_init_array(empty_branch_blocks) }
 }
@@ -563,7 +569,7 @@ where
         index: impl TryInto<HierarchyIndex<Conf::Mask, Conf::LevelCount>>,
         value: T
     ) {
-        let (mut terminal_block, child_index) = self.get_or_insert_terminal_block(index);
+        let (terminal_block, child_index) = self.get_or_insert_terminal_block(index);
         unsafe{ terminal_block.insert_unchecked(child_index, value); }
     }
     
@@ -572,7 +578,7 @@ where
     where
         T: Default
     {
-        let (mut terminal_block, child_index) = self.get_or_insert_terminal_block(index);
+        let (terminal_block, child_index) = self.get_or_insert_terminal_block(index);
         unsafe{
             let mut item = terminal_block.get_or_insert_unchecked(child_index, ||Default::default());
             item.as_mut()
@@ -696,9 +702,9 @@ impl<T, Conf: Config, R: DefaultRequirement> HibitTree for Tree<T, Conf, R> {
     }
 }
 
-type CursorBranch<T, Conf: Config> = ArrayOf<
+type CursorBranch<T, Conf> = ArrayOf<
     Option<BlockPtr<T, Conf>>, 
-    Conf::LevelCount
+    <Conf as Config>::LevelCount
 >; 
 pub struct TreeCursor<'tree, T, Conf: Config, R: DefaultRequirement>{
     branch: CursorBranch<T, Conf>, 
@@ -747,7 +753,7 @@ impl<'tree, T, Conf: Config, R: DefaultRequirement> HibitTreeCursor<'tree> for T
     }
 
     #[inline]
-    unsafe fn data<'a>(&'a self, tree: &'tree Self::Tree, level_index: usize) 
+    unsafe fn data<'a>(&'a self, _: &'tree Self::Tree, level_index: usize) 
         -> Option<&'tree T> 
     {
         let terminal_node = self.branch.as_ref().last().unwrap_unchecked().unwrap_unchecked();
@@ -759,7 +765,7 @@ impl<'tree, T, Conf: Config, R: DefaultRequirement> HibitTreeCursor<'tree> for T
     }
 
     #[inline]
-    unsafe fn data_unchecked<'a>(&'a self, tree: &'tree Self::Tree, level_index: usize) 
+    unsafe fn data_unchecked<'a>(&'a self, _: &'tree Self::Tree, level_index: usize) 
         -> &'tree T
     {
         let terminal_node = self.branch.as_ref().last().unwrap_unchecked().unwrap_unchecked();
@@ -777,9 +783,9 @@ impl<'tree, T, Conf: Config, R: DefaultRequirement> HibitTreeCursor<'tree> for T
 #[cfg(test)]
 mod test{
     use std::collections::HashMap;
-    use cfg_if::cfg_if;
     use itertools::assert_equal;
     use rand::{Rng, SeedableRng};
+    use crate::config::_64bit;
     use super::*;
     
     #[test]

@@ -1,11 +1,10 @@
 use std::marker::PhantomData;
-use std::borrow::Borrow;
 use std::slice;
 use arrayvec::ArrayVec;
 use crate::{BitBlock, LazyHibitTree, RegularHibitTree, MultiHibitTree, MultiHibitTreeTypes, HibitTreeData, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex};
-use crate::const_utils::{ConstArray, ConstBool, ConstFalse, ConstInteger, ConstTrue, IsConstTrue};
+use crate::const_utils::{ConstBool, ConstFalse, ConstInteger, ConstTrue};
 use crate::hibit_tree::{HibitTree, HibitTreeCursor};
-use crate::utils::{Array, Borrowable, Ref};
+use crate::utils::{Borrowable, Ref};
 
 /// Intersection between all iterator items.
 ///
@@ -95,7 +94,7 @@ where
         {
             let mut datas: ArrayVec<_, N> = Default::default();
             for container in self.iter.clone(){
-                let data = unsafe{ container.borrow().data(index) };
+                let data = container.borrow().data(index);
                 if let Some(data) = data{
                     datas.push(data);
                 } else {

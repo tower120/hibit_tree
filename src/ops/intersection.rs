@@ -1,7 +1,6 @@
 use std::borrow::Borrow;
 use std::marker::PhantomData;
-use std::ops::BitAnd;
-use crate::const_utils::{ConstAnd, ConstBool, ConstInteger};
+use crate::const_utils::{ConstAnd, ConstInteger};
 use crate::{LazyHibitTree, RegularHibitTree, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex};
 use crate::hibit_tree::{HibitTree, HibitTreeCursor};
 use crate::utils::{Borrowable};

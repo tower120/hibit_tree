@@ -133,7 +133,7 @@ mod test{
     }
     
     fn visit_debug<B: ConstBool, T: Debug, F: Debug>(
-        s: &CondType<B, T, F>, mut f: impl DebugVisitor
+        s: &CondType<B, T, F>, f: impl DebugVisitor
     ) {
         match s.get(){
             Either::True(v) => f.visit(v),

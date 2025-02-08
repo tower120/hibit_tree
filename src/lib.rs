@@ -5,9 +5,7 @@
 
 //! # Hibit tree[^hibit]
 //!
-//! TODO: better description in this section.
-//! The core of the lib is [SparseTree] container with [HibitTree] 
-//! interface. These are fixed-depth, K-ary[^k_ary] trees[^trie] with integer keys,
+//! Fixed-depth, K-ary[^k_ary] tree[^trie] with integer keys,
 //! that form bitmap hierarchy[^bitmap_hierarchy].
 //! 
 //! * Branchless O(1) access.
@@ -37,7 +35,7 @@
 //! 
 //! Random insert have the same logic as random access, but with branching at each level.
 //!
-//! Ordered (by index) iteration is fast. Traversing each hierarchy node is fast O(1)
+//! Ordered iteration is fast. Traversing each hierarchy node is fast O(1)
 //! operation, which basically is just BMI's pop_cnt/trail_cnt. There is no "scan"
 //! across node child items, for finding non-empty child/sub-tree.
 //! 
@@ -48,32 +46,6 @@
 //! basically free. 
 //! Hierarchical bitmap acts as acceleration structure for intersection.
 //! Branches/sub-trees that have no keys in common index-range discarded early.
-//! 
-//! ### Benchmarks data
-//! 
-//! TODO: move this somewhere?
-//! 
-//! #### Against HashMap
-//! 
-//! Comparing random access against `no_hash` HashMap with uniformly distributed keys 
-//! (ideal HashMap scenario):
-//! * 256x4 [SparseTree] (u32 range)  60% faster. 
-//! * 256x8 [SparseTree] (u64 range)  25% slower.
-//! 
-//! TODO: add graphic image?
-//! 
-//! In general, performance does not depends on data distribution across index range.
-//! But tree depth matters.
-//!
-//! Random insert is not benchmarked yet.
-//! 
-//! Bulk insert with [materialize] is not benchmarked yet. Should be **significantly** 
-//! faster then random insert.
-//! 
-//! Intersection is order of magnitudes faster then HashMap's per-element "contains"/"get". 
-//!
-//! Unordered iteration is faster then current [hashbrown](https://crates.io/crates/hashbrown)
-//! implementation.   
 //! 
 //! ## Inter HibitTree operations
 //! 
@@ -121,7 +93,7 @@
 //! 
 //! ### simd
 //! 
-//! Enabled by default. Allow to use 128, 256 bit configurations in [SparseTree].
+//! Enabled by default. Allow to use 128, 256 bit configurations.
 //! 
 //! ### may_dangle
 //! 
