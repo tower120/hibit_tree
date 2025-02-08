@@ -12,14 +12,13 @@ impl<B: ConstBool> DefaultRequirement for ReqDefault<B>{
     type Required = B;
 } 
 
-pub trait IsReqDefault{}
-impl IsReqDefault for ReqDefault<ConstTrue>{}
+/*pub trait IsReqDefault{}
+impl IsReqDefault for ReqDefault<ConstTrue>{}*/
 
-
-pub(crate) trait MakeDefault<T> {
+pub trait MakeDefault<T> {
     fn make_default() -> T;
 }
-pub(crate) struct MakeDefaultFor<T, R>(PhantomData<(T, R)>);
+pub struct MakeDefaultFor<T, R>(PhantomData<(T, R)>);
 impl<T: Default> MakeDefault<T> for MakeDefaultFor<T, ReqDefault> {
     #[inline]
     fn make_default() -> T{
