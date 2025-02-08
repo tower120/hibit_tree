@@ -42,12 +42,12 @@ impl<T, const N: usize> Array for [T; N]{
 
     #[inline]
     unsafe fn assume_init_array(uninit_array: Self::UninitArray) -> Self {
-        MaybeUninit::array_assume_init(uninit_array)
+        //MaybeUninit::array_assume_init(uninit_array)
         
         // Compiler SHOULD optimize away this copy.
         // This should be just transmute, but compiler can't work with "dependently-sized types"
-        //mem::transmute_copy(&uninit_array)
-        /*mem::transmute::<
+        std::mem::transmute_copy(&uninit_array)
+        /*std::mem::transmute::<
             [MaybeUninit::<Self::Item>; N],
             [Self::Item; N]
         >(uninit_array)*/

@@ -215,8 +215,6 @@ at once. In worst case, it degenerates to case of intersecting bitvecs without e
 All inter-container operations return lazy trees, which can be used further in inter-tree 
 operations. Lazy trees can be materialized to concrete container.
 
-TODO: EXAMPLE
-
 ## Design choices
 
 Tree have compile-time defined depth and node-width. This performs **significantly**

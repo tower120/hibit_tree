@@ -20,7 +20,7 @@
 //! [^trie]: Also, may be considered as form of radix tree, a.k.a. "prefix tree", a.k.a. "trie".
 //! [^bitmap_hierarchy]: Bitmap hierarchy - is a hierarchy of bitmasks, where each
 //! raised bit in bitmask means, that child at corresponding bit index have data.
-//! See [hi_sparse_bitset](https://crates.io/crates/hi_sparse_bitset), 
+//! See [hi_sparse_bitset](https://crates.io/crates/hi_sparse_bitset),
 //! [hibitset](https://docs.rs/hibitset/0.6.4/hibitset).     
 //! 
 //! ## Data structure

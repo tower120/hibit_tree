@@ -1,13 +1,13 @@
 [package]
 name = "hibit_tree"
 license = "MIT OR Apache-2.0"
-version = "0.1.0-alpha.3"
+version = "0.1.0-beta.1"
 rust-version = "1.79.0"
 edition = "2021"
 repository = "https://github.com/tower120/hibit_tree"
 categories = ["data-structures"]
-keywords = ["tree", "map", "compressed", "bitset", "bitmap"]
-description = "Hierarchical bitmap tree. Prefix tree without memory overhead that act as herarchical bitmap."
+keywords = ["tree", "trie", "map", "bitset", "bitmap"]
+description = "Hierarchical bitmap tree. Integer-key map that can intersect FAST."
 
 [features]
 default = ["simd"]
