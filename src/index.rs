@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 use crate::BitBlock;
-use crate::const_utils::{ConstCopyArrayType, ConstInteger};
+use crate::const_utils::{ConstInteger, CopyableArrayOf};
 use crate::utils::Array;
 
 // TODO: try replace with accumulated key on the fly calculation.
@@ -56,7 +56,7 @@ pub struct HierarchyIndex<LevelMask: BitBlock, LevelsCount: ConstInteger> {
     pub(crate) index: usize,
     // We could use smaller index size, like u8. 
     // But usize - show best performance so far.
-    pub(crate) level_indices: ConstCopyArrayType<usize, LevelsCount>,
+    pub(crate) level_indices: CopyableArrayOf<usize, LevelsCount>,
     pub(crate) phantom_data : PhantomData<(LevelMask, LevelsCount)>
 }
 
@@ -98,12 +98,12 @@ impl<LevelMask: BitBlock, LevelsCount: ConstInteger> TryFrom<usize> for
 // Compile-time loop inside. Ends up with N (AND + SHR)s.
 #[inline]
 fn level_indices<LevelMask, LevelsCount>(index: usize)
-     -> ConstCopyArrayType<usize, LevelsCount>
+     -> CopyableArrayOf<usize, LevelsCount>
 where
     LevelMask: BitBlock,
     LevelsCount: ConstInteger,
 {
-    let mut level_indices = ConstCopyArrayType::<usize, LevelsCount>::from_fn(|_|0);
+    let mut level_indices = CopyableArrayOf::<usize, LevelsCount>::from_fn(|_|0);
     
     let mut level_remainder = index;
     let level_count = LevelsCount::VALUE;

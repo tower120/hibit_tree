@@ -22,7 +22,7 @@ where
     type Cap = ConstUsize<N>;
     
     /// Array with N-1 size/cap.
-    type DecArray = ConstArrayType<Self::Item, <Self::Cap as ConstInteger>::Dec>;
+    type DecArray = ArrayOf<Self::Item, <Self::Cap as ConstInteger>::Dec>;
 
     #[inline]
     fn split_last(self) -> (Self::DecArray, Self::Item) {
@@ -39,15 +39,8 @@ where
     }
 }
 
-pub type ArrayOf<T, C: ConstInteger> = C::ArrayOf<T>;
-
-// TODO: remove, use ArrayOf 
-/// [ConstArray] with size `C` and type `T` items.
-pub type ConstArrayType<T, C: ConstInteger> = C::ArrayOf<T>;
-
-// TODO: remove, use ArrayOf
-/// Copyable [ConstArray] with size `C` and type `T` items.
-pub type ConstCopyArrayType<T: Copy, C: ConstInteger> = C::CopyArrayOf<T>;
+pub type ArrayOf<T, C> = <C as ConstInteger>::ArrayOf<T>;
+pub type CopyableArrayOf<T, C> = <C as ConstInteger>::CopyArrayOf<T>;
 
 /*/// [ConstInteger] friendly [PrimitiveArray]
 pub trait ConstPrimitiveArray

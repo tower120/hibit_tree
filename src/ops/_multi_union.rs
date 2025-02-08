@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::slice;
 use arrayvec::ArrayVec;
 use crate::{BitBlock, LazyHibitTree, RegularHibitTree, MultiHibitTree, MultiHibitTreeTypes, HibitTree, HibitTreeData, HibitTreeCursor, HibitTreeCursorTypes, HibitTreeTypes, HierarchyIndex};
-use crate::const_utils::{ConstArrayType, ConstBool, ConstFalse, ConstInteger, ConstTrue, IsConstTrue};
+use crate::const_utils::{ArrayOf, ConstBool, ConstFalse, ConstInteger, ConstTrue, IsConstTrue};
 use crate::utils::{Array, Borrowable, Ref};
 
 pub struct MultiUnion<Iter, D=ConstFalse> {
@@ -196,7 +196,7 @@ where
     /// [ArrayVec<usize, N>; Array::LevelCount - 1]
     /// 
     /// Root level skipped.
-    lvls_non_empty_states: ConstArrayType<
+    lvls_non_empty_states: ArrayOf<
         ArrayVec<CursorIndex, N>,
         <<IterItem<Iter> as HibitTree>::LevelCount as ConstInteger>::Dec,
     >,

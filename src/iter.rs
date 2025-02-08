@@ -1,14 +1,13 @@
 use crate::hibit_tree::{HibitTree, HibitTreeCursor};
 use crate::{BitBlock, data_block_index, RegularHibitTree, HibitTreeCursorTypes, HibitTreeTypes};
 use crate::bit_queue::BitQueue;
-use crate::const_utils::{ConstInteger, ConstUsize, const_loop};
-use crate::const_utils::ConstArrayType;
+use crate::const_utils::{ConstInteger, ConstUsize, const_loop, ArrayOf};
 use crate::utils::LendingIterator;
 use crate::utils::Array;
 
 /// [usize; T::LevelCount::N - 1]
 type LevelIndices<T> =
-    ConstArrayType<
+    ArrayOf<
         usize,
         <<T as HibitTree>::LevelCount as ConstInteger>::Dec   
     >;
@@ -17,7 +16,7 @@ type LevelIndices<T> =
 /// 
 /// [T::LevelMaskType::BitsIter; T::LevelCount]
 type LevelIterators<T> =
-    ConstArrayType<
+    ArrayOf<
         <<T as HibitTree>::LevelMask as BitBlock>::BitsIter,
         <T as HibitTree>::LevelCount
     >;
