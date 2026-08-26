@@ -207,15 +207,18 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         index: usize, 
         child: ChildCtr
     ) -> Result<NonNull<Child>, ChildCtr> {
-        let block = self.0.as_mut();
-        // TODO: try read first
-        let have_child = unsafe {
-            block.mask.set_bit_unchecked::<true>(index)    
-        };
-        if have_child {
+        // Test the occupancy bit without setting it. `mask` and `child_indices`
+        // are two halves of the same metadata and the destructor reads both:
+        // `mask` decides *whether* a child exists at `index`, `child_indices`
+        // decides *which* physical slot it lives in. Setting `mask` here leaves
+        // the two disagreeing if anything below unwinds, because
+        // `child_indices[index]` is still its zero-initialised default -- so a
+        // second logical index resolves to physical slot 0 and drops it twice.
+        // Both halves are committed together at the end instead.
+        if unsafe { self.0.as_ref().mask.get_bit_unchecked(index) } {
             return Err(child);
         }
-        
+
         let child_index = if let Some(child_index) = self.pop_free_child_index::<Child>() {
             child_index
         } else {
@@ -240,7 +243,8 @@ impl<T, Conf:Config> BlockPtr<T, Conf>{
         
         let block = self.0.as_mut();
         *block.child_indices.as_mut().get_unchecked_mut(index) = child_index as u8; 
-        
+        block.mask.set_bit_unchecked::<true>(index);
+
         Ok(NonNull::new_unchecked(child))
     }    
     
@@ -872,4 +876,47 @@ mod test{
             }
         }
     }    
+
+    /// `insert_impl` used to set the occupancy bit before running the child
+    /// constructor. If the constructor panicked the index mapping was never
+    /// written, so `child_indices[index]` stayed at its zero default and two
+    /// logical indices resolved to the same physical slot -- dropped twice.
+    #[test]
+    fn panicking_ctor_does_not_double_free(){
+        use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
+        use std::panic::{catch_unwind, AssertUnwindSafe};
+
+        static DROPS: AtomicUsize = AtomicUsize::new(0);
+        static ARMED: AtomicBool = AtomicBool::new(false);
+
+        struct Boom(#[allow(dead_code)] u64);
+
+        impl Default for Boom {
+            fn default() -> Self {
+                if ARMED.swap(false, Ordering::SeqCst) {
+                    panic!("user Default panics");
+                }
+                Boom(0)
+            }
+        }
+
+        impl Drop for Boom {
+            fn drop(&mut self) {
+                DROPS.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+
+        DROPS.store(0, Ordering::SeqCst);
+        {
+            let mut tree: Tree<Boom, _64bit<2>> = Tree::new();
+            // Occupies physical slot 0 of the terminal block.
+            tree.insert(5, Boom(1));
+
+            ARMED.store(true, Ordering::SeqCst);
+            let r = catch_unwind(AssertUnwindSafe(|| { tree.get_or_insert(7); }));
+            assert!(r.is_err(), "the armed Default should have panicked");
+        }
+        // Only the element inserted at index 5 exists, so exactly one drop.
+        assert_eq!(DROPS.load(Ordering::SeqCst), 1, "an element was dropped twice");
+    }
 }
