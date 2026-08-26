@@ -1,7 +1,7 @@
 [package]
 name = "hibit_tree"
 license = "MIT OR Apache-2.0"
-version = "0.1.0-beta.1"
+version = "0.1.1-beta.1"
 rust-version = "1.79.0"
 edition = "2021"
 repository = "https://github.com/tower120/hibit_tree"
@@ -12,7 +12,7 @@ description = "Hierarchical bitmap tree. Integer-key map that can intersect FAST
 [features]
 default = ["simd"]
 simd = ["dep:wide"]
-# Allows storing &T in containers.  
+# Allows storing &T in containers.
 # https://doc.rust-lang.org/nomicon/dropck.html#an-escape-hatch
 may_dangle = []
 
